@@ -8,12 +8,23 @@ export async function PATCH(
 ) {
   try {
     const { notes } = await request.json()
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+    // Check if user is authenticated
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    if (authError || !session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
     const { data, error } = await supabase
       .from('vidmaflights')
       .update({ notes })
       .eq('id', params.id)
+      .eq('user_id', session.user.id)
       .select()
       .single()
 

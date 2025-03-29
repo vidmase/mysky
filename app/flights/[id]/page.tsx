@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import * as React from 'react'
 
 interface Flight {
   id: number
@@ -79,33 +80,39 @@ function getAirlineLogo(airline: string | null): string {
 
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const [flight, setFlight] = useState<Flight | null>(null)
+  const [flightId, setFlightId] = useState<string>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [flight, setFlight] = useState<Flight | null>(null)
   const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
-  const resolvedParams = use(params)
 
   useEffect(() => {
-    const fetchFlight = async () => {
+    const initializePage = async () => {
       try {
-        const response = await fetch(`/api/flights/${resolvedParams.id}`)
+        // Await the params to get the id
+        const { id } = React.use(params)
+        setFlightId(id)
+
+        // Fetch flight data
+        const response = await fetch(`/api/flights/${id}`)
         if (!response.ok) {
-          throw new Error('Flight not found')
+          throw new Error(`HTTP error! status: ${response.status}`)
         }
         const data = await response.json()
         setFlight(data)
         setNotes(data.notes || "")
       } catch (err) {
+        console.error('Error:', err)
         setError(err instanceof Error ? err.message : 'Failed to load flight')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchFlight()
-  }, [resolvedParams.id])
+    initializePage()
+  }, [params])
 
   const handleSaveNotes = async () => {
     if (!flight) return

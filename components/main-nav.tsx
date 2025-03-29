@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X } from "lucide-react"
@@ -8,9 +9,13 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { UserMenu } from "@/components/user-menu"
+import { useAuth } from "@/contexts/auth-context"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function MainNav() {
   const pathname = usePathname()
+  const { user, loading, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
 
   const navItems = [
@@ -79,10 +84,35 @@ export function MainNav() {
               </Link>
             </Button>
           ))}
+          <div className="ml-2">
+            {loading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : user ? (
+              <>
+                <span className="text-sm text-foreground/60">
+                  {user.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  className="text-foreground/60"
+                  onClick={() => signOut()}
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link href="/auth">
+                <Button variant="ghost" className="text-foreground/60">
+                  Sign In
+                </Button>
+              </Link>
+            )}
+          </div>
         </nav>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden">
+        <div className="md:hidden flex items-center gap-2">
+          <UserMenu />
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">

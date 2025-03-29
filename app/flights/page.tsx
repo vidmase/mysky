@@ -8,6 +8,8 @@ import type { Locale } from 'date-fns'
 import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import Image from "next/image"
+import { useNotification } from '@/contexts/notification-context'
+import { Flight } from '@/types/flight'
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -266,8 +268,10 @@ export default function FlightsPage() {
   const [sortOrder, setSortOrder] = useState("desc")
   const [flights, setFlights] = useState<Flight[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [airlines, setAirlines] = useState<string[]>([])
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>("USD")
+  const { showSuccess, showError, showInfo } = useNotification()
   
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
@@ -275,29 +279,22 @@ export default function FlightsPage() {
   useEffect(() => {
     const fetchFlights = async () => {
       try {
+        showInfo('Fetching your flights...')
         const response = await fetch('/api/flights')
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
         
-        // Ensure data is an array before setting it
-        if (Array.isArray(data)) {
-          setFlights(data)
-          // Extract unique airlines for the filter dropdown
-          const uniqueAirlines = Array.from(new Set(data.map(f => f.airline).filter(Boolean))) as string[]
-          setAirlines(uniqueAirlines)
-        } else if (data.error) {
-          console.error('API error:', data.error)
-          setFlights([])
-          setAirlines([])
-        } else {
-          console.error('Expected array of flights but got:', data)
-          setFlights([])
-          setAirlines([])
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`HTTP error! status: ${response.status} - ${JSON.stringify(errorData)}`)
         }
+        
+        const data = await response.json()
+        setFlights(data)
+        const uniqueAirlines = Array.from(new Set(data.map(f => f.airline).filter(Boolean))) as string[]
+        setAirlines(uniqueAirlines)
+        showSuccess('Successfully loaded your flights')
       } catch (error) {
         console.error('Error fetching flights:', error)
+        showError('Failed to load flights. Please try again later.')
         setFlights([])
         setAirlines([])
       } finally {
@@ -306,7 +303,7 @@ export default function FlightsPage() {
     }
 
     fetchFlights()
-  }, [])
+  }, [showSuccess, showError, showInfo])
 
   // Filter flights based on search term and filters
   const filteredFlights = Array.isArray(flights) ? flights.filter((flight: Flight) => {
@@ -761,10 +758,10 @@ export default function FlightsPage() {
                       </TooltipProvider>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
+                        <div className="flex flex-col">
                         <Badge variant="outline" className="w-fit bg-muted/30 text-foreground">
                           {flight.reservation_number}
-                        </Badge>
+                            </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -790,26 +787,26 @@ export default function FlightsPage() {
                                     <Building className="h-5 w-5 text-muted-foreground" />
                                   )}
                                   <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
-                                </div>
+                        </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="font-medium">
                                 {flight.airline || "Unknown Airline"}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <div className="flex flex-col">
+                        <div className="flex flex-col">
                             <div className="flex items-baseline gap-1.5">
-                              <Badge
-                                variant="outline"
+                            <Badge
+                              variant="outline"
                                 className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
-                              >
+                            >
                                 {flight.flight_number}
-                              </Badge>
+                            </Badge>
                             </div>
                             {flight.seat && (
                               <span className="text-xs text-muted-foreground">
                                 Seat {flight.seat}
-                              </span>
+                          </span>
                             )}
                           </div>
                         </div>
@@ -834,7 +831,7 @@ export default function FlightsPage() {
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
                             {flight.arrival_iata || flight.arrival_airport}
-                          </Badge>
+                      </Badge>
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {flight.arrival_airport}

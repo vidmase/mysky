@@ -20,6 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { AirportSelector } from "@/components/airport-selector"
+import { PassengerSelector } from "@/components/passenger-selector"
+import { Airport } from "@/lib/airports"
+import { Passenger } from "@/lib/passengers"
 
 export default function AddFlightPage() {
   const router = useRouter()
@@ -77,11 +81,120 @@ export default function AddFlightPage() {
     setArrivalDateOpen(false)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [formData, setFormData] = useState({
+    departureAirport: '',
+    arrivalAirport: '',
+    departureIata: '',
+    arrivalIata: '',
+    arrivalCountry: '',
+    flightNumber: '',
+    reservationNumber: '',
+    airline: '',
+    seat: '',
+    notes: '',
+    departureTime: '',
+    arrivalTime: '',
+    passengerName: '',
+    passengerTitle: '',
+  })
+
+  const [selectedDepartureAirport, setSelectedDepartureAirport] = useState<Airport>()
+  const [selectedArrivalAirport, setSelectedArrivalAirport] = useState<Airport>()
+  const [selectedPassenger, setSelectedPassenger] = useState<Passenger>()
+
+  const handleAirportSelect = (airport: Airport, type: 'departure' | 'arrival') => {
+    if (type === 'departure') {
+      setSelectedDepartureAirport(airport)
+      setFormData(prev => ({
+        ...prev,
+        departureAirport: airport.name,
+        departureIata: airport.iata
+      }))
+    } else {
+      setSelectedArrivalAirport(airport)
+      setFormData(prev => ({
+        ...prev,
+        arrivalAirport: airport.name,
+        arrivalIata: airport.iata,
+        arrivalCountry: airport.country
+      }))
+    }
+  }
+
+  const handlePassengerSelect = (passenger: Passenger) => {
+    setSelectedPassenger(passenger)
+    setFormData(prev => ({
+      ...prev,
+      passengerName: passenger.name,
+      passengerTitle: passenger.title
+    }))
+  }
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would save the flight data
-    // For now, just redirect to the flights page
-    router.push("/flights")
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      // Format dates to ISO string
+      const formattedDepartureDate = departureDate?.toISOString().split('T')[0]
+      const formattedArrivalDate = arrivalDate?.toISOString().split('T')[0]
+
+      // Prepare the flight data
+      const flightData = {
+        departure_airport: formData.departureAirport,
+        arrival_airport: formData.arrivalAirport,
+        departure_iata: formData.departureIata || null,
+        arrival_iata: formData.arrivalIata || null,
+        arrival_country: formData.arrivalCountry || null,
+        departure_date: formattedDepartureDate,
+        departure_time: formData.departureTime,
+        arrival_date: formattedArrivalDate,
+        arrival_time: formData.arrivalTime,
+        flight_number: formData.flightNumber,
+        reservation_number: formData.reservationNumber,
+        airline: formData.airline || null,
+        seat: formData.seat || null,
+        notes: formData.notes || null,
+        passenger_name: formData.passengerName || null,
+        passenger_title: formData.passengerTitle || null,
+        purchased_date: new Date().toISOString().split('T')[0],
+        purchase_time: new Date().toLocaleTimeString(),
+        total_receipt: "0 USD", // This can be updated later if needed
+      }
+
+      // Send the POST request
+      const response = await fetch('/api/flights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(flightData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save flight')
+      }
+
+      // Redirect to flights page on success
+      router.push('/flights')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while saving the flight')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -122,36 +235,70 @@ export default function AddFlightPage() {
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleSubmit} className="relative">
-                {/* Main form content */}
+                {error && (
+                  <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md mb-4 mx-4">
+                    {error}
+                  </div>
+                )}
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <AirportSelector
+                      value={selectedDepartureAirport}
+                      onChange={(airport) => handleAirportSelect(airport, 'departure')}
+                      label="Departure Airport *"
+                      required
+                    />
+                    <AirportSelector
+                      value={selectedArrivalAirport}
+                      onChange={(airport) => handleAirportSelect(airport, 'arrival')}
+                      label="Arrival Airport *"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <PassengerSelector
+                      value={selectedPassenger}
+                      onChange={handlePassengerSelect}
+                      label="Passenger"
+                      required
+                    />
                     <div className="space-y-2">
-                      <Label htmlFor="departureAirport" className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-airport" />
-                        Departure Airport *
+                      <Label htmlFor="reservationNumber" className="flex items-center">
+                        <FileText className="h-4 w-4 mr-1 text-flight" />
+                        Reservation Number *
                       </Label>
                       <div className="relative">
-                        <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <FileText className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          id="departureAirport"
-                          placeholder="IATA code or name (e.g., LHR)"
+                          id="reservationNumber"
+                          name="reservationNumber"
+                          placeholder="e.g., ABC123"
                           className="pl-9"
                           required
+                          value={formData.reservationNumber}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="arrivalAirport" className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-1 text-airport" />
-                        Arrival Airport *
+                      <Label htmlFor="flightNumber" className="flex items-center">
+                        <Plane className="h-4 w-4 mr-1 text-flight" />
+                        Flight Number *
                       </Label>
                       <div className="relative">
-                        <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          id="arrivalAirport"
-                          placeholder="IATA code or name (e.g., JFK)"
+                          id="flightNumber"
+                          name="flightNumber"
+                          placeholder="e.g., BA123"
                           className="pl-9"
                           required
+                          value={formData.flightNumber}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -183,8 +330,9 @@ export default function AddFlightPage() {
                               mode="single"
                               selected={departureDate}
                               onSelect={handleDepartureDateSelect}
-                              disabled={(date) => date < today}
                               initialFocus
+                              fromYear={2000}
+                              toYear={new Date().getFullYear() + 1}
                             />
                           </div>
                         </PopoverContent>
@@ -197,7 +345,15 @@ export default function AddFlightPage() {
                       </Label>
                       <div className="relative">
                         <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="time" id="departureTime" className="pl-9" required />
+                        <Input
+                          type="time"
+                          id="departureTime"
+                          name="departureTime"
+                          className="pl-9"
+                          required
+                          value={formData.departureTime}
+                          onChange={handleInputChange}
+                        />
                       </div>
                     </div>
                   </div>
@@ -228,8 +384,10 @@ export default function AddFlightPage() {
                               mode="single"
                               selected={arrivalDate}
                               onSelect={handleArrivalDateSelect}
-                              disabled={(date) => date < today || (departureDate ? date < departureDate : false)}
+                              disabled={(date) => departureDate ? date < departureDate : false}
                               initialFocus
+                              fromYear={2000}
+                              toYear={new Date().getFullYear() + 1}
                             />
                           </div>
                         </PopoverContent>
@@ -242,40 +400,16 @@ export default function AddFlightPage() {
                       </Label>
                       <div className="relative">
                         <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input type="time" id="arrivalTime" className="pl-9" required />
+                        <Input
+                          type="time"
+                          id="arrivalTime"
+                          name="arrivalTime"
+                          className="pl-9"
+                          required
+                          value={formData.arrivalTime}
+                          onChange={handleInputChange}
+                        />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="flightNumber" className="flex items-center">
-                        <Plane className="h-4 w-4 mr-1 text-airline" />
-                        Flight Number
-                      </Label>
-                      <div className="relative">
-                        <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input id="flightNumber" placeholder="e.g., BA123" className="pl-9" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="airline" className="flex items-center">
-                        <Building className="h-4 w-4 mr-1 text-airline" />
-                        Airline
-                      </Label>
-                      <Select>
-                        <SelectTrigger className="pl-9 relative">
-                          <Building className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <SelectValue placeholder="Select airline" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {airlines.map((airline) => (
-                            <SelectItem key={airline} value={airline}>
-                              {airline}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
 
@@ -287,26 +421,15 @@ export default function AddFlightPage() {
                       </Label>
                       <div className="relative">
                         <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input id="seat" placeholder="e.g., 12A" className="pl-9" />
+                        <Input
+                          id="seat"
+                          name="seat"
+                          placeholder="e.g., 12A"
+                          className="pl-9"
+                          value={formData.seat}
+                          onChange={handleInputChange}
+                        />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="class" className="flex items-center">
-                        <CreditCard className="h-4 w-4 mr-1 text-muted-foreground" />
-                        Class
-                      </Label>
-                      <Select>
-                        <SelectTrigger className="pl-9 relative">
-                          <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <SelectValue placeholder="Select class" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="economy">Economy</SelectItem>
-                          <SelectItem value="premium">Premium Economy</SelectItem>
-                          <SelectItem value="business">Business</SelectItem>
-                          <SelectItem value="first">First</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
 
@@ -315,16 +438,40 @@ export default function AddFlightPage() {
                       <FileText className="h-4 w-4 mr-1 text-muted-foreground" />
                       Notes
                     </Label>
-                    <Textarea id="notes" placeholder="Any additional information about this flight" />
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      placeholder="Any additional information about this flight"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                    />
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline" type="button" onClick={() => router.back()}>
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    onClick={() => router.back()}
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-flight hover:bg-flight/90">
-                    <Plane className="mr-2 h-4 w-4" />
-                    Save Flight
+                  <Button 
+                    type="submit" 
+                    className="bg-flight hover:bg-flight/90"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Plane className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Plane className="mr-2 h-4 w-4" />
+                        Save Flight
+                      </>
+                    )}
                   </Button>
                 </CardFooter>
               </form>
