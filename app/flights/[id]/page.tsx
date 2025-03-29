@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
+import { useEffect, useState } from "react"
+import { use } from "react"
 import {
   ArrowLeft,
   Clock,
@@ -14,6 +16,7 @@ import {
   FileText,
   Wifi,
   Utensils,
+  Loader2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -22,50 +25,81 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-export default function FlightDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter()
-  const flightId = params.id
+interface Flight {
+  id: number
+  passenger_name: string
+  reservation_number: string
+  flight_number: string
+  departure_airport: string
+  arrival_airport: string
+  departure_date: string
+  departure_time: string
+  arrival_time: string
+  total_receipt: string
+  purchased_date: string
+  purchase_time: string
+  airline: string | null
+  arrival_country: string | null
+  arrival_iata: string | null
+  departure_iata: string | null
+  seat: string | null
+  notes: string | null
+}
 
-  // In a real app, this would fetch the flight data based on the ID
-  // For now, we'll use mock data
-  const flight = {
-    id: flightId,
-    departureAirport: {
-      code: "LHR",
-      name: "London Heathrow Airport",
-      city: "London",
-      country: "United Kingdom",
-      terminal: "5",
-      gate: "A22",
-    },
-    arrivalAirport: {
-      code: "JFK",
-      name: "John F. Kennedy International Airport",
-      city: "New York",
-      country: "United States",
-      terminal: "8",
-      gate: "B12",
-    },
-    departureDate: new Date(2023, 5, 15, 10, 30),
-    arrivalDate: new Date(2023, 5, 15, 18, 15),
-    airline: "British Airways",
-    flightNumber: "BA177",
-    aircraft: "Boeing 777-300ER",
-    seat: "23K",
-    class: "Economy",
-    duration: "7h 45m",
-    distance: "5541 km",
-    notes:
-      "Smooth flight with minimal turbulence. Food was decent. Window seat with good views during takeoff and landing.",
-    weather: {
-      departure: "Sunny, 22°C",
-      arrival: "Partly cloudy, 28°C",
-    },
-    amenities: ["Wi-Fi", "Power Outlets", "In-flight Entertainment", "Meal Service"],
+export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter()
+  const [flight, setFlight] = useState<Flight | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const resolvedParams = use(params)
+
+  useEffect(() => {
+    const fetchFlight = async () => {
+      try {
+        const response = await fetch(`/api/flights/${resolvedParams.id}`)
+        if (!response.ok) {
+          throw new Error('Flight not found')
+        }
+        const data = await response.json()
+        setFlight(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load flight')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFlight()
+  }, [resolvedParams.id])
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-flight" />
+          <p className="text-muted-foreground">Loading flight details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !flight) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col items-center gap-4">
+          <Plane className="h-12 w-12 text-muted-foreground" />
+          <p className="text-muted-foreground">{error || 'Flight not found'}</p>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   const calculateDuration = () => {
-    const diff = flight.arrivalDate.getTime() - flight.departureDate.getTime()
+    const diff = new Date(flight.arrival_time).getTime() - new Date(flight.departure_time).getTime()
     const hours = Math.floor(diff / (1000 * 60 * 60))
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
     return `${hours}h ${minutes}m`
@@ -85,36 +119,104 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
               Flight Details
             </h1>
             <p className="text-muted-foreground">
-              {flight.departureAirport.city} to {flight.arrivalAirport.city} •{" "}
-              {format(flight.departureDate, "MMM d, yyyy")}
+              {flight.departure_airport} to {flight.arrival_airport} • {flight.departure_date}
             </p>
           </div>
         </div>
 
-        <div className="relative py-6 px-4 rounded-xl bg-gradient-to-r from-flight/10 to-airport/10 border shadow-sm">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="text-center md:text-left space-y-1">
-              <div className="text-4xl font-bold text-flight">{flight.departureAirport.code}</div>
-              <div className="text-sm text-muted-foreground">{flight.departureAirport.city}</div>
-              <div className="text-lg font-medium">{format(flight.departureDate, "h:mm a")}</div>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Badge className="mb-2 bg-airline text-white">{flight.flightNumber}</Badge>
-              <div className="relative w-32 md:w-48 h-[2px] bg-muted-foreground/30 my-2">
-                <div className="absolute top-1/2 left-0 right-0 flex justify-center">
-                  <Plane className="h-5 w-5 text-flight -mt-2.5 rotate-90" />
-                </div>
-                <div className="absolute -top-1 left-0 w-2 h-2 rounded-full bg-flight"></div>
-                <div className="absolute -top-1 right-0 w-2 h-2 rounded-full bg-airport"></div>
+        <div className="relative rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg">
+          <div className="bg-gradient-to-r from-airline to-flight/80 p-4 text-white">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <Building className="h-6 w-6" />
+                <span className="text-lg font-semibold">{flight.airline}</span>
               </div>
-              <div className="text-sm text-muted-foreground">{flight.duration}</div>
+              <Badge variant="outline" className="bg-white/10 text-white border-white/20">
+                {flight.flight_number}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="p-6 relative">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-r-full"></div>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-l-full"></div>
+            
+            <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+              <div className="text-center md:text-left space-y-2">
+                <div className="text-5xl font-bold tracking-tight text-flight">
+                  {flight.departure_iata || flight.departure_airport.substring(0, 3)}
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">{flight.departure_airport}</div>
+                  <div className="text-2xl font-semibold">{flight.departure_time}</div>
+                  <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center py-4">
+                <div className="relative w-40 md:w-64">
+                  <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-flight to-airport"></div>
+                  <div className="absolute top-1/2 left-0 right-0 flex justify-center">
+                    <div className="bg-white dark:bg-slate-900 p-2 -mt-4 rounded-full shadow-md">
+                      <Plane className="h-6 w-6 text-airline rotate-90" />
+                    </div>
+                  </div>
+                  <div className="absolute -top-2 left-0 w-3 h-3 rounded-full bg-flight shadow-md"></div>
+                  <div className="absolute -top-2 right-0 w-3 h-3 rounded-full bg-airport shadow-md"></div>
+                </div>
+                <div className="mt-6 text-center">
+                  <Badge variant="outline" className="bg-muted font-medium">
+                    {calculateDuration()}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="text-center md:text-right space-y-2">
+                <div className="text-5xl font-bold tracking-tight text-airport">
+                  {flight.arrival_iata || flight.arrival_airport.substring(0, 3)}
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">
+                    {flight.arrival_airport}
+                    {flight.arrival_country && ` (${flight.arrival_country})`}
+                  </div>
+                  <div className="text-2xl font-semibold">{flight.arrival_time}</div>
+                  <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
+                </div>
+              </div>
             </div>
 
-            <div className="text-center md:text-right space-y-1">
-              <div className="text-4xl font-bold text-airport">{flight.arrivalAirport.code}</div>
-              <div className="text-sm text-muted-foreground">{flight.arrivalAirport.city}</div>
-              <div className="text-lg font-medium">{format(flight.arrivalDate, "h:mm a")}</div>
+            <div className="mt-8 pt-6 border-t border-dashed">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">Passenger</div>
+                  <div className="font-medium">{flight.passenger_name}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">Reservation</div>
+                  <div className="font-medium">{flight.reservation_number}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">Seat</div>
+                  <div className="font-medium">
+                    {flight.seat ? (
+                      <Badge variant="outline" className="bg-airline/10 text-airline border-airline/20">
+                        {flight.seat}
+                      </Badge>
+                    ) : (
+                      "Not Assigned"
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 text-sm text-muted-foreground flex justify-between items-center">
+              <div>Purchased: {flight.purchased_date} {flight.purchase_time}</div>
+              <div className="flex items-center space-x-2">
+                <Wifi className="h-4 w-4" />
+                <Utensils className="h-4 w-4" />
+              </div>
             </div>
           </div>
         </div>
@@ -143,7 +245,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     <MapPin className="h-5 w-5 mr-2" />
                     Departure
                   </CardTitle>
-                  <CardDescription>{format(flight.departureDate, "EEEE, MMMM d, yyyy")}</CardDescription>
+                  <CardDescription>{format(new Date(flight.departure_date), "EEEE, MMMM d, yyyy")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-start space-x-3">
@@ -152,10 +254,10 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     </div>
                     <div>
                       <div className="font-medium">
-                        {flight.departureAirport.name} ({flight.departureAirport.code})
+                        {flight.departure_airport}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {flight.departureAirport.city}, {flight.departureAirport.country}
+                        {flight.departure_airport}
                       </div>
                     </div>
                   </div>
@@ -164,21 +266,8 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       <Clock className="h-4 w-4 text-flight" />
                     </div>
                     <div>
-                      <div className="font-medium">{format(flight.departureDate, "h:mm a")}</div>
+                      <div className="font-medium">{flight.departure_time}</div>
                       <div className="text-sm text-muted-foreground">Local time</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="h-8 w-8 rounded-full bg-flight/10 flex items-center justify-center mt-0.5">
-                      <div className="text-xs font-bold text-flight">T</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        Terminal {flight.departureAirport.terminal}, Gate {flight.departureAirport.gate}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Boarding time: {format(new Date(flight.departureDate.getTime() - 30 * 60000), "h:mm a")}
-                      </div>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -186,7 +275,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       <CloudSun className="h-4 w-4 text-flight" />
                     </div>
                     <div>
-                      <div className="font-medium">{flight.weather.departure}</div>
+                      <div className="font-medium">{flight.airline}</div>
                       <div className="text-sm text-muted-foreground">Weather at departure</div>
                     </div>
                   </div>
@@ -199,7 +288,7 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     <MapPin className="h-5 w-5 mr-2" />
                     Arrival
                   </CardTitle>
-                  <CardDescription>{format(flight.arrivalDate, "EEEE, MMMM d, yyyy")}</CardDescription>
+                  <CardDescription>{format(new Date(flight.departure_date), "EEEE, MMMM d, yyyy")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-start space-x-3">
@@ -208,10 +297,10 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     </div>
                     <div>
                       <div className="font-medium">
-                        {flight.arrivalAirport.name} ({flight.arrivalAirport.code})
+                        {flight.arrival_airport}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {flight.arrivalAirport.city}, {flight.arrivalAirport.country}
+                        {flight.arrival_airport}
                       </div>
                     </div>
                   </div>
@@ -220,19 +309,8 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       <Clock className="h-4 w-4 text-airport" />
                     </div>
                     <div>
-                      <div className="font-medium">{format(flight.arrivalDate, "h:mm a")}</div>
+                      <div className="font-medium">{flight.arrival_time}</div>
                       <div className="text-sm text-muted-foreground">Local time</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="h-8 w-8 rounded-full bg-airport/10 flex items-center justify-center mt-0.5">
-                      <div className="text-xs font-bold text-airport">T</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        Terminal {flight.arrivalAirport.terminal}, Gate {flight.arrivalAirport.gate}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Baggage claim information</div>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
@@ -240,118 +318,13 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                       <CloudSun className="h-4 w-4 text-airport" />
                     </div>
                     <div>
-                      <div className="font-medium">{flight.weather.arrival}</div>
+                      <div className="font-medium">{flight.airline}</div>
                       <div className="text-sm text-muted-foreground">Weather at arrival</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            <Card className="border-t-4 border-t-airline shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center text-airline">
-                  <Building className="h-5 w-5 mr-2" />
-                  Flight Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Building className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Airline</span>
-                      </div>
-                      <span className="font-medium">{flight.airline}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Plane className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Flight Number</span>
-                      </div>
-                      <Badge className="bg-airline text-white">{flight.flightNumber}</Badge>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Plane className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Aircraft</span>
-                      </div>
-                      <span className="font-medium">{flight.aircraft}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <User className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Seat</span>
-                      </div>
-                      <Badge variant="outline" className="bg-airline/10 text-airline border-airline/20">
-                        {flight.seat}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <CreditCard className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Class</span>
-                      </div>
-                      <span className="font-medium">{flight.class}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Duration</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{calculateDuration()}</span>
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <MapPin className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Distance</span>
-                      </div>
-                      <span className="font-medium">{flight.distance}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <CloudSun className="h-4 w-4 mr-2 text-airline" />
-                        <span className="text-sm text-muted-foreground">Weather</span>
-                      </div>
-                      <div className="flex items-center">
-                        <CloudSun className="mr-1 h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{flight.weather.arrival}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <h3 className="text-sm font-medium mb-3 flex items-center">
-                    <Utensils className="h-4 w-4 mr-2 text-airline" />
-                    Amenities
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {flight.amenities.map((amenity, index) => (
-                      <Badge key={index} variant="outline" className="bg-airline/5 border-airline/20">
-                        {amenity === "Wi-Fi" && <Wifi className="h-3 w-3 mr-1" />}
-                        {amenity === "Meal Service" && <Utensils className="h-3 w-3 mr-1" />}
-                        {amenity === "Power Outlets" && <div className="i-lucide-plug-zap h-3 w-3 mr-1" />}
-                        {amenity === "In-flight Entertainment" && <div className="i-lucide-tv h-3 w-3 mr-1" />}
-                        {amenity}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="map">
@@ -369,13 +342,13 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     <div className="absolute left-[20%] top-[40%] transform -translate-x-1/2 -translate-y-1/2">
                       <div className="h-4 w-4 rounded-full bg-flight animate-pulse-slow"></div>
                       <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 rounded text-xs font-medium shadow-md">
-                        {flight.departureAirport.code}
+                        {flight.departure_iata || flight.departure_airport}
                       </div>
                     </div>
                     <div className="absolute left-[80%] top-[35%] transform -translate-x-1/2 -translate-y-1/2">
                       <div className="h-4 w-4 rounded-full bg-airport animate-pulse-slow"></div>
                       <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 rounded text-xs font-medium shadow-md">
-                        {flight.arrivalAirport.code}
+                        {flight.arrival_iata || flight.arrival_airport}
                       </div>
                     </div>
                     <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -394,9 +367,9 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                   </div>
                   <div className="text-center space-y-2 relative z-10 bg-background/80 px-4 py-2 rounded-md">
                     <p className="text-sm font-medium">
-                      Flight path from {flight.departureAirport.city} to {flight.arrivalAirport.city}
+                      Flight path from {flight.departure_airport} to {flight.arrival_airport}
                     </p>
-                    <p className="text-xs text-muted-foreground">Distance: {flight.distance}</p>
+                    <p className="text-xs text-muted-foreground">Distance: {/* Distance would be fetched from the flight data */}</p>
                   </div>
                 </div>
 
@@ -407,10 +380,10 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     </div>
                     <div>
                       <div className="text-sm font-medium">
-                        {flight.departureAirport.city}, {flight.departureAirport.country}
+                        {flight.departure_airport}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {flight.departureAirport.name} ({flight.departureAirport.code})
+                        {flight.departure_airport}
                       </div>
                     </div>
                   </div>
@@ -420,10 +393,10 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
                     </div>
                     <div>
                       <div className="text-sm font-medium">
-                        {flight.arrivalAirport.city}, {flight.arrivalAirport.country}
+                        {flight.arrival_airport}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {flight.arrivalAirport.name} ({flight.arrivalAirport.code})
+                        {flight.arrival_airport}
                       </div>
                     </div>
                   </div>
