@@ -694,7 +694,7 @@ export default function FlightsPage() {
                 <TableHead className="hidden md:table-cell">Arrival</TableHead>
                 <TableHead className="hidden md:table-cell w-[80px]">Duration</TableHead>
                 <TableHead className="hidden lg:table-cell">Purchase Info</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -761,10 +761,10 @@ export default function FlightsPage() {
                       </TooltipProvider>
                     </TableCell>
                     <TableCell>
-                        <div className="flex flex-col">
+                      <div className="flex flex-col">
                         <Badge variant="outline" className="w-fit bg-muted/30 text-foreground">
                           {flight.reservation_number}
-                            </Badge>
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -782,7 +782,6 @@ export default function FlightsPage() {
                                       height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
                                       className={`object-contain p-0.5 ${flight.airline.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
                                       onError={(e) => {
-                                        // On error, show the Building icon
                                         e.currentTarget.style.display = 'none'
                                         e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
                                       }}
@@ -791,26 +790,26 @@ export default function FlightsPage() {
                                     <Building className="h-5 w-5 text-muted-foreground" />
                                   )}
                                   <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
-                        </div>
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="font-medium">
                                 {flight.airline || "Unknown Airline"}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        <div className="flex flex-col">
+                          <div className="flex flex-col">
                             <div className="flex items-baseline gap-1.5">
-                            <Badge
-                              variant="outline"
+                              <Badge
+                                variant="outline"
                                 className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
-                            >
+                              >
                                 {flight.flight_number}
-                            </Badge>
+                              </Badge>
                             </div>
                             {flight.seat && (
                               <span className="text-xs text-muted-foreground">
                                 Seat {flight.seat}
-                          </span>
+                              </span>
                             )}
                           </div>
                         </div>
@@ -835,7 +834,7 @@ export default function FlightsPage() {
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
                             {flight.arrival_iata || flight.arrival_airport}
-                      </Badge>
+                          </Badge>
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {flight.arrival_airport}
@@ -882,10 +881,10 @@ export default function FlightsPage() {
                         variant="ghost"
                         size="sm"
                         asChild
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
                       >
-                        <Link href={`/flights/${flight.id}`}>
-                          <ArrowRight className="h-4 w-4" />
+                        <Link href={`/flights/${flight.id}`} className="flex items-center justify-center">
+                          <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                         </Link>
                       </Button>
                     </TableCell>
