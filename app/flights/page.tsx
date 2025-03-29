@@ -7,6 +7,7 @@ import { enUS } from 'date-fns/locale'
 import type { Locale } from 'date-fns'
 import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { DateRange } from "react-day-picker"
+import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -72,6 +73,40 @@ function formatTimeToHHMM(time: string): string {
   minutes = minutes.padStart(2, '0');
   
   return `${hours}:${minutes}`;
+}
+
+function calculateDuration(departureTime: string, arrivalTime: string): string {
+  // Convert times to minutes since midnight
+  const getMinutes = (time: string) => {
+    const [hours, minutes] = formatTimeToHHMM(time).split(':').map(Number)
+    return hours * 60 + minutes
+  }
+
+  let depMinutes = getMinutes(departureTime)
+  let arrMinutes = getMinutes(arrivalTime)
+
+  // Handle overnight flights
+  if (arrMinutes < depMinutes) {
+    arrMinutes += 24 * 60 // Add 24 hours
+  }
+
+  const durationMinutes = arrMinutes - depMinutes
+  const hours = Math.floor(durationMinutes / 60)
+  const minutes = durationMinutes % 60
+
+  return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
+}
+
+// Add airline logo helper function
+function getAirlineLogo(airline: string | null): string {
+  if (!airline) return ""
+  // Clean airline name for URL
+  const cleanAirlineName = airline.toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+  
+  // Return logo URL from logo.clearbit.com (fallback to null if no airline)
+  return `https://logo.clearbit.com/${cleanAirlineName}.com`
 }
 
 export default function FlightsPage() {
@@ -478,6 +513,7 @@ export default function FlightsPage() {
                 <TableHead>Flight Details</TableHead>
                 <TableHead className="hidden md:table-cell">Departure</TableHead>
                 <TableHead className="hidden md:table-cell">Arrival</TableHead>
+                <TableHead className="hidden md:table-cell w-[80px]">Duration</TableHead>
                 <TableHead className="hidden lg:table-cell">Purchase Info</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -554,9 +590,25 @@ export default function FlightsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center">
-                          <Building className="h-4 w-4 mr-1 text-airline" />
-                          <span>{flight.airline || "Unknown"}</span>
+                        <div className="flex items-center gap-2">
+                          {flight.airline && (
+                            <div className="relative w-5 h-5 rounded-full overflow-hidden bg-muted/30 flex items-center justify-center">
+                              <Image
+                                src={getAirlineLogo(flight.airline)}
+                                alt={`${flight.airline} logo`}
+                                width={20}
+                                height={20}
+                                className="object-contain"
+                                onError={(e) => {
+                                  // On error, show the Building icon
+                                  e.currentTarget.style.display = 'none'
+                                  e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
+                                }}
+                              />
+                              <Building className="h-3 w-3 text-muted-foreground absolute fallback-icon hidden" />
+                            </div>
+                          )}
+                          <span className="text-sm">{flight.airline || "Unknown"}</span>
                         </div>
                         <Badge variant="outline" className="w-fit bg-flight/10 text-flight border-flight/20">
                           {flight.flight_number}
@@ -591,6 +643,14 @@ export default function FlightsPage() {
                         <span className="text-xs text-muted-foreground flex items-center mt-1">
                           <Clock className="mr-1 h-3 w-3" />
                           {formatTimeToHHMM(flight.arrival_time)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell w-[80px]">
+                      <div className="flex items-center">
+                        <Clock className="mr-1 h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="text-sm whitespace-nowrap">
+                          {calculateDuration(flight.departure_time, flight.arrival_time)}
                         </span>
                       </div>
                     </TableCell>
