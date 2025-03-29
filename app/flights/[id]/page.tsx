@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { format, parse, parseISO } from "date-fns"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { use } from "react"
 import {
   ArrowLeft,
@@ -80,22 +80,19 @@ function getAirlineLogo(airline: string | null): string {
 
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const [flightId, setFlightId] = useState<string>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [flight, setFlight] = useState<Flight | null>(null)
   const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { id } = React.use(params)
 
   useEffect(() => {
-    const initializePage = async () => {
+    const fetchFlightData = async () => {
       try {
-        // Await the params to get the id
-        const { id } = React.use(params)
-        setFlightId(id)
-
-        // Fetch flight data
+        setLoading(true)
         const response = await fetch(`/api/flights/${id}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
@@ -111,15 +108,35 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       }
     }
 
-    initializePage()
-  }, [params])
+    fetchFlightData()
+  }, [id])
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/flights/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete flight')
+      }
+
+      toast.success('✈️ Flight deleted! Time to plan your next adventure! 🎉')
+      router.push('/flights')
+    } catch (error) {
+      toast.error('Oops! The flight seems to be stuck in turbulence. Try again! 🌪️')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const handleSaveNotes = async () => {
     if (!flight) return
 
     setIsSavingNotes(true)
     try {
-      const response = await fetch(`/api/flights/${flight.id}/notes`, {
+      const response = await fetch(`/api/flights/${id}/notes`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -134,9 +151,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       const updatedFlight = await response.json()
       setFlight(updatedFlight)
       setIsEditingNotes(false)
-      toast.success('Notes saved successfully')
+      toast.success('📝 Notes saved! Your memory is now as sharp as a pilot\'s eyes! 👀')
     } catch (error) {
-      toast.error('Failed to save notes')
+      toast.error('Oops! Your notes got lost in the clouds. Try again! ☁️')
     } finally {
       setIsSavingNotes(false)
     }

@@ -23,10 +23,11 @@ export async function GET(
       .from('vidmaflights')
       .select('*')
       .eq('id', params.id)
-      .eq('user_id', session.user.id)
+      .eq('owner_id', session.user.id)
       .single()
 
     if (error) {
+      console.error('Error fetching flight:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
