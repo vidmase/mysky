@@ -27,7 +27,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClientComponentClient()
   const { showSuccess, showError } = useNotification()
   const initialLoadRef = useRef(true)
+  const lastNotificationRef = useRef<string | null>(null)
   const router = useRouter()
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    // Prevent duplicate notifications within 2 seconds
+    const now = Date.now()
+    if (lastNotificationRef.current === message) {
+      return
+    }
+    lastNotificationRef.current = message
+    setTimeout(() => {
+      if (lastNotificationRef.current === message) {
+        lastNotificationRef.current = null
+      }
+    }, 2000)
+
+    if (type === 'success') {
+      showSuccess(message)
+    } else {
+      showError(message)
+    }
+  }
+
+  const createUserProfile = async (user: User) => {
+    try {
+      // Check if profile already exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (existingProfile) {
+        return // Profile already exists
+      }
+
+      // Create new profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: user.id,
+            username: user.email?.split('@')[0] || `user_${user.id.substring(0, 8)}`,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || null,
+            avatar_url: user.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString(),
+          },
+        ])
+
+      if (insertError) {
+        throw insertError
+      }
+    } catch (error) {
+      console.error('Error creating user profile:', error)
+      showNotification(
+        'Failed to create user profile. Please update your profile information.',
+        'error'
+      )
+    }
+  }
 
   useEffect(() => {
     const getUser = async () => {
@@ -35,9 +95,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { user }, error } = await supabase.auth.getUser()
         if (error) throw error
         setUser(user)
+        if (user) {
+          await createUserProfile(user)
+        }
       } catch (error) {
         setError(error instanceof Error ? error : new Error('An error occurred'))
-        showError(error instanceof Error ? error.message : 'An error occurred during authentication')
+        showNotification(
+          error instanceof Error ? error.message : 'An error occurred during authentication',
+          'error'
+        )
       } finally {
         setLoading(false)
         initialLoadRef.current = false
@@ -47,19 +113,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const newUser = session?.user ?? null
-      setUser(newUser)
-      setLoading(false)
       
-      // Only show notifications after initial load and when there's an actual change
-      if (!initialLoadRef.current && user?.id !== newUser?.id) {
-        if (newUser) {
-          showSuccess('Successfully signed in')
-        } else if (user) { // Only show sign out message if there was a previous user
-          showSuccess('Successfully signed out')
-          // Redirect to home page after logout
-          router.push('/')
+      // Only update user and show notification if there's an actual change
+      if (user?.id !== newUser?.id) {
+        setUser(newUser)
+        setLoading(false)
+
+        if (!initialLoadRef.current) {
+          if (newUser) {
+            await createUserProfile(newUser)
+            showNotification('Successfully signed in', 'success')
+          } else if (user) {
+            showNotification('Successfully signed out', 'success')
+            router.push('/')
+          }
         }
       }
     })
@@ -69,19 +138,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth, showSuccess, showError, router])
+  }, [supabase.auth, showSuccess, showError, router, user])
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut()
       setUser(null)
-      // Clear any local storage or session data if needed
       localStorage.clear()
       sessionStorage.clear()
-      // Don't show success message here as it will be handled by the auth state change listener
     } catch (error) {
       setError(error instanceof Error ? error : new Error('An error occurred during sign out'))
-      showError(error instanceof Error ? error.message : 'An error occurred during sign out')
+      showNotification(
+        error instanceof Error ? error.message : 'An error occurred during sign out',
+        'error'
+      )
     }
   }
 

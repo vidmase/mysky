@@ -99,74 +99,88 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies })
 
-    // Get the current user's session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get the request body
-    const body = await request.json()
-
-    // Validate the request data
-    const validatedData = flightSchema.parse(body)
-
-    // Format dates and times
-    const departureDateTime = new Date(`${validatedData.departure_date}T${validatedData.departure_time}`)
-    const arrivalDateTime = new Date(`${validatedData.arrival_date}T${validatedData.arrival_time}`)
-
-    // Prepare the flight data for insertion
-    const flightData = {
-      owner_id: session.user.id,
-      departure_airport: validatedData.departure_airport,
-      arrival_airport: validatedData.arrival_airport,
-      departure_date: departureDateTime.toISOString(),
-      departure_time: validatedData.departure_time,
-      arrival_date: arrivalDateTime.toISOString(),
-      arrival_time: validatedData.arrival_time,
-      flight_number: validatedData.flight_number || null,
-      airline: validatedData.airline || null,
-      seat: validatedData.seat || null,
-      notes: validatedData.notes || null,
-      passenger_name: validatedData.passenger_name || null,
-      passenger_title: validatedData.passenger_title || null,
-      purchased_date: new Date().toISOString(),
-      purchase_time: new Date().toLocaleTimeString(),
-      total_receipt: "0 USD"
-    }
-
-    // Insert the flight data into Supabase
-    const { data, error } = await supabase
-      .from('vidmaflights')
-      .insert([flightData])
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Supabase error:', error)
+    // Verify authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    if (authError || !session) {
       return NextResponse.json(
-        { error: 'Failed to save flight data' },
-        { status: 500 }
+        { error: 'Unauthorized - Please sign in to add flights' },
+        { status: 401 }
       )
     }
 
-    return NextResponse.json(data, { status: 201 })
+    // Get request body
+    const flightData = await request.json()
 
-  } catch (error) {
-    console.error('API error:', error)
-    
-    if (error instanceof z.ZodError) {
+    // Validate required fields
+    const requiredFields = [
+      'passenger_name',
+      'reservation_number',
+      'flight_number',
+      'departure_airport',
+      'arrival_airport',
+      'departure_date',
+      'departure_time',
+      'arrival_time',
+      'total_receipt',
+      'purchased_date',
+      'purchase_time'
+    ]
+
+    const missingFields = requiredFields.filter(field => !flightData[field])
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: 'Invalid data format', details: error.errors },
+        { error: `Missing required fields: ${missingFields.join(', ')}` },
         { status: 400 }
       )
     }
 
+    // Insert the flight data
+    const { data, error: insertError } = await supabase
+      .from('vidmaflights')
+      .insert([
+        {
+          passenger_name: flightData.passenger_name,
+          reservation_number: flightData.reservation_number,
+          flight_number: flightData.flight_number,
+          departure_airport: flightData.departure_airport,
+          arrival_airport: flightData.arrival_airport,
+          departure_date: flightData.departure_date,
+          departure_time: flightData.departure_time,
+          arrival_time: flightData.arrival_time,
+          total_receipt: flightData.total_receipt,
+          purchased_date: flightData.purchased_date,
+          purchase_time: flightData.purchase_time,
+          airline: flightData.airline || null,
+          arrival_country: flightData.arrival_country || null,
+          arrival_iata: flightData.arrival_iata || null,
+          departure_iata: flightData.departure_iata || null,
+          seat: flightData.seat || null,
+          notes: flightData.notes || null,
+          // owner_id will be automatically set by RLS policy
+        }
+      ])
+      .select()
+
+    if (insertError) {
+      console.error('Error inserting flight:', insertError)
+      return NextResponse.json(
+        { error: 'Failed to save flight details' },
+        { status: 500 }
+      )
+    }
+
+    // Return the newly created flight
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { message: 'Flight added successfully', flight: data[0] },
+      { status: 201 }
+    )
+
+  } catch (error) {
+    console.error('Error in POST /api/flights:', error)
+    return NextResponse.json(
+      { error: 'An unexpected error occurred' },
       { status: 500 }
     )
   }
