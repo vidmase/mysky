@@ -49,6 +49,139 @@ interface Flight {
   notes: string | null
 }
 
+// Add currency conversion helper function at the top of the file, after the imports
+const CURRENCY_RATES = {
+  USD: 1,
+  EUR: 0.92,
+  GBP: 0.79,
+  PLN: 3.95,
+  HUF: 350.50,
+  RON: 4.60,
+  CZK: 23.20,
+  BGN: 1.80,
+  HRK: 7.03,
+  DKK: 6.87,
+  SEK: 10.40,
+  NOK: 10.60,
+  ISK: 140.00,
+  CHF: 0.90,
+  TRY: 32.00,
+  UAH: 39.00,
+  MDL: 17.80,
+  ALL: 95.00,
+  MKD: 56.50,
+  SRD: 35.00,
+  BAM: 1.80,
+  RSD: 107.00,
+  KZT: 450.00,
+  AZN: 1.70,
+  GEL: 2.70,
+  AMD: 400.00,
+  KGS: 89.00,
+  TJS: 10.90,
+  UZS: 12500.00,
+  TMT: 3.50,
+  AFN: 71.00,
+  IRR: 42000.00,
+  IQD: 1300.00,
+  SYP: 13000.00,
+  LBP: 89000.00,
+  JOD: 0.71,
+  AED: 3.67,
+  SAR: 3.75,
+  QAR: 3.64,
+  BHD: 0.38,
+  KWD: 0.31,
+  OMR: 0.38,
+  ILS: 3.70,
+  EGP: 31.00,
+  DZD: 135.00,
+  TND: 3.10,
+  MAD: 10.00,
+  LYD: 4.80,
+  SDG: 600.00,
+  ETB: 56.00,
+  KES: 160.00,
+  UGX: 3800.00,
+  ZAR: 18.80,
+  MUR: 45.00,
+  SCR: 13.50,
+  MVR: 15.40,
+  BDT: 110.00,
+  NPR: 133.00,
+  PKR: 280.00,
+  LKR: 320.00,
+  MMK: 2100.00,
+  KHR: 4100.00,
+  LAK: 21000.00,
+  VND: 24500.00,
+  THB: 35.50,
+  MYR: 4.80,
+  SGD: 1.35,
+  IDR: 15900.00,
+  PHP: 56.50,
+  KRW: 1330.00,
+  JPY: 151.00,
+  CNY: 7.20,
+  HKD: 7.82,
+  TWD: 31.80,
+  MOP: 8.00,
+  AUD: 1.52,
+  NZD: 1.66,
+  CAD: 1.35,
+  BRL: 4.95,
+  ARS: 870.00,
+  CLP: 950.00,
+  COP: 3900.00,
+  MXN: 16.70,
+  PEN: 3.70,
+  UYU: 39.00,
+  VES: 35.00,
+  PYG: 7300.00,
+  BOB: 6.90,
+  CRC: 520.00,
+  DOP: 58.00,
+  GTQ: 7.80,
+  HNL: 24.70,
+  NIO: 36.80,
+  PAB: 1.00,
+  SVC: 8.75,
+  TTD: 6.80,
+  XCD: 2.70,
+  ANG: 1.80,
+  AWG: 1.80,
+  BBD: 2.00,
+  BSD: 1.00,
+  CUP: 24.00,
+  DJF: 178.00,
+  ERN: 15.00,
+  GMD: 65.00,
+  GNF: 8600.00,
+  HTG: 138.00,
+  KMF: 450.00,
+  LRD: 190.00,
+  MWK: 1700.00,
+  MZN: 64.00,
+  NAD: 18.80,
+  RWF: 1300.00,
+  SLL: 22000.00,
+  SOS: 570.00,
+  SSP: 1300.00,
+  STN: 22.50,
+  SZL: 18.80,
+  TZS: 2500.00,
+  ZMW: 25.00,
+  ZWL: 3200.00,
+}
+
+function convertCurrency(amount: number, fromCurrency: string, toCurrency: string): number {
+  const usdAmount = amount / CURRENCY_RATES[fromCurrency as keyof typeof CURRENCY_RATES]
+  return usdAmount * CURRENCY_RATES[toCurrency as keyof typeof CURRENCY_RATES]
+}
+
+// Add currency type
+type Currency = keyof typeof CURRENCY_RATES
+
 function formatTimeToHHMM(time: string): string {
   if (!time) return '';
   
@@ -134,6 +267,7 @@ export default function FlightsPage() {
   const [flights, setFlights] = useState<Flight[]>([])
   const [loading, setLoading] = useState(true)
   const [airlines, setAirlines] = useState<string[]>([])
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>("USD")
   
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
@@ -259,6 +393,24 @@ export default function FlightsPage() {
     const flightDate = new Date(date)
     flightDate.setHours(23, 59, 59, 999) // End of the flight day
     return flightDate > new Date()
+  }
+
+  // Update the price range filter logic
+  const getPriceRangeLabel = (range: string) => {
+    const baseAmounts: Record<string, number> = {
+      'under100': 100,
+      '100to500': 500,
+      '500to1000': 1000,
+      'over1000': 1000
+    }
+    
+    const baseAmount = baseAmounts[range] || 0
+
+    if (range === "all") return "All prices"
+    if (range === "under100") return `Under ${selectedCurrency} ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
+    if (range === "100to500") return `${selectedCurrency} ${Math.round(convertCurrency(100, "USD", selectedCurrency))} - ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
+    if (range === "500to1000") return `${selectedCurrency} ${Math.round(convertCurrency(500, "USD", selectedCurrency))} - ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
+    return `Over ${selectedCurrency} ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
   }
 
   return (
@@ -443,19 +595,33 @@ export default function FlightsPage() {
                       <CreditCard className="h-4 w-4 mr-1 text-flight" />
                       Price Range
                     </Label>
-                    <Select value={priceRange} onValueChange={setPriceRange}>
-                      <SelectTrigger id="priceRange" className="pl-9 relative">
-                        <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder="All prices" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All prices</SelectItem>
-                        <SelectItem value="under100">Under $100</SelectItem>
-                        <SelectItem value="100to500">$100 - $500</SelectItem>
-                        <SelectItem value="500to1000">$500 - $1000</SelectItem>
-                        <SelectItem value="over1000">Over $1000</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Select value={priceRange} onValueChange={setPriceRange}>
+                        <SelectTrigger id="priceRange" className="pl-9 relative">
+                          <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <SelectValue placeholder="All prices" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All prices</SelectItem>
+                          <SelectItem value="under100">{getPriceRangeLabel("under100")}</SelectItem>
+                          <SelectItem value="100to500">{getPriceRangeLabel("100to500")}</SelectItem>
+                          <SelectItem value="500to1000">{getPriceRangeLabel("500to1000")}</SelectItem>
+                          <SelectItem value="over1000">{getPriceRangeLabel("over1000")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={selectedCurrency} onValueChange={(value: Currency) => setSelectedCurrency(value)}>
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(CURRENCY_RATES).map((currency) => (
+                            <SelectItem key={currency} value={currency}>
+                              {currency}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -595,10 +761,10 @@ export default function FlightsPage() {
                       </TooltipProvider>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
+                        <div className="flex flex-col">
                         <Badge variant="outline" className="w-fit bg-muted/30 text-foreground">
                           {flight.reservation_number}
-                        </Badge>
+                            </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -625,26 +791,26 @@ export default function FlightsPage() {
                                     <Building className="h-5 w-5 text-muted-foreground" />
                                   )}
                                   <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
-                                </div>
+                        </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="font-medium">
                                 {flight.airline || "Unknown Airline"}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <div className="flex flex-col">
+                        <div className="flex flex-col">
                             <div className="flex items-baseline gap-1.5">
-                              <Badge 
-                                variant="outline" 
+                            <Badge
+                              variant="outline"
                                 className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
-                              >
+                            >
                                 {flight.flight_number}
-                              </Badge>
+                            </Badge>
                             </div>
                             {flight.seat && (
                               <span className="text-xs text-muted-foreground">
                                 Seat {flight.seat}
-                              </span>
+                          </span>
                             )}
                           </div>
                         </div>
@@ -669,7 +835,7 @@ export default function FlightsPage() {
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
                             {flight.arrival_iata || flight.arrival_airport}
-                          </Badge>
+                      </Badge>
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {flight.arrival_airport}

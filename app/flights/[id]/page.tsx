@@ -183,9 +183,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       }
 
       const diff = arrivalDate.getTime() - departureDate.getTime()
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      return `${hours}h ${minutes}m`
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    return `${hours}h ${minutes}m`
     } catch (error) {
       return "Duration N/A"
     }
@@ -269,7 +269,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex flex-col items-center py-4">
                 <div className="relative w-40 md:w-64">
                   <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-flight to-airport"></div>
-                  <div className="absolute top-1/2 left-0 right-0 flex justify-center">
+                <div className="absolute top-1/2 left-0 right-0 flex justify-center">
                     <div className="bg-white dark:bg-slate-900 p-2 -mt-4 rounded-full shadow-md">
                       <Plane className="h-6 w-6 text-airline rotate-90" />
                     </div>
@@ -523,8 +523,8 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center text-stats">
-                    <FileText className="h-5 w-5 mr-2" />
-                    Notes
+                  <FileText className="h-5 w-5 mr-2" />
+                  Notes
                   </div>
                   {!isEditingNotes && (
                     <Button
@@ -575,20 +575,20 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                   flight?.notes ? (
                     <div className="p-4 rounded-md bg-muted/30 border">
                       <p className="whitespace-pre-wrap">{flight.notes}</p>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                      <p className="text-muted-foreground">No notes added for this flight.</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">No notes added for this flight.</p>
                       <Button
                         variant="outline"
                         className="mt-4"
                         onClick={() => setIsEditingNotes(true)}
                       >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Add Notes
-                      </Button>
-                    </div>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Add Notes
+                    </Button>
+                  </div>
                   )
                 )}
               </CardContent>
