@@ -206,6 +206,13 @@ export default function FlightsPage() {
     }
   })
 
+  // Add isUpcoming helper function at the top of the component
+  const isUpcoming = (date: string) => {
+    const flightDate = new Date(date)
+    flightDate.setHours(23, 59, 59, 999) // End of the flight day
+    return flightDate > new Date()
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col space-y-6">
@@ -503,9 +510,19 @@ export default function FlightsPage() {
                   >
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">
-                          {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
-                        </span>
+                        <div className="flex items-center gap-2 relative">
+                          <span className="font-medium">
+                            {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
+                          </span>
+                          {isUpcoming(flight.departure_date) && (
+                            <Badge 
+                              variant="secondary" 
+                              className="bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/30 transition-colors px-1.5 py-0 text-[0.65rem] absolute -top-5 left-0 font-medium"
+                            >
+                               ✈️Upcoming
+                            </Badge>
+                          )}
+                        </div>
                         <span className="text-xs text-muted-foreground hidden sm:inline flex items-center">
                           <Calendar className="inline h-3 w-3 mr-1" />
                           {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
