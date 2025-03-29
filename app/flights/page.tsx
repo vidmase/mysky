@@ -100,8 +100,21 @@ function calculateDuration(departureTime: string, arrivalTime: string): string {
 // Add airline logo helper function
 function getAirlineLogo(airline: string | null): string {
   if (!airline) return ""
+  
+  // Special cases for airlines with local logos
+  const airlineName = airline.toLowerCase()
+  if (airlineName === 'ryanair') {
+    return '/ryanair.png'
+  }
+  if (airlineName === 'wizzair') {
+    return '/wizzair.png'
+  }
+  if (airlineName === 'easyjet') {
+    return '/easyjet.png'
+  }
+  
   // Clean airline name for URL
-  const cleanAirlineName = airline.toLowerCase()
+  const cleanAirlineName = airlineName
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
   
@@ -589,30 +602,52 @@ export default function FlightsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          {flight.airline && (
-                            <div className="relative w-5 h-5 rounded-full overflow-hidden bg-muted/30 flex items-center justify-center">
-                              <Image
-                                src={getAirlineLogo(flight.airline)}
-                                alt={`${flight.airline} logo`}
-                                width={20}
-                                height={20}
-                                className="object-contain"
-                                onError={(e) => {
-                                  // On error, show the Building icon
-                                  e.currentTarget.style.display = 'none'
-                                  e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
-                                }}
-                              />
-                              <Building className="h-3 w-3 text-muted-foreground absolute fallback-icon hidden" />
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 relative">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
+                                  {flight.airline ? (
+                                    <Image
+                                      src={getAirlineLogo(flight.airline)}
+                                      alt={`${flight.airline} logo`}
+                                      width={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                                      height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                                      className={`object-contain p-0.5 ${flight.airline.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
+                                      onError={(e) => {
+                                        // On error, show the Building icon
+                                        e.currentTarget.style.display = 'none'
+                                        e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
+                                      }}
+                                    />
+                                  ) : (
+                                    <Building className="h-5 w-5 text-muted-foreground" />
+                                  )}
+                                  <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="font-medium">
+                                {flight.airline || "Unknown Airline"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <div className="flex flex-col">
+                            <div className="flex items-baseline gap-1.5">
+                              <Badge 
+                                variant="outline" 
+                                className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
+                              >
+                                {flight.flight_number}
+                              </Badge>
                             </div>
-                          )}
-                          <span className="text-sm">{flight.airline || "Unknown"}</span>
+                            {flight.seat && (
+                              <span className="text-xs text-muted-foreground">
+                                Seat {flight.seat}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="outline" className="w-fit bg-flight/10 text-flight border-flight/20">
-                          {flight.flight_number}
-                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">

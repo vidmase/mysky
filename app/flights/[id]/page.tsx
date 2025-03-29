@@ -21,6 +21,8 @@ import {
   Edit2,
   X,
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import Image from "next/image"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +51,30 @@ interface Flight {
   departure_iata: string | null
   seat: string | null
   notes: string | null
+}
+
+function getAirlineLogo(airline: string | null): string {
+  if (!airline) return ""
+  
+  // Special cases for airlines with local logos
+  const airlineName = airline.toLowerCase()
+  if (airlineName === 'ryanair') {
+    return '/ryanair.png'
+  }
+  if (airlineName === 'wizzair') {
+    return '/wizzair.png'
+  }
+  if (airlineName === 'easyjet') {
+    return '/easyjet.png'
+  }
+  
+  // Clean airline name for URL
+  const cleanAirlineName = airlineName
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+  
+  // Return logo URL from logo.clearbit.com (fallback to null if no airline)
+  return `https://logo.clearbit.com/${cleanAirlineName}.com`
 }
 
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -188,7 +214,34 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
           <div className="bg-gradient-to-r from-airline to-flight/80 p-4 text-white">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-3">
-                <Building className="h-6 w-6" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
+                        {flight.airline ? (
+                          <Image
+                            src={getAirlineLogo(flight.airline)}
+                            alt={`${flight.airline} logo`}
+                            width={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                            height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                            className={`object-contain p-0.5 ${flight.airline.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
+                            onError={(e) => {
+                              // On error, show the Building icon
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
+                            }}
+                          />
+                        ) : (
+                          <Building className="h-5 w-5 text-white" />
+                        )}
+                        <Building className="h-5 w-5 text-white absolute fallback-icon hidden" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="font-medium">
+                      {flight.airline || "Unknown Airline"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <span className="text-lg font-semibold">{flight.airline}</span>
               </div>
               <Badge variant="outline" className="bg-white/10 text-white border-white/20">
