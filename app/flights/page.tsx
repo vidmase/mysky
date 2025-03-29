@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { format } from "date-fns"
-import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User } from "lucide-react"
+import { format, isWithinInterval, isSameDay, addYears, subYears, setMonth, setYear, addMonths, subMonths } from "date-fns"
+import { enUS } from 'date-fns/locale'
+import type { Locale } from 'date-fns'
+import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { DateRange } from "react-day-picker"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import {
   Tooltip,
@@ -72,11 +77,18 @@ function formatTimeToHHMM(time: string): string {
 export default function FlightsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showFilters, setShowFilters] = useState(false)
-  const [airline, setAirline] = useState<string>("")
-  const [dateRange, setDateRange] = useState<string>("")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
+  const [airline, setAirline] = useState("all")
+  const [priceRange, setPriceRange] = useState("all")
+  const [tripType, setTripType] = useState("all")
+  const [sortBy, setSortBy] = useState("date")
+  const [sortOrder, setSortOrder] = useState("desc")
   const [flights, setFlights] = useState<Flight[]>([])
   const [loading, setLoading] = useState(true)
   const [airlines, setAirlines] = useState<string[]>([])
+  
+  // Ensure consistent initial date
+  const [initialDate] = useState(() => new Date())
 
   useEffect(() => {
     const fetchFlights = async () => {
@@ -128,24 +140,71 @@ export default function FlightsPage() {
 
     const matchesAirline = airline === "all" || airline === "" || flight.airline === airline
 
-    // Date range filter
+    // Date range filter using react-day-picker's DateRange
     let matchesDateRange = true
-    if (dateRange === "last3months") {
-      const threeMonthsAgo = new Date()
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-      matchesDateRange = new Date(flight.departure_date) >= threeMonthsAgo
-    } else if (dateRange === "last6months") {
-      const sixMonthsAgo = new Date()
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-      matchesDateRange = new Date(flight.departure_date) >= sixMonthsAgo
-    } else if (dateRange === "lastyear") {
-      const oneYearAgo = new Date()
-      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-      matchesDateRange = new Date(flight.departure_date) >= oneYearAgo
+    if (dateRange?.from || dateRange?.to) {
+      const flightDate = new Date(flight.departure_date)
+      if (dateRange.from && dateRange.to) {
+        matchesDateRange = isWithinInterval(flightDate, { start: dateRange.from, end: dateRange.to })
+      } else if (dateRange.from) {
+        matchesDateRange = isSameDay(flightDate, dateRange.from)
+      }
     }
 
-    return matchesSearch && matchesAirline && matchesDateRange
+    // Price range filter
+    let matchesPriceRange = true
+    if (priceRange !== "all") {
+      const price = parseFloat(flight.total_receipt.replace(/[^0-9.]/g, ''))
+      switch (priceRange) {
+        case "under100":
+          matchesPriceRange = price < 100
+          break
+        case "100to500":
+          matchesPriceRange = price >= 100 && price <= 500
+          break
+        case "500to1000":
+          matchesPriceRange = price >= 500 && price <= 1000
+          break
+        case "over1000":
+          matchesPriceRange = price > 1000
+          break
+      }
+    }
+
+    // Trip type filter (based on departure and arrival airports)
+    let matchesTripType = true
+    if (tripType !== "all") {
+      const isRoundTrip = flights.some(
+        (otherFlight: Flight) =>
+          otherFlight.id !== flight.id &&
+          otherFlight.departure_airport === flight.arrival_airport &&
+          otherFlight.arrival_airport === flight.departure_airport
+      )
+      matchesTripType = tripType === "roundtrip" ? isRoundTrip : !isRoundTrip
+    }
+
+    return matchesSearch && matchesAirline && matchesDateRange && matchesPriceRange && matchesTripType
   }) : []
+
+  // Sort filtered flights
+  const sortedFlights = [...filteredFlights].sort((a, b) => {
+    switch (sortBy) {
+      case "date":
+        const dateA = new Date(a.departure_date)
+        const dateB = new Date(b.departure_date)
+        return sortOrder === "desc" ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime()
+      case "price":
+        const priceA = parseFloat(a.total_receipt.replace(/[^0-9.]/g, ''))
+        const priceB = parseFloat(b.total_receipt.replace(/[^0-9.]/g, ''))
+        return sortOrder === "desc" ? priceB - priceA : priceA - priceB
+      case "airline":
+        const airlineA = a.airline || ""
+        const airlineB = b.airline || ""
+        return sortOrder === "desc" ? airlineB.localeCompare(airlineA) : airlineA.localeCompare(airlineB)
+      default:
+        return 0
+    }
+  })
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -187,28 +246,125 @@ export default function FlightsPage() {
           <CollapsibleContent className="animate-slide-up">
             <Card className="border-t-4 border-t-flight">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="dateRange" className="flex items-center">
+                    <Label className="flex items-center">
                       <Calendar className="h-4 w-4 mr-1 text-flight" />
                       Date Range
                     </Label>
-                    <Select value={dateRange} onValueChange={setDateRange}>
-                      <SelectTrigger id="dateRange" className="pl-9 relative">
-                        <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder="All time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All time</SelectItem>
-                        <SelectItem value="last3months">Last 3 months</SelectItem>
-                        <SelectItem value="last6months">Last 6 months</SelectItem>
-                        <SelectItem value="lastyear">Last year</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={`w-full justify-start text-left font-normal ${!dateRange && "text-muted-foreground"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {dateRange?.from ? (
+                              dateRange.to ? (
+                                <div className="flex-1 flex items-center gap-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-muted-foreground">From</span>
+                                    <span className="font-medium">{format(dateRange.from, "MMM dd, yyyy", { locale: enUS })}</span>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-muted-foreground">To</span>
+                                    <span className="font-medium">{format(dateRange.to, "MMM dd, yyyy", { locale: enUS })}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-muted-foreground">Selected Date</span>
+                                  <span className="font-medium">{format(dateRange.from, "MMM dd, yyyy", { locale: enUS })}</span>
+                                </div>
+                              )
+                            ) : (
+                              <span>Select date range</span>
+                            )}
+                            {dateRange && (
+                              <X
+                                className="h-4 w-4 opacity-50 hover:opacity-100 cursor-pointer ml-auto"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDateRange(undefined)
+                                }}
+                              />
+                            )}
+                          </div>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <div className="p-3 border-b">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium">Select Range</h4>
+                            <p className="text-xs text-muted-foreground">
+                              Pick a start and end date for your search
+                            </p>
+                          </div>
+                        </div>
+                        <CalendarComponent
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dateRange?.from || initialDate}
+                          selected={dateRange}
+                          onSelect={(range: DateRange | undefined) => setDateRange(range)}
+                          numberOfMonths={2}
+                          className="p-3"
+                          showOutsideDays={false}
+                          fixedWeeks
+                          locale={enUS}
+                          formatters={{
+                            formatCaption: (date, options) => format(date, "MMMM yyyy", { locale: enUS }),
+                          }}
+                          classNames={{
+                            months: "flex space-x-4",
+                            month: "space-y-4",
+                            caption: "flex justify-center pt-1 relative items-center",
+                            caption_label: "text-sm font-medium",
+                            nav: "space-x-1 flex items-center",
+                            nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-muted transition-colors rounded-md",
+                            nav_button_previous: "absolute left-1",
+                            nav_button_next: "absolute right-1",
+                            table: "w-full border-collapse space-y-1",
+                            head_row: "flex",
+                            head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+                            row: "flex w-full mt-2",
+                            cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md",
+                            day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-muted rounded-md transition-colors",
+                            day_range_start: "day-range-start",
+                            day_range_end: "day-range-end",
+                            day_selected: "bg-flight text-primary-foreground hover:bg-flight hover:text-primary-foreground focus:bg-flight focus:text-primary-foreground",
+                            day_today: "bg-accent text-accent-foreground",
+                            day_outside: "text-muted-foreground opacity-50",
+                            day_disabled: "text-muted-foreground opacity-50",
+                            day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                            day_hidden: "invisible",
+                          }}
+                          components={{
+                            IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+                            IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+                          }}
+                        />
+                        {dateRange?.from && (
+                          <div className="p-3 border-t">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-xs text-muted-foreground"
+                              onClick={() => setDateRange(undefined)}
+                            >
+                              Clear Selection
+                            </Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="airline" className="flex items-center">
-                      <Building className="h-4 w-4 mr-1 text-airline" />
+                      <Building className="h-4 w-4 mr-1 text-flight" />
                       Airline
                     </Label>
                     <Select value={airline} onValueChange={setAirline}>
@@ -218,25 +374,86 @@ export default function FlightsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All airlines</SelectItem>
-                        {airlines.map((airline) => (
-                          <SelectItem key={airline} value={airline}>
+                        {Array.from(new Set(flights?.map(f => f.airline).filter(Boolean))).map(airline => (
+                          <SelectItem key={airline} value={airline || ""}>
                             {airline}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        setDateRange("")
-                        setAirline("")
-                      }}
-                    >
-                      Clear Filters
-                    </Button>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="priceRange" className="flex items-center">
+                      <CreditCard className="h-4 w-4 mr-1 text-flight" />
+                      Price Range
+                    </Label>
+                    <Select value={priceRange} onValueChange={setPriceRange}>
+                      <SelectTrigger id="priceRange" className="pl-9 relative">
+                        <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="All prices" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All prices</SelectItem>
+                        <SelectItem value="under100">Under $100</SelectItem>
+                        <SelectItem value="100to500">$100 - $500</SelectItem>
+                        <SelectItem value="500to1000">$500 - $1000</SelectItem>
+                        <SelectItem value="over1000">Over $1000</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tripType" className="flex items-center">
+                      <Plane className="h-4 w-4 mr-1 text-flight" />
+                      Trip Type
+                    </Label>
+                    <Select value={tripType} onValueChange={setTripType}>
+                      <SelectTrigger id="tripType" className="pl-9 relative">
+                        <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="All trips" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All trips</SelectItem>
+                        <SelectItem value="oneway">One-way</SelectItem>
+                        <SelectItem value="roundtrip">Round-trip</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sortBy" className="flex items-center">
+                      <ArrowUpDown className="h-4 w-4 mr-1 text-flight" />
+                      Sort By
+                    </Label>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger id="sortBy" className="pl-9 relative">
+                        <ArrowUpDown className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="price">Price</SelectItem>
+                        <SelectItem value="airline">Airline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sortOrder" className="flex items-center">
+                      <ArrowDownUp className="h-4 w-4 mr-1 text-flight" />
+                      Sort Order
+                    </Label>
+                    <Select value={sortOrder} onValueChange={setSortOrder}>
+                      <SelectTrigger id="sortOrder" className="pl-9 relative">
+                        <ArrowDownUp className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Sort order" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="desc">Descending</SelectItem>
+                        <SelectItem value="asc">Ascending</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>
@@ -268,7 +485,7 @@ export default function FlightsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredFlights.length === 0 ? (
+              ) : sortedFlights.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     <div className="flex flex-col items-center">
@@ -278,7 +495,7 @@ export default function FlightsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredFlights.map((flight) => (
+                sortedFlights.map((flight) => (
                   <TableRow
                     key={flight.id}
                     className="hover:bg-muted/30 cursor-pointer group"
@@ -287,11 +504,11 @@ export default function FlightsPage() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {format(new Date(flight.departure_date), "MMM d, yyyy")}
+                          {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
                         </span>
                         <span className="text-xs text-muted-foreground hidden sm:inline flex items-center">
                           <Calendar className="inline h-3 w-3 mr-1" />
-                          {format(new Date(flight.departure_date), "EEEE")}
+                          {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
                         </span>
                       </div>
                     </TableCell>
@@ -367,14 +584,14 @@ export default function FlightsPage() {
                             <div className="flex flex-col">
                               <span className="font-medium">{flight.total_receipt}</span>
                               <span className="text-xs text-muted-foreground truncate">
-                                Purchased: {format(new Date(flight.purchased_date), "MMM d, yyyy")}
+                                Purchased: {format(new Date(flight.purchased_date), "MMM d, yyyy", { locale: enUS })}
                               </span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent className="flex flex-col gap-1">
                             <p className="font-medium">Purchase Details</p>
                             <div className="text-xs">
-                              <p>Date: {format(new Date(flight.purchased_date), "MMMM d, yyyy")}</p>
+                              <p>Date: {format(new Date(flight.purchased_date), "MMMM d, yyyy", { locale: enUS })}</p>
                               <p>Time: {flight.purchase_time}</p>
                               <p>Total: {flight.total_receipt}</p>
                             </div>

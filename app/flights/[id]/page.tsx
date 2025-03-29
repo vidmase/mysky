@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
+import { format, parse, parseISO } from "date-fns"
 import { useEffect, useState } from "react"
 import { use } from "react"
 import {
@@ -17,6 +17,9 @@ import {
   Wifi,
   Utensils,
   Loader2,
+  Save,
+  Edit2,
+  X,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -24,6 +27,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
 
 interface Flight {
   id: number
@@ -51,6 +56,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   const [flight, setFlight] = useState<Flight | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
+  const [notes, setNotes] = useState("")
+  const [isSavingNotes, setIsSavingNotes] = useState(false)
   const resolvedParams = use(params)
 
   useEffect(() => {
@@ -62,6 +70,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
         }
         const data = await response.json()
         setFlight(data)
+        setNotes(data.notes || "")
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load flight')
       } finally {
@@ -71,6 +80,34 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
     fetchFlight()
   }, [resolvedParams.id])
+
+  const handleSaveNotes = async () => {
+    if (!flight) return
+
+    setIsSavingNotes(true)
+    try {
+      const response = await fetch(`/api/flights/${flight.id}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save notes')
+      }
+
+      const updatedFlight = await response.json()
+      setFlight(updatedFlight)
+      setIsEditingNotes(false)
+      toast.success('Notes saved successfully')
+    } catch (error) {
+      toast.error('Failed to save notes')
+    } finally {
+      setIsSavingNotes(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -98,11 +135,34 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
     )
   }
 
+  const formatTime = (timeStr: string) => {
+    // Parse time string (assuming format like "14:30") and return in HH:mm format
+    const [hours, minutes] = timeStr.split(':')
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+  }
+
   const calculateDuration = () => {
-    const diff = new Date(flight.arrival_time).getTime() - new Date(flight.departure_time).getTime()
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    return `${hours}h ${minutes}m`
+    try {
+      // Combine date and time strings
+      const departureDateTime = `${flight.departure_date}T${flight.departure_time}`
+      const arrivalDateTime = `${flight.departure_date}T${flight.arrival_time}`
+      
+      // Parse the combined strings into Date objects
+      const departureDate = new Date(departureDateTime)
+      const arrivalDate = new Date(arrivalDateTime)
+
+      // Handle case where arrival is next day
+      if (arrivalDate < departureDate) {
+        arrivalDate.setDate(arrivalDate.getDate() + 1)
+      }
+
+      const diff = arrivalDate.getTime() - departureDate.getTime()
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      return `${hours}h ${minutes}m`
+    } catch (error) {
+      return "Duration N/A"
+    }
   }
 
   return (
@@ -148,7 +208,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="space-y-1">
                   <div className="text-sm font-medium">{flight.departure_airport}</div>
-                  <div className="text-2xl font-semibold">{flight.departure_time}</div>
+                  <div className="text-2xl font-semibold">{formatTime(flight.departure_time)}</div>
                   <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
                 </div>
               </div>
@@ -180,7 +240,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                     {flight.arrival_airport}
                     {flight.arrival_country && ` (${flight.arrival_country})`}
                   </div>
-                  <div className="text-2xl font-semibold">{flight.arrival_time}</div>
+                  <div className="text-2xl font-semibold">{formatTime(flight.arrival_time)}</div>
                   <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
                 </div>
               </div>
@@ -266,7 +326,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       <Clock className="h-4 w-4 text-flight" />
                     </div>
                     <div>
-                      <div className="font-medium">{flight.departure_time}</div>
+                      <div className="font-medium">{formatTime(flight.departure_time)}</div>
                       <div className="text-sm text-muted-foreground">Local time</div>
                     </div>
                   </div>
@@ -309,7 +369,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       <Clock className="h-4 w-4 text-airport" />
                     </div>
                     <div>
-                      <div className="font-medium">{flight.arrival_time}</div>
+                      <div className="font-medium">{formatTime(flight.arrival_time)}</div>
                       <div className="text-sm text-muted-foreground">Local time</div>
                     </div>
                   </div>
@@ -408,25 +468,75 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
           <TabsContent value="notes">
             <Card className="border-t-4 border-t-stats shadow-md">
               <CardHeader>
-                <CardTitle className="flex items-center text-stats">
-                  <FileText className="h-5 w-5 mr-2" />
-                  Notes
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center text-stats">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Notes
+                  </div>
+                  {!isEditingNotes && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingNotes(true)}
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit Notes
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {flight.notes ? (
-                  <div className="p-4 rounded-md bg-muted/30 border">
-                    <p>{flight.notes}</p>
+                {isEditingNotes ? (
+                  <div className="space-y-4">
+                    <Textarea
+                      placeholder="Add your notes here..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="min-h-[200px] resize-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingNotes(false)
+                          setNotes(flight?.notes || "")
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveNotes}
+                        disabled={isSavingNotes}
+                      >
+                        {isSavingNotes ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Save Notes
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-muted-foreground">No notes added for this flight.</p>
-                    <Button variant="outline" className="mt-4">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Add Notes
-                    </Button>
-                  </div>
+                  flight?.notes ? (
+                    <div className="p-4 rounded-md bg-muted/30 border">
+                      <p className="whitespace-pre-wrap">{flight.notes}</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                      <p className="text-muted-foreground">No notes added for this flight.</p>
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => setIsEditingNotes(true)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Add Notes
+                      </Button>
+                    </div>
+                  )
                 )}
               </CardContent>
             </Card>
