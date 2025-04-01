@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X } from "lucide-react"
+import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard } from "lucide-react"
 import { useState } from "react"
 
 import { cn } from "@/lib/utils"
@@ -54,6 +54,13 @@ export function MainNav() {
       color: "text-stats",
       bgColor: "bg-stats/10",
     },
+    {
+      name: "Pricing",
+      href: "/pricing",
+      icon: CreditCard,
+      color: "text-flight",
+      bgColor: "bg-flight/10",
+    },
   ]
 
   return (
@@ -64,7 +71,7 @@ export function MainNav() {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-airline text-white">
               <PlaneTakeoff className="h-4 w-4" />
             </div>
-            <span className="hidden sm:inline-block text-white">FlightTrack</span>
+            <span className="hidden sm:inline-block text-white">FlightsTrack</span>
           </Link>
         </div>
 

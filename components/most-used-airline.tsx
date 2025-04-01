@@ -13,19 +13,39 @@ type AirlineStats = {
 export function MostUsedAirline() {
   const [mostUsedAirline, setMostUsedAirline] = useState<AirlineStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchMostUsedAirline() {
+    let mounted = true
+
+    async function fetchMostUsedAirline(userId: string) {
+      if (!userId) return
+
       try {
-        const { data, error } = await supabase
+        setLoading(true)
+        setError(null)
+
+        const { data, error: queryError } = await supabase
           .from('vidmaflights')
           .select('airline')
+          .eq('owner_id', userId)
 
-        if (error) throw error
+        if (queryError) {
+          console.error('Query error:', queryError)
+          setError('Failed to fetch airline data')
+          return
+        }
+
+        if (!data || data.length === 0) {
+          setMostUsedAirline({ airline: 'No flights yet', count: 0 })
+          return
+        }
 
         // Count occurrences of each airline
         const airlineCounts = data.reduce((acc: { [key: string]: number }, flight) => {
-          acc[flight.airline] = (acc[flight.airline] || 0) + 1
+          if (flight.airline) {
+            acc[flight.airline] = (acc[flight.airline] || 0) + 1
+          }
           return acc
         }, {})
 
@@ -34,15 +54,54 @@ export function MostUsedAirline() {
           return count > (max.count || 0) ? { airline, count } : max
         }, { airline: '', count: 0 })
 
-        setMostUsedAirline(mostUsed)
+        if (mounted) {
+          setMostUsedAirline(mostUsed)
+        }
       } catch (error) {
         console.error('Error fetching most used airline:', error)
+        setError('An unexpected error occurred')
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchMostUsedAirline()
+    // Initialize auth state
+    let currentSession: string | null = null
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
+      
+      if (event === 'INITIAL_SESSION') {
+        if (session?.user?.id) {
+          currentSession = session.user.id
+          await fetchMostUsedAirline(session.user.id)
+        }
+      } else if (event === 'SIGNED_IN') {
+        if (session?.user?.id && currentSession !== session.user.id) {
+          currentSession = session.user.id
+          await fetchMostUsedAirline(session.user.id)
+        }
+      } else if (event === 'SIGNED_OUT') {
+        currentSession = null
+        setMostUsedAirline({ airline: 'Please sign in', count: 0 })
+        setLoading(false)
+      }
+    })
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.id && currentSession !== session.user.id) {
+        currentSession = session.user.id
+        fetchMostUsedAirline(session.user.id)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
   }, [])
 
   return (
@@ -60,10 +119,22 @@ export function MostUsedAirline() {
           </div>
           <div>
             <div className="text-xl font-semibold">
-              {loading ? '...' : mostUsedAirline?.airline}
+              {loading ? (
+                <div className="animate-pulse">Loading...</div>
+              ) : error ? (
+                <span className="text-red-500">{error}</span>
+              ) : (
+                mostUsedAirline?.airline || 'No flights yet'
+              )}
             </div>
             <div className="text-sm text-muted-foreground">
-              {loading ? '...' : `${mostUsedAirline?.count} flights`}
+              {loading ? (
+                <div className="animate-pulse">Loading...</div>
+              ) : error ? (
+                <span className="text-red-500">Failed to load data</span>
+              ) : (
+                `${mostUsedAirline?.count || 0} flights`
+              )}
             </div>
           </div>
         </div>

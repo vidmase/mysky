@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { TotalFlights } from "@/components/total-flights"
 import { TotalCountries } from "@/components/total-countries"
+import { HoursInAir } from "@/components/hours-in-air"
+import { TotalKilometers } from "@/components/total-kilometers"
 import { MostUsedAirline } from "@/components/most-used-airline"
 import { MostVisitedAirport } from "@/components/most-visited-airport"
 
@@ -30,24 +32,8 @@ export default function Home() {
         <section className="grid gap-6 md:grid-cols-4">
           <TotalFlights />
           <TotalCountries />
-          <Card className="stat-card bg-gradient-flight text-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-4xl font-bold flex items-center">
-                <Clock className="h-6 w-6 mr-2 opacity-80" />
-                {stats.totalHours}
-              </CardTitle>
-              <CardDescription className="text-white/80">Hours in Air</CardDescription>
-            </CardHeader>
-          </Card>
-          <Card className="stat-card bg-gradient-stats text-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-4xl font-bold flex items-center">
-                <Calendar className="h-6 w-6 mr-2 opacity-80" />
-                {new Date().getFullYear()}
-              </CardTitle>
-              <CardDescription className="text-white/80">Current Year</CardDescription>
-            </CardHeader>
-          </Card>
+          <HoursInAir />
+          <TotalKilometers />
         </section>
 
         <section className="grid gap-6 md:grid-cols-2">

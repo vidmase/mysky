@@ -5,11 +5,21 @@ import Link from "next/link"
 import { format, isWithinInterval, isSameDay, addYears, subYears, setMonth, setYear, addMonths, subMonths } from "date-fns"
 import { enUS } from 'date-fns/locale'
 import type { Locale } from 'date-fns'
-import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import Image from "next/image"
 import { useNotification } from '@/contexts/notification-context'
-import { Flight } from '@/types/flight'
+import { useRouter } from "next/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -272,6 +282,9 @@ export default function FlightsPage() {
   const [airlines, setAirlines] = useState<string[]>([])
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>("USD")
   const { showSuccess, showError, showInfo } = useNotification()
+  const router = useRouter()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null)
   
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
@@ -289,7 +302,7 @@ export default function FlightsPage() {
         
         const data = await response.json()
         setFlights(data)
-        const uniqueAirlines = Array.from(new Set(data.map(f => f.airline).filter(Boolean))) as string[]
+        const uniqueAirlines = Array.from(new Set(data.map((f: Flight) => f.airline).filter(Boolean))) as string[]
         setAirlines(uniqueAirlines)
         showSuccess('Successfully loaded your flights')
       } catch (error) {
@@ -408,6 +421,33 @@ export default function FlightsPage() {
     if (range === "100to500") return `${selectedCurrency} ${Math.round(convertCurrency(100, "USD", selectedCurrency))} - ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
     if (range === "500to1000") return `${selectedCurrency} ${Math.round(convertCurrency(500, "USD", selectedCurrency))} - ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
     return `Over ${selectedCurrency} ${Math.round(convertCurrency(baseAmount, "USD", selectedCurrency))}`
+  }
+
+  const handleDelete = async (flight: Flight) => {
+    try {
+      setIsDeleting(true)
+      const response = await fetch(`/api/flights/${flight.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete flight')
+      }
+
+      // Update local state
+      setFlights(flights.filter(f => f.id !== flight.id))
+      showSuccess('Flight deleted successfully! ✈️')
+      setFlightToDelete(null)
+    } catch (error) {
+      console.error('Error deleting flight:', error)
+      showError('Failed to delete flight. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleEdit = (flight: Flight) => {
+    router.push(`/flights/${flight.id}/edit`)
   }
 
   return (
@@ -874,16 +914,41 @@ export default function FlightsPage() {
                       </TooltipProvider>
                     </TableCell>
                     <TableCell>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(flight)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setFlightToDelete(flight)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        asChild
-                        className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
-                      >
-                        <Link href={`/flights/${flight.id}`} className="flex items-center justify-center">
+                          className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/flights/${flight.id}`)
+                          }}
+                        >
                           <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                        </Link>
                       </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -891,6 +956,81 @@ export default function FlightsPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!flightToDelete} onOpenChange={() => setFlightToDelete(null)}>
+          <AlertDialogContent className="sm:max-w-[425px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                Delete Flight
+              </AlertDialogTitle>
+              <AlertDialogDescription className="pt-4">
+                Are you sure you want to delete this flight? This action cannot be undone.
+                <div className="mt-4 space-y-4">
+                  {/* Flight Details */}
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Plane className="h-4 w-4 text-flight" />
+                      <span className="font-medium">{flightToDelete?.airline} {flightToDelete?.flight_number}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
+                        {flightToDelete?.departure_airport}
+                        {flightToDelete?.departure_iata && ` (${flightToDelete.departure_iata})`}
+                      </Badge>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
+                        {flightToDelete?.arrival_airport}
+                        {flightToDelete?.arrival_iata && ` (${flightToDelete.arrival_iata})`}
+                        {flightToDelete?.arrival_country && ` (${flightToDelete.arrival_country})`}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      {flightToDelete?.departure_date ? format(new Date(flightToDelete.departure_date), "MMMM d, yyyy", { locale: enUS }) : 'No date'}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      {flightToDelete?.departure_time} - {flightToDelete?.arrival_time}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <User className="h-4 w-4" />
+                      {flightToDelete?.passenger_name}
+                      {flightToDelete?.seat && ` (Seat ${flightToDelete.seat})`}
+                    </div>
+                  </div>
+
+                  {/* Warning Message */}
+                  <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                    <p className="font-medium">Warning:</p>
+                    <p>This will permanently delete this flight from your history. This action cannot be undone.</p>
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => flightToDelete && handleDelete(flightToDelete)}
+                className="bg-destructive hover:bg-destructive/90"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Deleting...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Flight
+                  </div>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
