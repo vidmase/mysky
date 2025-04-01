@@ -7,6 +7,9 @@ import { SupabaseClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalidate every minute
 
+// Cache version for invalidation
+const CACHE_VERSION = '1.0.0'
+
 // IATA code to country mapping
 const iataToCountry: { [key: string]: string } = {
   // United Kingdom
@@ -53,13 +56,7 @@ interface FlightStatistics {
   hoursInAir: number
   totalKilometers: number
   lastUpdated: string
-}
-
-interface Flight {
-  arrival_iata: string
-  departure_time: string
-  arrival_time: string
-  departure_date: string
+  etag?: string
 }
 
 // Calculate duration between two times, handling overnight flights
@@ -93,52 +90,52 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c
 }
 
-// Cache key generator with version for invalidation
-const getCacheKey = (userId: string) => `flight_statistics_${userId}_v2`
-
-// Fetch and process flight statistics
-const getFlightStatistics = async (
+// Implement efficient batch fetching
+const batchFetchFlightData = async (
   supabase: SupabaseClient,
   userId: string
-): Promise<FlightStatistics> => {
-  // Fetch all flights with departure and arrival IATA codes
-  const flightsResult = await supabase
-    .from('vidmaflights')
-    .select('departure_iata, arrival_iata')
-    .eq('owner_id', userId)
-    .not('arrival_iata', 'is', null)
+): Promise<{ flights: any[], airports: any[] }> => {
+  const [flightsResult, airportsResult] = await Promise.all([
+    supabase
+      .from('vidmaflights')
+      .select('departure_iata, arrival_iata, departure_time, arrival_time')
+      .eq('owner_id', userId)
+      .not('arrival_iata', 'is', null),
+
+    supabase
+      .from('all_airport_gps')
+      .select('iata, lat, lon')
+  ])
 
   if (flightsResult.error) throw flightsResult.error
-
-  // Get unique IATA codes from flights
-  const iataSet = new Set<string>()
-  flightsResult.data.forEach(flight => {
-    if (flight.departure_iata) iataSet.add(flight.departure_iata)
-    if (flight.arrival_iata) iataSet.add(flight.arrival_iata)
-  })
-
-  // Fetch GPS coordinates for all airports
-  const airportsResult = await supabase
-    .from('all_airport_gps')
-    .select('iata, lat, lon')
-    .in('iata', Array.from(iataSet))
-
   if (airportsResult.error) throw airportsResult.error
 
-  // Create a map of IATA codes to coordinates
-  const airportCoords = new Map(
-    airportsResult.data.map(airport => [
-      airport.iata,
-      { lat: Number(airport.lat), lon: Number(airport.lon) }
-    ])
-  )
+  return {
+    flights: flightsResult.data,
+    airports: airportsResult.data
+  }
+}
 
-  // Calculate total distance
+// Implement efficient statistics calculation
+const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightStatistics> => {
+  const airportMap = new Map(airports.map(airport => [
+    airport.iata,
+    { lat: Number(airport.lat), lon: Number(airport.lon) }
+  ]))
+
+  const uniqueIataCodes = new Set<string>()
   let totalKilometers = 0
-  flightsResult.data.forEach(flight => {
-    const departure = airportCoords.get(flight.departure_iata)
-    const arrival = airportCoords.get(flight.arrival_iata)
+  let totalHours = 0
 
+  // Single pass through flights for all calculations
+  flights.forEach(flight => {
+    if (flight.arrival_iata) {
+      uniqueIataCodes.add(flight.arrival_iata)
+    }
+
+    // Calculate distance if coordinates available
+    const departure = airportMap.get(flight.departure_iata)
+    const arrival = airportMap.get(flight.arrival_iata)
     if (departure && arrival) {
       totalKilometers += calculateDistance(
         departure.lat,
@@ -147,93 +144,90 @@ const getFlightStatistics = async (
         arrival.lon
       )
     }
+
+    // Calculate duration
+    if (flight.departure_time && flight.arrival_time) {
+      totalHours += calculateFlightDuration(flight.departure_time, flight.arrival_time)
+    }
   })
 
-  // Get existing statistics
-  const [flightCountResult, flightDetailsResult] = await Promise.all([
-    supabase
-      .from('vidmaflights')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_id', userId),
-
-    supabase
-      .from('vidmaflights')
-      .select('arrival_iata, departure_time, arrival_time, departure_date')
-      .eq('owner_id', userId)
-      .not('arrival_iata', 'is', null)
-  ])
-
-  if (flightCountResult.error) throw flightCountResult.error
-  if (flightDetailsResult.error) throw flightDetailsResult.error
-
-  const flights = flightDetailsResult.data
-
-  // Process IATA codes efficiently using Set operations
-  const uniqueIataCodes = new Set(
-    flights
-      .map(flight => flight.arrival_iata)
-      .filter(Boolean)
-  )
-
-  // Calculate total hours in air
-  const totalHours = flights.reduce((total, flight) => {
-    if (flight.departure_time && flight.arrival_time) {
-      return total + calculateFlightDuration(flight.departure_time, flight.arrival_time)
-    }
-    return total
-  }, 0)
-
-  // Pre-allocate sets for better performance
+  // Process countries
   const countries = new Set<string>()
   const unmappedCodes = new Set<string>()
 
-  // Single-pass processing of IATA codes
-  for (const iata of uniqueIataCodes) {
-    if (typeof iata === 'string') {
-      const country = iataToCountry[iata]
-      country ? countries.add(country) : unmappedCodes.add(iata)
+  uniqueIataCodes.forEach(iata => {
+    const country = iataToCountry[iata]
+    if (country) {
+      countries.add(country)
+    } else {
+      unmappedCodes.add(iata)
     }
-  }
+  })
 
   return {
-    totalFlights: flightCountResult.count || 0,
+    totalFlights: flights.length,
     totalCountries: countries.size,
     countries: Array.from(countries).sort(),
     unmappedAirports: Array.from(unmappedCodes),
     hoursInAir: Math.round(totalHours * 10) / 10,
-    totalKilometers: Math.round(totalKilometers),
-    lastUpdated: new Date().toISOString()
+    totalKilometers: Math.round(totalKilometers)
   }
 }
 
-export async function GET() {
+// Generate ETag for caching
+const generateETag = (data: any): string => {
+  return Buffer.from(JSON.stringify(data)).toString('base64').slice(0, 27)
+}
+
+// Implement efficient caching strategy
+const getCacheKey = (userId: string) => `flight_stats_${userId}_${CACHE_VERSION}`
+
+export async function GET(request: Request) {
   try {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-    // Get the current user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
     if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use cached data if available, with shorter cache duration
-    const cachedStatistics = await unstable_cache(
+    // Check for If-None-Match header
+    const ifNoneMatch = request.headers.get('If-None-Match')
+
+    // Implement stale-while-revalidate caching
+    const cachedStats = await unstable_cache(
       async () => {
-        return getFlightStatistics(supabase, session.user.id)
+        const { flights, airports } = await batchFetchFlightData(supabase, session.user.id)
+        const stats = calculateStatistics(flights, airports)
+        const etag = generateETag(stats)
+
+        return {
+          ...stats,
+          lastUpdated: new Date().toISOString(),
+          etag
+        }
       },
       [getCacheKey(session.user.id)],
       {
-        revalidate: 60, // Cache for 1 minute
+        revalidate: 3600, // Cache for 1 hour
         tags: ['flight-statistics', `user-${session.user.id}`]
       }
     )()
 
-    return NextResponse.json(cachedStatistics)
+    // Return 304 if ETag matches
+    if (ifNoneMatch && ifNoneMatch === cachedStats.etag) {
+      return new NextResponse(null, { status: 304 })
+    }
+
+    // Set cache headers
+    const headers = new Headers()
+    headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400')
+    headers.set('ETag', cachedStats.etag)
+    headers.set('Vary', 'Cookie, Authorization')
+
+    return NextResponse.json(cachedStats, { headers })
 
   } catch (error) {
     console.error('Error fetching statistics:', error)

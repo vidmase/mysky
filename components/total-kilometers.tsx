@@ -20,21 +20,54 @@ export function TotalKilometers() {
     const [isInitialLoad, setIsInitialLoad] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
 
+    // Add local storage caching
+    useEffect(() => {
+        const cachedStats = localStorage.getItem('flight-stats')
+        if (cachedStats) {
+            try {
+                const parsed = JSON.parse(cachedStats)
+                const cacheAge = Date.now() / 1000 - parsed.cacheTimestamp
+                if (cacheAge < 3600) { // Use cache if less than 1 hour old
+                    setStats(parsed)
+                    setLoading(false)
+                    setIsInitialLoad(false)
+                }
+            } catch (e) {
+                localStorage.removeItem('flight-stats')
+            }
+        }
+    }, [])
+
     const fetchStats = useCallback(async (force = false) => {
         if (!isAuthenticated) return
 
         try {
-            // Don't set loading to true for subsequent updates to prevent flicker
             if (isInitialLoad) {
                 setLoading(true)
             }
             setIsRefreshing(true)
 
-            // Add cache-busting parameter when forcing refresh
-            const url = force ? '/api/statistics?t=' + new Date().getTime() : '/api/statistics'
+            // Implement request deduplication
+            const currentTimestamp = Date.now()
+            const lastFetch = parseInt(sessionStorage.getItem('last-fetch') || '0')
+            if (!force && currentTimestamp - lastFetch < 10000) { // Prevent refetching within 10 seconds
+                setIsRefreshing(false)
+                return
+            }
+
+            const url = force ? '/api/statistics?t=' + currentTimestamp : '/api/statistics'
             const response = await fetch(url, {
                 cache: force ? 'no-store' : 'default',
+                headers: {
+                    'Accept': 'application/json',
+                    'If-None-Match': sessionStorage.getItem('etag') || ''
+                }
             })
+
+            if (response.status === 304) {
+                setIsRefreshing(false)
+                return
+            }
 
             if (!response.ok) {
                 if (response.status === 401) {
@@ -46,9 +79,17 @@ export function TotalKilometers() {
 
             const data = await response.json()
 
-            // Only update if the data is newer or if we don't have data yet
-            if (!stats?.lastUpdated || new Date(data.lastUpdated) > new Date(stats.lastUpdated)) {
+            // Update cache timestamps
+            sessionStorage.setItem('last-fetch', currentTimestamp.toString())
+            sessionStorage.setItem('etag', response.headers.get('etag') || '')
+
+            // Only update if data is newer
+            if (!stats?.lastUpdated || new Date(data.lastUpdated).getTime() > new Date(stats.lastUpdated).getTime()) {
                 setStats(data)
+                localStorage.setItem('flight-stats', JSON.stringify({
+                    ...data,
+                    cacheTimestamp: Math.floor(Date.now() / 1000)
+                }))
             }
 
             setError(null)

@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { format, isWithinInterval, isSameDay, addYears, subYears, setMonth, setYear, addMonths, subMonths } from "date-fns"
 import { enUS } from 'date-fns/locale'
 import type { Locale } from 'date-fns'
-import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react"
+import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight, Pencil, Trash2, ChevronFirst, ChevronLast, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import Image from "next/image"
 import { useNotification } from '@/contexts/notification-context'
@@ -196,14 +196,14 @@ type Currency = keyof typeof CURRENCY_RATES
 
 function formatTimeToHHMM(time: string): string {
   if (!time) return '';
-  
+
   // Handle different time formats
   const timeStr = time.toString().trim();
-  
+
   // Try to parse the time string
   let hours: string;
   let minutes: string;
-  
+
   // Check if time is in HH:MM format
   if (timeStr.includes(':')) {
     [hours, minutes] = timeStr.split(':');
@@ -212,11 +212,11 @@ function formatTimeToHHMM(time: string): string {
     hours = timeStr.slice(0, 2);
     minutes = timeStr.slice(2, 4);
   }
-  
+
   // Ensure hours and minutes are two digits
   hours = hours.padStart(2, '0');
   minutes = minutes.padStart(2, '0');
-  
+
   return `${hours}:${minutes}`;
 }
 
@@ -245,7 +245,7 @@ function calculateDuration(departureTime: string, arrivalTime: string): string {
 // Add airline logo helper function
 function getAirlineLogo(airline: string | null): string {
   if (!airline) return ""
-  
+
   // Special cases for airlines with local logos
   const airlineName = airline.toLowerCase()
   if (airlineName === 'ryanair') {
@@ -257,12 +257,12 @@ function getAirlineLogo(airline: string | null): string {
   if (airlineName === 'easyjet') {
     return '/easyjet.png'
   }
-  
+
   // Clean airline name for URL
   const cleanAirlineName = airlineName
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
-  
+
   // Return logo URL from logo.clearbit.com (fallback to null if no airline)
   return `https://logo.clearbit.com/${cleanAirlineName}.com`
 }
@@ -285,7 +285,9 @@ export default function FlightsPage() {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null)
-  
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(6)
+
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
 
@@ -294,12 +296,12 @@ export default function FlightsPage() {
       try {
         showInfo('Fetching your flights...')
         const response = await fetch('/api/flights')
-        
+
         if (!response.ok) {
           const errorData = await response.json()
           throw new Error(`HTTP error! status: ${response.status} - ${JSON.stringify(errorData)}`)
         }
-        
+
         const data = await response.json()
         setFlights(data)
         const uniqueAirlines = Array.from(new Set(data.map((f: Flight) => f.airline).filter(Boolean))) as string[]
@@ -398,6 +400,23 @@ export default function FlightsPage() {
     }
   })
 
+  // Calculate pagination values
+  const totalPages = Math.ceil(sortedFlights.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentFlights = sortedFlights.slice(startIndex, endIndex)
+
+  // Handle page navigation
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.min(Math.max(1, page), totalPages))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, airline, dateRange, priceRange, tripType, sortBy, sortOrder])
+
   // Add isUpcoming helper function at the top of the component
   const isUpcoming = (date: string) => {
     const flightDate = new Date(date)
@@ -413,7 +432,7 @@ export default function FlightsPage() {
       '500to1000': 1000,
       'over1000': 1000
     }
-    
+
     const baseAmount = baseAmounts[range] || 0
 
     if (range === "all") return "All prices"
@@ -744,7 +763,7 @@ export default function FlightsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : sortedFlights.length === 0 ? (
+              ) : currentFlights.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     <div className="flex flex-col items-center">
@@ -754,7 +773,7 @@ export default function FlightsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedFlights.map((flight) => (
+                currentFlights.map((flight) => (
                   <TableRow
                     key={flight.id}
                     className="hover:bg-muted/30 cursor-pointer group"
@@ -767,11 +786,11 @@ export default function FlightsPage() {
                             {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
                           </span>
                           {isUpcoming(flight.departure_date) && (
-                            <Badge 
-                              variant="secondary" 
+                            <Badge
+                              variant="secondary"
                               className="bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/30 transition-colors px-1.5 py-0 text-[0.65rem] absolute -top-5 left-0 font-medium"
                             >
-                               ✈️Upcoming
+                              ✈️Upcoming
                             </Badge>
                           )}
                         </div>
@@ -798,10 +817,10 @@ export default function FlightsPage() {
                       </TooltipProvider>
                     </TableCell>
                     <TableCell>
-                        <div className="flex flex-col">
+                      <div className="flex flex-col">
                         <Badge variant="outline" className="w-fit bg-muted/30 text-foreground">
                           {flight.reservation_number}
-                            </Badge>
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -827,26 +846,26 @@ export default function FlightsPage() {
                                     <Building className="h-5 w-5 text-muted-foreground" />
                                   )}
                                   <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
-                        </div>
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="font-medium">
                                 {flight.airline || "Unknown Airline"}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        <div className="flex flex-col">
+                          <div className="flex flex-col">
                             <div className="flex items-baseline gap-1.5">
-                            <Badge
-                              variant="outline"
+                              <Badge
+                                variant="outline"
                                 className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
-                            >
+                              >
                                 {flight.flight_number}
-                            </Badge>
+                              </Badge>
                             </div>
                             {flight.seat && (
                               <span className="text-xs text-muted-foreground">
                                 Seat {flight.seat}
-                          </span>
+                              </span>
                             )}
                           </div>
                         </div>
@@ -871,7 +890,7 @@ export default function FlightsPage() {
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
                             {flight.arrival_iata || flight.arrival_airport}
-                      </Badge>
+                          </Badge>
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {flight.arrival_airport}
@@ -937,9 +956,9 @@ export default function FlightsPage() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -947,7 +966,7 @@ export default function FlightsPage() {
                           }}
                         >
                           <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </Button>
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -956,6 +975,99 @@ export default function FlightsPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Controls */}
+        {!loading && sortedFlights.length > 0 && (
+          <div className="flex items-center justify-between px-2 py-4">
+            <div className="flex-1 text-sm text-muted-foreground">
+              Showing <span className="font-medium">{startIndex + 1}</span> to{" "}
+              <span className="font-medium">
+                {Math.min(endIndex, sortedFlights.length)}
+              </span>{" "}
+              of <span className="font-medium">{sortedFlights.length}</span> flights
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronFirst className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNumber: number
+                  if (totalPages <= 5) {
+                    pageNumber = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNumber = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNumber = totalPages - 4 + i
+                  } else {
+                    pageNumber = currentPage - 2 + i
+                  }
+
+                  return (
+                    <Button
+                      key={pageNumber}
+                      variant={currentPage === pageNumber ? "default" : "outline"}
+                      size="icon"
+                      className={`h-8 w-8 ${currentPage === pageNumber
+                          ? "bg-flight hover:bg-flight/90"
+                          : ""
+                        }`}
+                      onClick={() => goToPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  )
+                })}
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <>
+                    <span className="px-2 text-muted-foreground">...</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => goToPage(totalPages)}
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronLast className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!flightToDelete} onOpenChange={() => setFlightToDelete(null)}>

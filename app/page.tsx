@@ -1,21 +1,42 @@
 import Link from "next/link"
 import { ArrowRight, MapPin, PlaneTakeoff, Plus, BarChart3, Globe, Clock, Calendar, Plane, List } from "lucide-react"
+import dynamic from 'next/dynamic'
+import { Suspense, lazy } from 'react'
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { TotalFlights } from "@/components/total-flights"
-import { TotalCountries } from "@/components/total-countries"
-import { HoursInAir } from "@/components/hours-in-air"
-import { TotalKilometers } from "@/components/total-kilometers"
-import { MostUsedAirline } from "@/components/most-used-airline"
-import { MostVisitedAirport } from "@/components/most-visited-airport"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+
+// Implement lazy loading with loading boundaries
+const StatisticsSection = lazy(() => import('@/components/sections/statistics-section'))
+const InsightsSection = lazy(() => import('@/components/sections/insights-section'))
+
+// Implement loading fallbacks
+const StatisticsLoadingFallback = () => (
+  <section className="grid gap-6 md:grid-cols-4">
+    {[...Array(4)].map((_, i) => (
+      <Card key={i} className="stat-card bg-gradient-stats text-white">
+        <CardHeader>
+          <LoadingSpinner />
+        </CardHeader>
+      </Card>
+    ))}
+  </section>
+)
+
+const InsightsLoadingFallback = () => (
+  <section className="grid gap-6 md:grid-cols-2">
+    {[...Array(2)].map((_, i) => (
+      <Card key={i} className="stat-card">
+        <CardHeader>
+          <LoadingSpinner />
+        </CardHeader>
+      </Card>
+    ))}
+  </section>
+)
 
 export default function Home() {
-  // Mock data - in a real app this would come from a database
-  const stats = {
-    totalHours: 187,
-  }
-
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col space-y-8">
@@ -29,17 +50,15 @@ export default function Home() {
           </p>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-4">
-          <TotalFlights />
-          <TotalCountries />
-          <HoursInAir />
-          <TotalKilometers />
-        </section>
+        {/* Implement lazy loading for statistics section */}
+        <Suspense fallback={<StatisticsLoadingFallback />}>
+          <StatisticsSection />
+        </Suspense>
 
-        <section className="grid gap-6 md:grid-cols-2">
-          <MostUsedAirline />
-          <MostVisitedAirport />
-        </section>
+        {/* Implement lazy loading for insights section */}
+        <Suspense fallback={<InsightsLoadingFallback />}>
+          <InsightsSection />
+        </Suspense>
 
         <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card className="flight-card border-t-4 border-t-flight">
