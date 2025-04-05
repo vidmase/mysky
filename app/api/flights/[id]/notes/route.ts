@@ -24,7 +24,7 @@ export async function PATCH(
       .from('vidmaflights')
       .update({ notes })
       .eq('id', params.id)
-      .eq('user_id', session.user.id)
+      .eq('owner_id', session.user.id)
       .select()
       .single()
 

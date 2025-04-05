@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Image from "next/image"
+import { PlaneIcon } from "@/app/components/PlaneIcon"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,7 +57,7 @@ interface Flight {
 
 function getAirlineLogo(airline: string | null): string {
   if (!airline) return ""
-  
+
   // Special cases for airlines with local logos
   const airlineName = airline.toLowerCase()
   if (airlineName === 'ryanair') {
@@ -68,12 +69,12 @@ function getAirlineLogo(airline: string | null): string {
   if (airlineName === 'easyjet') {
     return '/easyjet.png'
   }
-  
+
   // Clean airline name for URL
   const cleanAirlineName = airlineName
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
-  
+
   // Return logo URL from logo.clearbit.com (fallback to null if no airline)
   return `https://logo.clearbit.com/${cleanAirlineName}.com`
 }
@@ -196,7 +197,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       // Combine date and time strings
       const departureDateTime = `${flight.departure_date}T${flight.departure_time}`
       const arrivalDateTime = `${flight.departure_date}T${flight.arrival_time}`
-      
+
       // Parse the combined strings into Date objects
       const departureDate = new Date(departureDateTime)
       const arrivalDate = new Date(arrivalDateTime)
@@ -207,9 +208,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       }
 
       const diff = arrivalDate.getTime() - departureDate.getTime()
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    return `${hours}h ${minutes}m`
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      return `${hours}h ${minutes}m`
     } catch (error) {
       return "Duration N/A"
     }
@@ -277,7 +278,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
           <div className="p-6 relative">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-r-full"></div>
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-l-full"></div>
-            
+
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="text-center md:text-left space-y-2">
                 <div className="text-5xl font-bold tracking-tight text-flight">
@@ -293,9 +294,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex flex-col items-center py-4">
                 <div className="relative w-40 md:w-64">
                   <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-flight to-airport"></div>
-                <div className="absolute top-1/2 left-0 right-0 flex justify-center">
+                  <div className="absolute top-1/2 left-0 right-0 flex justify-center">
                     <div className="bg-white dark:bg-slate-900 p-2 -mt-4 rounded-full shadow-md">
-                      <Plane className="h-6 w-6 text-airline rotate-90" />
+                      <PlaneIcon className="h-6 w-6 text-airline" />
                     </div>
                   </div>
                   <div className="absolute -top-2 left-0 w-3 h-3 rounded-full bg-flight shadow-md"></div>
@@ -490,16 +491,16 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                     </div>
                     <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
                       <path
-                        d="M 20% 40% Q 50% 20%, 80% 35%"
+                        d="M 20% 40% Q 50% 30%, 80% 35%"
                         fill="none"
-                        stroke="hsl(var(--color-flight))"
+                        stroke="rgb(59, 130, 246)"
                         strokeWidth="2"
-                        strokeDasharray="5,5"
-                        className="flight-path"
+                        strokeDasharray="4,4"
+                        className="animate-dash"
                       />
                     </svg>
-                    <div className="absolute left-[50%] top-[30%] transform -translate-x-1/2 -translate-y-1/2">
-                      <Plane className="h-6 w-6 text-flight rotate-45" />
+                    <div className="absolute left-[50%] top-[32%] transform -translate-x-1/2 -translate-y-1/2">
+                      <PlaneIcon className="h-5 w-5 text-blue-500 animate-float" />
                     </div>
                   </div>
                   <div className="text-center space-y-2 relative z-10 bg-background/80 px-4 py-2 rounded-md">
@@ -547,8 +548,8 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center text-stats">
-                  <FileText className="h-5 w-5 mr-2" />
-                  Notes
+                    <FileText className="h-5 w-5 mr-2" />
+                    Notes
                   </div>
                   {!isEditingNotes && (
                     <Button
@@ -599,20 +600,20 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                   flight?.notes ? (
                     <div className="p-4 rounded-md bg-muted/30 border">
                       <p className="whitespace-pre-wrap">{flight.notes}</p>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-muted-foreground">No notes added for this flight.</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                      <p className="text-muted-foreground">No notes added for this flight.</p>
                       <Button
                         variant="outline"
                         className="mt-4"
                         onClick={() => setIsEditingNotes(true)}
                       >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Add Notes
-                    </Button>
-                  </div>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Add Notes
+                      </Button>
+                    </div>
                   )
                 )}
               </CardContent>

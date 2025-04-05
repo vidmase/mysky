@@ -12,14 +12,14 @@ type AirlineStats = {
 
 export function MostUsedAirline() {
   const [mostUsedAirline, setMostUsedAirline] = useState<AirlineStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)  // Start with false to prevent initial flash
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
 
     async function fetchMostUsedAirline(userId: string) {
-      if (!userId) return
+      if (!userId || !mounted) return
 
       try {
         setLoading(true)
@@ -29,6 +29,8 @@ export function MostUsedAirline() {
           .from('vidmaflights')
           .select('airline')
           .eq('owner_id', userId)
+
+        if (!mounted) return
 
         if (queryError) {
           console.error('Query error:', queryError)
@@ -58,8 +60,10 @@ export function MostUsedAirline() {
           setMostUsedAirline(mostUsed)
         }
       } catch (error) {
-        console.error('Error fetching most used airline:', error)
-        setError('An unexpected error occurred')
+        if (mounted) {
+          console.error('Error fetching most used airline:', error)
+          setError('An unexpected error occurred')
+        }
       } finally {
         if (mounted) {
           setLoading(false)
@@ -70,31 +74,31 @@ export function MostUsedAirline() {
     // Initialize auth state
     let currentSession: string | null = null
 
+    // First, check the initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+
+      if (session?.user?.id) {
+        currentSession = session.user.id
+        fetchMostUsedAirline(session.user.id)
+      } else {
+        setMostUsedAirline({ airline: 'Sign in to view', count: 0 })
+      }
+    })
+
+    // Then set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
-      
-      if (event === 'INITIAL_SESSION') {
-        if (session?.user?.id) {
-          currentSession = session.user.id
-          await fetchMostUsedAirline(session.user.id)
-        }
-      } else if (event === 'SIGNED_IN') {
+      if (!mounted) return
+
+      if (event === 'SIGNED_IN') {
         if (session?.user?.id && currentSession !== session.user.id) {
           currentSession = session.user.id
           await fetchMostUsedAirline(session.user.id)
         }
       } else if (event === 'SIGNED_OUT') {
         currentSession = null
-        setMostUsedAirline({ airline: 'Please sign in', count: 0 })
+        setMostUsedAirline({ airline: 'Sign in to view', count: 0 })
         setLoading(false)
-      }
-    })
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.id && currentSession !== session.user.id) {
-        currentSession = session.user.id
-        fetchMostUsedAirline(session.user.id)
       }
     })
 
@@ -124,7 +128,7 @@ export function MostUsedAirline() {
               ) : error ? (
                 <span className="text-red-500">{error}</span>
               ) : (
-                mostUsedAirline?.airline || 'No flights yet'
+                mostUsedAirline?.airline
               )}
             </div>
             <div className="text-sm text-muted-foreground">
@@ -132,6 +136,8 @@ export function MostUsedAirline() {
                 <div className="animate-pulse">Loading...</div>
               ) : error ? (
                 <span className="text-red-500">Failed to load data</span>
+              ) : mostUsedAirline?.airline === 'Sign in to view' ? (
+                'Sign in to view flight count'
               ) : (
                 `${mostUsedAirline?.count || 0} flights`
               )}

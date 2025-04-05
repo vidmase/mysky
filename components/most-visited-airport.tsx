@@ -12,14 +12,14 @@ type AirportStats = {
 
 export function MostVisitedAirport() {
   const [mostVisitedAirport, setMostVisitedAirport] = useState<AirportStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)  // Start with false to prevent initial flash
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
 
     async function fetchMostVisitedAirport(userId: string) {
-      if (!userId) return
+      if (!userId || !mounted) return
 
       try {
         setLoading(true)
@@ -29,6 +29,8 @@ export function MostVisitedAirport() {
           .from('vidmaflights')
           .select('arrival_airport')
           .eq('owner_id', userId)
+
+        if (!mounted) return
 
         if (queryError) {
           console.error('Query error:', queryError)
@@ -58,8 +60,10 @@ export function MostVisitedAirport() {
           setMostVisitedAirport(mostVisited)
         }
       } catch (error) {
-        console.error('Error fetching most visited airport:', error)
-        setError('An unexpected error occurred')
+        if (mounted) {
+          console.error('Error fetching most visited airport:', error)
+          setError('An unexpected error occurred')
+        }
       } finally {
         if (mounted) {
           setLoading(false)
@@ -70,31 +74,31 @@ export function MostVisitedAirport() {
     // Initialize auth state
     let currentSession: string | null = null
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
+    // First, check the initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
 
-      if (event === 'INITIAL_SESSION') {
-        if (session?.user?.id) {
-          currentSession = session.user.id
-          await fetchMostVisitedAirport(session.user.id)
-        }
-      } else if (event === 'SIGNED_IN') {
+      if (session?.user?.id) {
+        currentSession = session.user.id
+        fetchMostVisitedAirport(session.user.id)
+      } else {
+        setMostVisitedAirport({ airport: 'Sign in to view', count: 0 })
+      }
+    })
+
+    // Then set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+
+      if (event === 'SIGNED_IN') {
         if (session?.user?.id && currentSession !== session.user.id) {
           currentSession = session.user.id
           await fetchMostVisitedAirport(session.user.id)
         }
       } else if (event === 'SIGNED_OUT') {
         currentSession = null
-        setMostVisitedAirport({ airport: 'Please sign in', count: 0 })
+        setMostVisitedAirport({ airport: 'Sign in to view', count: 0 })
         setLoading(false)
-      }
-    })
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.id && currentSession !== session.user.id) {
-        currentSession = session.user.id
-        fetchMostVisitedAirport(session.user.id)
       }
     })
 
@@ -124,7 +128,7 @@ export function MostVisitedAirport() {
               ) : error ? (
                 <span className="text-red-500">{error}</span>
               ) : (
-                mostVisitedAirport?.airport || 'No flights yet'
+                mostVisitedAirport?.airport
               )}
             </div>
             <div className="text-sm text-muted-foreground">
@@ -132,6 +136,8 @@ export function MostVisitedAirport() {
                 <div className="animate-pulse">Loading...</div>
               ) : error ? (
                 <span className="text-red-500">Failed to load data</span>
+              ) : mostVisitedAirport?.airport === 'Sign in to view' ? (
+                'Sign in to view visit count'
               ) : (
                 `${mostVisitedAirport?.count || 0} visits`
               )}
