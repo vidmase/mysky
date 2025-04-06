@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Plus_Jakarta_Sans } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from '@/contexts/auth-context'
 import { NotificationProvider } from '@/contexts/notification-context'
@@ -10,6 +10,12 @@ import { MainNav } from "@/components/main-nav"
 import 'leaflet/dist/leaflet.css'
 
 const inter = Inter({ subsets: ["latin"] })
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-jakarta',
+})
 
 export const metadata: Metadata = {
   title: "FlightTrack - Track Your Flight History",
@@ -23,12 +29,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`${inter.variable} ${jakarta.variable} dark`}>
       <head>
         {/* Add this to ensure proper mobile viewport */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
-      <body className={inter.className}>
+      <body className="font-jakarta font-light tracking-wide">
         <AuthProvider>
           <NotificationProvider>
             <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
@@ -43,7 +49,5 @@ export default function RootLayout({
     </html>
   )
 }
-
-
 
 import './globals.css'

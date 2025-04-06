@@ -98,6 +98,9 @@ const config = {
         "slide-up": "slide-up 0.5s ease-out",
         dash: "dash 1s linear infinite",
       },
+      fontFamily: {
+        jakarta: ['var(--font-jakarta)', 'sans-serif'],
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

@@ -2,118 +2,145 @@
 
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Plane } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 type Statistics = {
   totalFlights: number
-  totalCountries: number
   lastUpdated: string
 }
 
+const CACHE_KEY = 'total-flights-stats'
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 export function TotalFlights() {
-  const [stats, setStats] = useState<Statistics | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<Statistics | null>(() => {
+    // Initialize from cache if available
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached)
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          return data
+        }
+      }
+    }
+    return null
+  })
+  const [loading, setLoading] = useState(!stats)
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
-  const fetchStatistics = useCallback(async () => {
+  const fetchStatistics = useCallback(async (force = false) => {
     if (!isAuthenticated) return
 
     try {
-      setError(null)
-      // Don't set loading to true for subsequent updates to prevent flicker
-      if (isInitialLoad) {
-        setLoading(true)
-      }
-
-      const response = await fetch('/api/statistics', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setIsAuthenticated(false)
+      // Use cached data if available and not forced refresh
+      if (!force && stats?.lastUpdated) {
+        const cachedTimestamp = new Date(stats.lastUpdated).getTime()
+        if (Date.now() - cachedTimestamp < CACHE_DURATION) {
           return
         }
-        throw new Error('Failed to fetch statistics')
       }
 
-      const data = await response.json()
-      setStats(data)
-      setIsInitialLoad(false)
-    } catch (error) {
-      console.error('Error fetching statistics:', error)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setIsAuthenticated(false)
+        return
+      }
+
+      const { data, error: flightError } = await supabase
+        .from('vidmaflights')
+        .select('id')
+        .eq('owner_id', session.user.id)
+
+      if (flightError) throw flightError
+
+      const newStats = {
+        totalFlights: data?.length || 0,
+        lastUpdated: new Date().toISOString()
+      }
+
+      setStats(newStats)
+
+      // Update cache
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        data: newStats,
+        timestamp: Date.now()
+      }))
+
+      setError(null)
+    } catch (err) {
+      console.error('Error fetching flight statistics:', err)
       setError('Unable to load flight data')
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, isInitialLoad])
+  }, [isAuthenticated, stats?.lastUpdated])
 
-  useEffect(() => {
-    let mounted = true
-    let refreshInterval: NodeJS.Timeout | null = null
-
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return
-      if (session?.user) {
-        setIsAuthenticated(true)
-      }
-    })
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return
-
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user) {
-          setIsAuthenticated(true)
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setIsAuthenticated(false)
-        setStats(null)
-        setLoading(false)
-        setIsInitialLoad(true)
-        if (refreshInterval) {
-          clearInterval(refreshInterval)
-          refreshInterval = null
-        }
-      }
-    })
-
-    return () => {
-      mounted = false
-      if (refreshInterval) {
-        clearInterval(refreshInterval)
-      }
-      subscription?.unsubscribe()
-    }
+  // Memoize session check to prevent unnecessary re-renders
+  const checkSession = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    setIsAuthenticated(!!session?.user)
   }, [])
 
-  // Separate effect for data fetching
   useEffect(() => {
-    let mounted = true
-    let refreshInterval: NodeJS.Timeout | null = null
+    checkSession()
 
-    if (isAuthenticated) {
-      fetchStatistics()
-      // Refresh every 2 minutes instead of 30 seconds
-      refreshInterval = setInterval(fetchStatistics, 120000)
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user)
+    })
 
     return () => {
-      mounted = false
-      if (refreshInterval) {
-        clearInterval(refreshInterval)
+      subscription?.unsubscribe()
+    }
+  }, [checkSession])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchStatistics()
+
+      // Set up real-time subscription
+      const subscription = supabase
+        .channel('flight-changes')
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'vidmaflights' },
+          () => fetchStatistics(true)
+        )
+        .subscribe()
+
+      return () => {
+        subscription.unsubscribe()
       }
     }
   }, [isAuthenticated, fetchStatistics])
+
+  // Memoize the card content to prevent unnecessary re-renders
+  const cardContent = useMemo(() => {
+    if (!isAuthenticated) {
+      return <span className="text-lg">Sign in to track your flights</span>
+    }
+
+    if (error) {
+      return <span className="text-red-200">{error}</span>
+    }
+
+    if (loading) {
+      return <LoadingSpinner size="lg" />
+    }
+
+    return (
+      <div className="flex flex-col">
+        <span>{stats?.totalFlights.toLocaleString() || '0'}</span>
+        {stats?.lastUpdated && (
+          <span className="text-xs text-white/60 font-normal mt-1">
+            Last updated: {new Date(stats.lastUpdated).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+    )
+  }, [isAuthenticated, error, loading, stats])
 
   return (
     <Card className="stat-card bg-gradient-airline text-white">
@@ -122,28 +149,8 @@ export function TotalFlights() {
           <div className="text-4xl font-bold flex items-center justify-between">
             <div className="flex items-center">
               <Plane className="h-6 w-6 mr-2 opacity-80" />
-              {loading && isInitialLoad ? (
-                <div className="flex items-center space-x-2">
-                  <LoadingSpinner size="lg" />
-                </div>
-              ) : !isAuthenticated ? (
-                <span className="text-lg">Sign in to track your flights</span>
-              ) : error ? (
-                <span className="text-red-200">{error}</span>
-              ) : (
-                <div className="flex flex-col">
-                  <span>{stats?.totalFlights.toLocaleString() || '0'}</span>
-                  {stats?.lastUpdated && (
-                    <span className="text-xs text-white/60 font-normal mt-1">
-                      Last updated: {new Date(stats.lastUpdated).toLocaleTimeString()}
-                    </span>
-                  )}
-                </div>
-              )}
+              {cardContent}
             </div>
-            {loading && !isInitialLoad && (
-              <LoadingSpinner size="sm" className="opacity-60" />
-            )}
           </div>
         </CardTitle>
         <CardDescription className="text-white/80">
