@@ -3,6 +3,7 @@
 import React from 'react'
 import { createClient } from "@/utils/supabase/client"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { airportData } from '@/lib/airport-data'
 import {
   BarChart,
   Calendar,
@@ -59,10 +60,10 @@ export default function StatsPage() {
 
         console.log('Fetching stats for user:', session.user.id)
 
-        // Get flights data including departure date
+        // Get flights data including countries
         const { data: flightData, error: flightError } = await supabase
           .from('vidmaflights')
-          .select('id, arrival_country, airline, departure_iata, arrival_iata, departure_date')
+          .select('id, departure_country, arrival_country, departure_airport, arrival_airport, departure_iata, arrival_iata, airline, departure_date')
           .eq('owner_id', session.user.id)
 
         if (flightError) {
@@ -152,12 +153,43 @@ export default function StatsPage() {
           setFrequentRoute({ route: mostFrequentRoute, count: routeCount })
         }
 
-        // Calculate countries
-        const uniqueCountries = new Set(
-          flightData
-            .map(flight => flight.arrival_country)
-            .filter(country => country != null)
-        )
+        // Calculate unique countries from all available sources
+        const uniqueCountries = new Set<string>();
+
+        console.log('=== Starting Country Calculation ===');
+        flightData.forEach((flight, index) => {
+          console.log(`Processing flight ${index + 1}`);
+
+          // Add countries from direct country fields
+          if (flight.departure_country) {
+            uniqueCountries.add(flight.departure_country);
+            console.log(`Added departure country: ${flight.departure_country}`);
+          }
+          if (flight.arrival_country) {
+            uniqueCountries.add(flight.arrival_country);
+            console.log(`Added arrival country: ${flight.arrival_country}`);
+          }
+
+          // Backup: Try to get countries from airport data if direct country is not available
+          if (!flight.departure_country && flight.departure_iata) {
+            const depAirport = airportData[flight.departure_iata.trim()];
+            if (depAirport?.country) {
+              uniqueCountries.add(depAirport.country);
+              console.log(`Added departure country from airport data: ${depAirport.country}`);
+            }
+          }
+          if (!flight.arrival_country && flight.arrival_iata) {
+            const arrAirport = airportData[flight.arrival_iata.trim()];
+            if (arrAirport?.country) {
+              uniqueCountries.add(arrAirport.country);
+              console.log(`Added arrival country from airport data: ${arrAirport.country}`);
+            }
+          }
+        });
+
+        console.log('=== Country Calculation Results ===');
+        console.log('Unique countries:', Array.from(uniqueCountries));
+        console.log('Total unique countries:', uniqueCountries.size);
 
         console.log('Stats calculated:', {
           totalFlights: flightData.length,

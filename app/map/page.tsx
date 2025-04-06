@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
-import type { Map as LeafletMap, Layer, LayerGroup } from "leaflet"
+import type { Map as LeafletMap, Layer, LayerGroup, GeoJSON } from "leaflet"
 import "/node_modules/flag-icons/css/flag-icons.min.css"
 
 // Types
@@ -109,6 +109,7 @@ export default function MapPage() {
   const [airports, setAirports] = useState<Airport[]>([])
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("map")
 
   // Refs for map elements
   const mapRef = useRef<LeafletMap | null>(null)
@@ -283,11 +284,10 @@ export default function MapPage() {
 
     // Create the path with animation
     const path = L.polyline(points, {
-      color: isHighlighted ? "hsl(var(--color-flight))" : "rgba(150, 150, 150, 0.6)",
-      weight: isHighlighted ? 3 : 2,
-      opacity: isHighlighted ? 0.9 : 0.7,
-      dashArray: undefined,
-      className: "flight-path",
+      color: "hsl(var(--color-flight))",
+      weight: 3,
+      opacity: 0.9,
+      className: "flight-path animate-draw",
       interactive: true,
       smoothFactor: 1,
     });
@@ -297,7 +297,10 @@ export default function MapPage() {
       .bindTooltip(
         `<div class="flight-tooltip">
           <div class="flight-route">
-            ${route.from} → ${route.to}
+            <span class="fi fi-${getCountryCode(fromAirport.country)}" style="margin-right: 4px;"></span>
+            ${route.from} → 
+            <span class="fi fi-${getCountryCode(toAirport.country)}" style="margin-left: 4px;"></span>
+            ${route.to}
           </div>
           <div class="flight-count">
             ${route.count} flight${route.count > 1 ? 's' : ''}
@@ -305,69 +308,15 @@ export default function MapPage() {
           <div class="flight-distance">
             ${Math.round(distance / 1000)}km
           </div>
-                 </div>`,
+        </div>`,
         {
           permanent: false,
           direction: 'top',
           className: 'custom-tooltip'
         }
-      )
-      .on('mouseover', () => {
-        path.setStyle({
-          weight: isHighlighted ? 4 : 3,
-          opacity: 1,
-          color: "hsl(var(--color-flight))"
-        });
-        path.bringToFront();
-      })
-      .on('mouseout', () => {
-        path.setStyle({
-          weight: isHighlighted ? 3 : 2,
-          opacity: isHighlighted ? 0.9 : 0.7,
-          color: isHighlighted ? "hsl(var(--color-flight))" : "rgba(150, 150, 150, 0.6)"
-        });
-      })
-      .on('click', () => {
-        const bounds = L.latLngBounds(
-          [fromAirport.lat, fromAirport.lng],
-          [toAirport.lat, toAirport.lng]
-        );
-        map.fitBounds(bounds, {
-          padding: [50, 50],
-          maxZoom: 6,
-          animate: true,
-          duration: 1
-        });
-      });
+      );
 
-    // Add plane icon at the midpoint
-    const midPoint = points[Math.floor(points.length / 2)];
-    const planeIcon = L.divIcon({
-      className: "plane-icon",
-      html: `<div class="bg-white rounded-full p-1.5 shadow-md transform hover:scale-125 transition-all duration-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--color-flight))" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rotate-45">
-                <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
-              </svg>
-                   </div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
-    });
-
-    const marker = L.marker(midPoint, {
-      icon: planeIcon,
-      interactive: true
-    }).bindTooltip(
-      `${route.from} → ${route.to}<br>${route.count} flight${route.count > 1 ? 's' : ''}`,
-      {
-        permanent: false,
-        direction: 'top',
-        className: 'custom-tooltip'
-      }
-    );
-
-    // Create a feature group to return both path and marker
-    const group = L.featureGroup([path, marker]);
-    return group;
+    return path;
   }, []);
 
   // Debounced path update function
@@ -446,66 +395,202 @@ export default function MapPage() {
 
   // Initialize map
   useEffect(() => {
+    let map: LeafletMap | null = null;
+    let layerGroup: LayerGroup | null = null;
+
     const initMap = async () => {
-      if (typeof window === "undefined") return
+      if (typeof window === "undefined" || activeTab !== "map") return
 
-      const L = (await import("leaflet")).default
-      leafletRef.current = L
+      // Clean up existing map instance if it exists
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+        pathLayerGroupRef.current = null
+      }
 
-      if (!mapRef.current) {
+      try {
+        const L = await import("leaflet")
+        leafletRef.current = L.default
+
         // Create map instance
-        const map = L.map("map", {
+        map = L.default.map("map", {
           center: [20, 0],
           zoom: 2,
           minZoom: 2,
           maxZoom: 8,
-          maxBounds: L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180)),
+          maxBounds: L.default.latLngBounds(L.default.latLng(-90, -180), L.default.latLng(90, 180)),
           maxBoundsViscosity: 1.0,
           zoomControl: false,
           attributionControl: false,
         })
 
         // Add custom map tiles
-        L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+        L.default.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
           id: "mapbox/light-v11",
           tileSize: 512,
           zoomOffset: -1,
           accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
         }).addTo(map)
 
-        // Add zoom control
-        L.control.zoom({
-          position: "bottomright"
-        }).addTo(map)
+        // Get unique visited countries
+        const visitedCountries = new Set(airports.map(airport => airport.country));
 
-        // Create layer group for paths
-        const layerGroup = L.layerGroup().addTo(map)
+        // Fetch and add GeoJSON data for country borders
+        const response = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson');
+        const geoData = await response.json();
+
+        // Add GeoJSON layer with custom styling
+        L.default.geoJSON(geoData, {
+          style: (feature) => ({
+            fillColor: visitedCountries.has(feature?.properties?.ADMIN) ? 'hsl(var(--color-flight))' : 'transparent',
+            fillOpacity: visitedCountries.has(feature?.properties?.ADMIN) ? 0.1 : 0,
+            weight: visitedCountries.has(feature?.properties?.ADMIN) ? 1.5 : 0.5,
+            color: visitedCountries.has(feature?.properties?.ADMIN) ? 'hsl(var(--color-flight))' : '#666',
+            opacity: visitedCountries.has(feature?.properties?.ADMIN) ? 0.8 : 0.2
+          }),
+          interactive: true,
+          onEachFeature: (feature, layer) => {
+            if (visitedCountries.has(feature?.properties?.ADMIN)) {
+              layer.on({
+                mouseover: (e) => {
+                  const geoJSONLayer = e.target as GeoJSON;
+                  geoJSONLayer.setStyle({
+                    fillOpacity: 0.3,
+                    weight: 2,
+                    opacity: 1
+                  });
+                },
+                mouseout: (e) => {
+                  const geoJSONLayer = e.target as GeoJSON;
+                  geoJSONLayer.setStyle({
+                    fillOpacity: 0.1,
+                    weight: 1.5,
+                    opacity: 0.8
+                  });
+                }
+              });
+            }
+          }
+        }).addTo(map);
+
+        // Create layer group for paths (but don't add any paths initially)
+        layerGroup = L.default.layerGroup().addTo(map)
 
         // Store references
         mapRef.current = map
         pathLayerGroupRef.current = layerGroup
 
-        // Initial path update
-        updatePaths()
+        // Add markers for all airports
+        airports.forEach(airport => {
+          if (!map) return;
 
-        // Update paths when map is ready
-        map.whenReady(() => {
-          updatePaths()
-        })
+          const marker = L.default.circleMarker([airport.lat, airport.lng], {
+            radius: 5,
+            fillColor: "hsl(var(--color-flight))",
+            color: "#fff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+          }).bindTooltip(
+            `<div class="marker-tooltip">
+              <div class="font-medium">${airport.name}</div>
+              <div class="text-sm text-muted-foreground">${airport.code}</div>
+              <div class="text-xs text-muted-foreground">${airport.visits} visits</div>
+            </div>`,
+            {
+              direction: 'top',
+              className: 'custom-tooltip',
+              permanent: false,
+              offset: [0, -10],
+              opacity: 1
+            }
+          );
+
+          let currentPaths: Layer[] = [];
+
+          marker.on({
+            mouseover: () => {
+              if (!map) return;
+
+              // Clear existing paths
+              pathLayerGroupRef.current?.clearLayers();
+
+              // Find all routes for this airport
+              const airportRoutes = routes.filter(route =>
+                route.from === airport.code || route.to === airport.code
+              );
+
+              // Draw routes for this airport
+              airportRoutes.forEach(route => {
+                const fromAirport = airports.find(a => a.code === route.from);
+                const toAirport = airports.find(a => a.code === route.to);
+                if (fromAirport && toAirport && map) {
+                  const path = createFlightPath(fromAirport, toAirport, route, map, true);
+                  if (path) {
+                    currentPaths.push(path);
+                    pathLayerGroupRef.current?.addLayer(path);
+                  }
+                }
+              });
+
+              // Highlight the marker
+              marker.setStyle({
+                radius: 7,
+                fillOpacity: 1,
+                weight: 3
+              });
+            },
+            mouseout: (e) => {
+              const relatedTarget = e.originalEvent?.relatedTarget as HTMLElement;
+              // Only clear paths if we're not hovering over a path or tooltip
+              if (!relatedTarget?.closest('.leaflet-tooltip') &&
+                !relatedTarget?.closest('.flight-path')) {
+                // Clear flight paths
+                pathLayerGroupRef.current?.clearLayers();
+                currentPaths = [];
+
+                // Reset marker style
+                marker.setStyle({
+                  radius: 5,
+                  fillOpacity: 0.8,
+                  weight: 2
+                });
+              }
+            },
+            click: () => {
+              if (!map) return;
+              // Zoom to airport
+              map.setView([airport.lat, airport.lng], 6, {
+                animate: true,
+                duration: 1
+              });
+            }
+          });
+
+          marker.addTo(map);
+        });
+
+        // Add zoom control
+        L.default.control.zoom({
+          position: "bottomright"
+        }).addTo(map)
+
+      } catch (error) {
+        console.error("Error initializing map:", error)
       }
     }
 
     initMap()
-  }, [updatePaths])
 
-  // Update paths when selection changes
-  useEffect(() => {
-    if (selectedAirport !== null) {
-      updatePaths(selectedAirport);
-    } else {
-      updatePaths();
+    // Cleanup function
+    return () => {
+      if (map) {
+        map.remove()
+        mapRef.current = null
+        pathLayerGroupRef.current = null
+      }
     }
-  }, [selectedAirport, updatePaths]);
+  }, [activeTab, airports, routes, createFlightPath])
 
   // If user is not authenticated, show login prompt
   useEffect(() => {
@@ -519,9 +604,72 @@ export default function MapPage() {
     checkAuth()
   }, [supabase, router])
 
+  // Add global styles for map
+  const mapStyles = `
+    .leaflet-container {
+      background: #f8f9fa;
+    }
+
+    .leaflet-tile-pane {
+      filter: saturate(1.1) hue-rotate(-5deg);
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: white;
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .leaflet-popup-tip {
+      background: white;
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .custom-tooltip {
+      background: white;
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .marker-tooltip {
+      text-align: center;
+    }
+
+    .flight-path {
+      stroke: hsl(var(--color-flight));
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.1));
+    }
+
+    .animate-draw {
+      animation: draw 1.5s ease-out forwards;
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+    }
+
+    @keyframes draw {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .flight-path:hover {
+      filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.2));
+    }
+  `
+
   return (
     <div className="container mx-auto p-4 space-y-4">
-      <Tabs defaultValue="map" className="w-full">
+      <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="map">Map View</TabsTrigger>
           <TabsTrigger value="list">Airport List</TabsTrigger>
@@ -559,20 +707,9 @@ export default function MapPage() {
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-5 w-5 text-primary"
-                              >
-                                <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
-                              </svg>
+                              <span className={`fi fi-${getCountryCode(airport.country)}`}
+                                style={{ width: "1.5rem", height: "1.125rem" }}
+                                title={airport.country} />
                               <h3 className="font-semibold text-lg tracking-tight">
                                 {airport.name}
                               </h3>
@@ -584,9 +721,6 @@ export default function MapPage() {
                               {airport.country && (
                                 <span className="flex items-center gap-2">
                                   <span>•</span>
-                                  <span className={`fi fi-${getCountryCode(airport.country)}`}
-                                    style={{ width: "1.5rem", height: "1.125rem" }}
-                                    title={`${airport.country} (${getCountryCode(airport.country)})`} />
                                   {airport.country}
                                 </span>
                               )}
@@ -671,25 +805,31 @@ export default function MapPage() {
                                     className="flex items-center justify-between rounded-lg bg-background/50 p-2 text-sm hover:bg-background transition-colors"
                                   >
                                     <div className="flex items-center gap-2">
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        className="h-4 w-4 text-muted-foreground"
-                                      >
-                                        <path d="M5 12h14" />
-                                        <path d="m12 5 7 7-7 7" />
-                                      </svg>
-                                      <span>{otherAirport?.name}</span>
-                                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md text-muted-foreground">
-                                        {otherAirport?.code}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`fi fi-${getCountryCode(airport.country)}`}
+                                          style={{ width: "1.25rem", height: "0.9375rem" }}
+                                          title={airport.country} />
+                                        <span>{airport.code}</span>
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          className="h-4 w-4 text-muted-foreground"
+                                        >
+                                          <path d="M5 12h14" />
+                                          <path d="m12 5 7 7-7 7" />
+                                        </svg>
+                                        <span className={`fi fi-${getCountryCode(otherAirport?.country || '')}`}
+                                          style={{ width: "1.25rem", height: "0.9375rem" }}
+                                          title={otherAirport?.country} />
+                                        <span>{otherAirport?.code}</span>
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 text-muted-foreground">
                                       <svg
@@ -788,6 +928,8 @@ export default function MapPage() {
         .plane-icon {
           transition: all 0.3s ease;
         }
+
+        ${mapStyles}
       `}</style>
     </div>
   )

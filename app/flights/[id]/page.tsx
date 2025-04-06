@@ -194,9 +194,13 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   }
 
   const formatTime = (timeStr: string) => {
-    // Parse time string (assuming format like "14:30") and return in HH:mm format
-    const [hours, minutes] = timeStr.split(':')
-    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
+    try {
+      // Parse time string and ensure it's in HH:MM format
+      const [hours, minutes] = timeStr.split(':').map(num => num.padStart(2, '0'))
+      return `${hours}:${minutes}`
+    } catch (error) {
+      return timeStr // Return original string if parsing fails
+    }
   }
 
   const calculateDuration = () => {
@@ -226,19 +230,25 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="icon" onClick={() => router.back()} className="h-8 w-8">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center">
-              <Plane className="h-5 w-5 mr-2 text-flight" />
-              Flight Details
-            </h1>
-            <p className="text-muted-foreground">
-              {flight.departure_airport} to {flight.arrival_airport} • {flight.departure_date}
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Flights
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold flex items-center">
+                <Plane className="h-5 w-5 mr-2 text-flight" />
+                Flight Details
+              </h1>
+              <p className="text-muted-foreground">
+                {flight.departure_airport} to {flight.arrival_airport} • {flight.departure_date}
+              </p>
+            </div>
           </div>
         </div>
 

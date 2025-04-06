@@ -6,10 +6,22 @@ import { useNotification } from "@/contexts/notification-context"
 import { FlightForm } from "@/components/flight-form"
 import { format } from "date-fns"
 import { enUS } from 'date-fns/locale'
-import { Plane, Building, Clock, CreditCard, User } from "lucide-react"
+import { Plane, Building, Clock, CreditCard, User, ArrowLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { use } from "react"
+
+// Add formatTime helper function after the imports
+const formatTime = (timeStr: string) => {
+  try {
+    // Parse time string and ensure it's in HH:MM format
+    const [hours, minutes] = timeStr.split(':').map(num => num.padStart(2, '0'))
+    return `${hours}:${minutes}`
+  } catch (error) {
+    return timeStr // Return original string if parsing fails
+  }
+}
 
 export default function EditFlightPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -78,8 +90,21 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Edit Flight</h1>
-        
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              size="icon"
+              className="h-8 w-8"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+            </Button>
+            <h1 className="text-3xl font-bold">Edit Flight</h1>
+          </div>
+        </div>
+
         {/* Flight Summary Card */}
         <Card className="border-t-4 border-t-flight mb-8">
           <CardContent className="pt-6">
@@ -152,7 +177,7 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center">
                   <Clock className="mr-1 h-3 w-3" />
-                  {flight.departure_time}
+                  {formatTime(flight.departure_time)}
                 </div>
               </div>
 
@@ -173,7 +198,7 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center">
                   <Clock className="mr-1 h-3 w-3" />
-                  {flight.arrival_time}
+                  {formatTime(flight.arrival_time)}
                 </div>
               </div>
 
@@ -192,7 +217,7 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
         </Card>
 
         {/* Edit Form */}
-        <FlightForm 
+        <FlightForm
           initialData={flight}
           onSubmit={handleSubmit}
           submitLabel="Update Flight"
