@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plane } from 'lucide-react'
 
@@ -12,56 +11,40 @@ type AirlineStats = {
 
 export function MostUsedAirline() {
   const [mostUsedAirline, setMostUsedAirline] = useState<AirlineStats | null>(null)
-  const [loading, setLoading] = useState(false)  // Start with false to prevent initial flash
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
 
-    async function fetchMostUsedAirline(userId: string) {
-      if (!userId || !mounted) return
-
+    async function fetchStatistics() {
       try {
         setLoading(true)
         setError(null)
 
-        const { data, error: queryError } = await supabase
-          .from('vidmaflights')
-          .select('airline')
-          .eq('owner_id', userId)
+        const response = await fetch('/api/statistics')
+        if (!mounted) return
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            setMostUsedAirline({ airline: 'Sign in to view', count: 0 })
+            return
+          }
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
 
         if (!mounted) return
 
-        if (queryError) {
-          console.error('Query error:', queryError)
-          setError('Failed to fetch airline data')
-          return
-        }
-
-        if (!data || data.length === 0) {
+        if (data.mostUsedAirline) {
+          setMostUsedAirline(data.mostUsedAirline)
+        } else {
           setMostUsedAirline({ airline: 'No flights yet', count: 0 })
-          return
-        }
-
-        // Count occurrences of each airline
-        const airlineCounts = data.reduce((acc: { [key: string]: number }, flight) => {
-          if (flight.airline) {
-            acc[flight.airline] = (acc[flight.airline] || 0) + 1
-          }
-          return acc
-        }, {})
-
-        // Find the airline with the highest count
-        const mostUsed = Object.entries(airlineCounts).reduce((max, [airline, count]) => {
-          return count > (max.count || 0) ? { airline, count } : max
-        }, { airline: '', count: 0 })
-
-        if (mounted) {
-          setMostUsedAirline(mostUsed)
         }
       } catch (error) {
         if (mounted) {
-          console.error('Error fetching most used airline:', error)
+          console.error('Error fetching statistics:', error)
           setError('An unexpected error occurred')
         }
       } finally {
@@ -71,40 +54,10 @@ export function MostUsedAirline() {
       }
     }
 
-    // Initialize auth state
-    let currentSession: string | null = null
-
-    // First, check the initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return
-
-      if (session?.user?.id) {
-        currentSession = session.user.id
-        fetchMostUsedAirline(session.user.id)
-      } else {
-        setMostUsedAirline({ airline: 'Sign in to view', count: 0 })
-      }
-    })
-
-    // Then set up the auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-
-      if (event === 'SIGNED_IN') {
-        if (session?.user?.id && currentSession !== session.user.id) {
-          currentSession = session.user.id
-          await fetchMostUsedAirline(session.user.id)
-        }
-      } else if (event === 'SIGNED_OUT') {
-        currentSession = null
-        setMostUsedAirline({ airline: 'Sign in to view', count: 0 })
-        setLoading(false)
-      }
-    })
+    fetchStatistics()
 
     return () => {
       mounted = false
-      subscription?.unsubscribe()
     }
   }, [])
 

@@ -7,13 +7,14 @@ import { NotificationProvider } from '@/contexts/notification-context'
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
+import 'leaflet/dist/leaflet.css'
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "FlightTrack - Track Your Flight History",
   description: "Keep track of your flights, visualize your travels, and gain insights into your journey.",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({

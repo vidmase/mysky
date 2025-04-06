@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 
 interface Flight {
   id: number
@@ -78,6 +79,12 @@ function getAirlineLogo(airline: string | null): string {
   // Return logo URL from logo.clearbit.com (fallback to null if no airline)
   return `https://logo.clearbit.com/${cleanAirlineName}.com`
 }
+
+// Import FlightMap dynamically to avoid SSR issues with Leaflet
+const FlightMap = dynamic(
+  () => import('@/app/components/FlightMap'),
+  { ssr: false }
+)
 
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -474,42 +481,12 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="aspect-video bg-muted/50 rounded-md flex items-center justify-center world-map-bg relative overflow-hidden">
-                  <div className="absolute w-full h-full">
-                    {/* This would be replaced with an actual map component in a real app */}
-                    <div className="absolute left-[20%] top-[40%] transform -translate-x-1/2 -translate-y-1/2">
-                      <div className="h-4 w-4 rounded-full bg-flight animate-pulse-slow"></div>
-                      <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 rounded text-xs font-medium shadow-md">
-                        {flight.departure_iata || flight.departure_airport}
-                      </div>
-                    </div>
-                    <div className="absolute left-[80%] top-[35%] transform -translate-x-1/2 -translate-y-1/2">
-                      <div className="h-4 w-4 rounded-full bg-airport animate-pulse-slow"></div>
-                      <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 rounded text-xs font-medium shadow-md">
-                        {flight.arrival_iata || flight.arrival_airport}
-                      </div>
-                    </div>
-                    <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M 20% 40% Q 50% 30%, 80% 35%"
-                        fill="none"
-                        stroke="rgb(59, 130, 246)"
-                        strokeWidth="2"
-                        strokeDasharray="4,4"
-                        className="animate-dash"
-                      />
-                    </svg>
-                    <div className="absolute left-[50%] top-[32%] transform -translate-x-1/2 -translate-y-1/2">
-                      <PlaneIcon className="h-5 w-5 text-blue-500 animate-float" />
-                    </div>
-                  </div>
-                  <div className="text-center space-y-2 relative z-10 bg-background/80 px-4 py-2 rounded-md">
-                    <p className="text-sm font-medium">
-                      Flight path from {flight.departure_airport} to {flight.arrival_airport}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Distance: {/* Distance would be fetched from the flight data */}</p>
-                  </div>
-                </div>
+                <FlightMap
+                  departureAirport={flight.departure_airport}
+                  arrivalAirport={flight.arrival_airport}
+                  departureIata={flight.departure_iata}
+                  arrivalIata={flight.arrival_iata}
+                />
 
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center p-4 rounded-md bg-muted/30">

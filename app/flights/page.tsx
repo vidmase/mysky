@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import Link from "next/link"
 import { format, isWithinInterval, isSameDay, addYears, subYears, setMonth, setYear, addMonths, subMonths } from "date-fns"
 import { enUS } from 'date-fns/locale'
 import type { Locale } from 'date-fns'
-import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react"
+import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus, User, CreditCard, ArrowUpDown, ArrowDownUp, X, ChevronLeft, ChevronRight, Pencil, Trash2, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import Image from "next/image"
 import { useNotification } from '@/contexts/notification-context'
@@ -285,6 +285,8 @@ export default function FlightsPage() {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 7
 
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
@@ -292,7 +294,7 @@ export default function FlightsPage() {
   useEffect(() => {
     const fetchFlights = async () => {
       try {
-        showInfo('Fetching your flights...')
+        setLoading(true)
         const response = await fetch('/api/flights')
 
         if (!response.ok) {
@@ -316,7 +318,7 @@ export default function FlightsPage() {
     }
 
     fetchFlights()
-  }, [showSuccess, showError, showInfo])
+  }, [showSuccess, showError])
 
   // Filter flights based on search term and filters
   const filteredFlights = Array.isArray(flights) ? flights.filter((flight: Flight) => {
@@ -397,6 +399,19 @@ export default function FlightsPage() {
         return 0
     }
   })
+
+  // Calculate pagination
+  const totalPages = Math.ceil(sortedFlights.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentFlights = sortedFlights.slice(startIndex, endIndex)
+
+  const canGoPrevious = currentPage > 1
+  const canGoNext = currentPage < totalPages
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.min(Math.max(1, page), totalPages))
+  }
 
   // Add isUpcoming helper function at the top of the component
   const isUpcoming = (date: string) => {
@@ -744,7 +759,7 @@ export default function FlightsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : sortedFlights.length === 0 ? (
+              ) : currentFlights.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     <div className="flex flex-col items-center">
@@ -754,7 +769,7 @@ export default function FlightsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedFlights.map((flight) => (
+                currentFlights.map((flight) => (
                   <TableRow
                     key={flight.id}
                     className="hover:bg-muted/30 cursor-pointer group"
@@ -956,6 +971,83 @@ export default function FlightsPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Controls */}
+        {!loading && sortedFlights.length > 0 && (
+          <div className="flex items-center justify-between px-2">
+            <div className="flex-1 text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, sortedFlights.length)} of {sortedFlights.length} flights
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(1)}
+                disabled={!canGoPrevious}
+              >
+                <span className="sr-only">Go to first page</span>
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={!canGoPrevious}
+              >
+                <span className="sr-only">Go to previous page</span>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-2">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show current page, first and last pages, and pages around current
+                    const nearCurrent = Math.abs(page - currentPage) <= 1
+                    const isFirstPage = page === 1
+                    const isLastPage = page === totalPages
+                    return nearCurrent || isFirstPage || isLastPage
+                  })
+                  .map((page, index, array) => (
+                    <Fragment key={page}>
+                      {index > 0 && array[index - 1] !== page - 1 && (
+                        <span className="text-muted-foreground">...</span>
+                      )}
+                      <Button
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="icon"
+                        className={`h-8 w-8 ${currentPage === page ? 'bg-flight hover:bg-flight/90' : ''}`}
+                        onClick={() => goToPage(page)}
+                      >
+                        <span className="sr-only">Go to page {page}</span>
+                        {page}
+                      </Button>
+                    </Fragment>
+                  ))}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={!canGoNext}
+              >
+                <span className="sr-only">Go to next page</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => goToPage(totalPages)}
+                disabled={!canGoNext}
+              >
+                <span className="sr-only">Go to last page</span>
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!flightToDelete} onOpenChange={() => setFlightToDelete(null)}>

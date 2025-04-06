@@ -196,3 +196,24 @@
     background-color: rgba(255, 255, 255, 0.5);
   }
 }
+
+/* Map styles */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background-color: hsl(var(--card));
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.8) saturate(1.2) contrast(1.1);
+}
+
+.leaflet-popup-content-wrapper {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-radius: var(--radius);
+}
+
+.leaflet-popup-tip {
+  background-color: hsl(var(--card));
+}

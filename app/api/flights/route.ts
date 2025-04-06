@@ -51,11 +51,11 @@ export async function GET() {
 
     if (!profile) {
       console.log('Creating new profile for user:', session.user.id) // Debug log
-      
+
       // Create profile if it doesn't exist
       const { data: newProfile, error: createProfileError } = await supabase
         .from('profiles')
-        .insert([{ 
+        .insert([{
           id: session.user.id,
           email: session.user.email,
           full_name: session.user.user_metadata?.full_name || null,
@@ -66,9 +66,9 @@ export async function GET() {
 
       if (createProfileError) {
         console.error('Error creating profile:', createProfileError)
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Failed to create user profile',
-          details: createProfileError.message 
+          details: createProfileError.message
         }, { status: 500 })
       }
 

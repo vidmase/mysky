@@ -7,6 +7,17 @@ import { SupabaseClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalidate every minute
 
+// API Response types
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+  metadata?: {
+    cache_hit?: boolean
+    last_updated?: string
+  }
+}
+
 // Cache version for invalidation
 const CACHE_VERSION = '1.0.0'
 
@@ -57,6 +68,10 @@ interface FlightStatistics {
   totalKilometers: number
   lastUpdated: string
   etag?: string
+  mostUsedAirline?: {
+    airline: string
+    count: number
+  }
 }
 
 // Calculate duration between two times, handling overnight flights
@@ -98,7 +113,7 @@ const batchFetchFlightData = async (
   const [flightsResult, airportsResult] = await Promise.all([
     supabase
       .from('vidmaflights')
-      .select('departure_iata, arrival_iata, departure_time, arrival_time')
+      .select('departure_iata, arrival_iata, departure_time, arrival_time, airline')
       .eq('owner_id', userId)
       .not('arrival_iata', 'is', null),
 
@@ -124,6 +139,7 @@ const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightSta
   ]))
 
   const uniqueIataCodes = new Set<string>()
+  const airlineCounts = new Map<string, number>()
   let totalKilometers = 0
   let totalHours = 0
 
@@ -131,6 +147,11 @@ const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightSta
   flights.forEach(flight => {
     if (flight.arrival_iata) {
       uniqueIataCodes.add(flight.arrival_iata)
+    }
+
+    // Track airline usage
+    if (flight.airline) {
+      airlineCounts.set(flight.airline, (airlineCounts.get(flight.airline) || 0) + 1)
     }
 
     // Calculate distance if coordinates available
@@ -151,6 +172,14 @@ const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightSta
     }
   })
 
+  // Find most used airline
+  let mostUsedAirline: { airline: string; count: number } | undefined
+  for (const [airline, count] of airlineCounts) {
+    if (!mostUsedAirline || count > mostUsedAirline.count) {
+      mostUsedAirline = { airline, count }
+    }
+  }
+
   // Process countries
   const countries = new Set<string>()
   const unmappedCodes = new Set<string>()
@@ -170,7 +199,8 @@ const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightSta
     countries: Array.from(countries).sort(),
     unmappedAirports: Array.from(unmappedCodes),
     hoursInAir: Math.round(totalHours * 10) / 10,
-    totalKilometers: Math.round(totalKilometers)
+    totalKilometers: Math.round(totalKilometers),
+    mostUsedAirline: mostUsedAirline || { airline: 'No flights yet', count: 0 }
   }
 }
 
@@ -231,9 +261,9 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error('Error fetching statistics:', error)
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    )
+    return NextResponse.json<ApiResponse<null>>({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal Server Error'
+    }, { status: 500 })
   }
 } 
