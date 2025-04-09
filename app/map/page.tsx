@@ -12,28 +12,30 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
-import type { Map as LeafletMap, Layer, LayerGroup, GeoJSON } from "leaflet"
 import "/node_modules/flag-icons/css/flag-icons.min.css"
+import "mapbox-gl/dist/mapbox-gl.css"
+import mapboxgl from "mapbox-gl"
 
 // Types
-type Airport = {
-  code: string
-  name: string
-  city: string
-  country: string
-  lat: number
-  lng: number
-  visits: number
-  routes: Route[]
+interface Airport {
+  code: string;
+  name: string;
+  city: string;
+  country: string;
+  lat: number;
+  lng: number;
+  visits: number;
+  routes: Route[];
 }
 
-type Route = {
-  from: string
-  to: string
-  count: number
+interface Route {
+  id: string;
+  from: string;
+  to: string;
+  count: number;
 }
 
-type Flight = {
+interface Flight {
   departure_airport: string
   arrival_airport: string
 }
@@ -99,6 +101,172 @@ const getCountryCode = (country: string): string => {
   return code || normalizedCountry.toLowerCase().slice(0, 2);
 };
 
+// Function to get unique visited countries
+const getVisitedCountries = (airports: Airport[]): Set<string> => {
+  const countryNameMap: Record<string, string> = {
+    "United Kingdom": "United Kingdom of Great Britain and Northern Ireland",
+    "Ireland": "Ireland",
+    "Cyprus": "Cyprus",
+    "Switzerland": "Switzerland",
+    "Lithuania": "Lithuania",
+    "Spain": "Spain"
+  };
+
+  return new Set(airports.map(airport => countryNameMap[airport.country] || airport.country));
+};
+
+// Update the color function to return a string instead of Color array
+const getArcColor = (count: number): string => {
+  // Color gradient based on flight count
+  const scale = Math.min(1, count / 10); // Normalize count to 0-1 range
+  const r = Math.round(103 + scale * (0 - 103));
+  const g = Math.round(232 + scale * (165 - 232));
+  const b = Math.round(249 + scale * (233 - 249));
+  return `rgba(${r}, ${g}, ${b}, 0.7)`;
+};
+
+// Add type for the feature
+interface FlightPathFeature {
+  type: 'Feature';
+  properties: {
+    from: string;
+    to: string;
+    count: number;
+    hover_airport: string | null;
+  };
+  geometry: {
+    type: 'LineString';
+    coordinates: [number, number][];
+  };
+}
+
+// Add the Haversine distance calculation function
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c); // Return rounded kilometers
+};
+
+// Update the calculateTotalDistance function
+const calculateTotalDistance = (airport: Airport, airports: Airport[]): number => {
+  let totalDistance = 0;
+  const processedRoutes = new Set<string>();
+
+  airport.routes.forEach(route => {
+    // Create a unique route identifier that's the same regardless of direction
+    const routeId = [route.from, route.to].sort().join('-');
+
+    // Only process each route once
+    if (!processedRoutes.has(routeId)) {
+      processedRoutes.add(routeId);
+
+      const otherAirport = airports.find(a =>
+        a.code === (route.from === airport.code ? route.to : route.from)
+      );
+
+      if (otherAirport) {
+        const distance = calculateDistance(
+          airport.lat, airport.lng,
+          otherAirport.lat, otherAirport.lng
+        );
+        totalDistance += distance * route.count;
+      }
+    }
+  });
+
+  return totalDistance;
+};
+
+// Update the calculateStatistics function
+const calculateStatistics = (airports: Airport[]): {
+  totalVisits: number;
+  totalRoutes: number;
+  totalFlights: number;
+  totalDistance: number;
+  mostVisitedAirport: Airport;
+  mostConnectedAirport: Airport;
+  mostFlownRoute: Route;
+  countriesVisited: number;
+} => {
+  const totalVisits = airports.reduce((sum, airport) => sum + airport.visits, 0);
+  const totalRoutes = airports.reduce((sum, airport) => sum + airport.routes.length / 2, 0);
+  const totalFlights = airports.reduce((sum, airport) =>
+    sum + airport.routes.reduce((routeSum, route) => routeSum + route.count, 0), 0) / 2;
+
+  // Improved total distance calculation
+  const processedRoutes = new Set<string>();
+  const totalDistance = airports.reduce((sum, fromAirport) => {
+    let airportDistance = 0;
+    fromAirport.routes.forEach(route => {
+      // Create a unique route identifier that's the same regardless of direction
+      const routeId = [route.from, route.to].sort().join('-');
+
+      // Only process each route once
+      if (!processedRoutes.has(routeId)) {
+        processedRoutes.add(routeId);
+
+        const toAirport = airports.find(a => a.code === (route.from === fromAirport.code ? route.to : route.from));
+        if (toAirport) {
+          const distance = calculateDistance(
+            fromAirport.lat,
+            fromAirport.lng,
+            toAirport.lat,
+            toAirport.lng
+          );
+          // Multiply distance by the number of flights on this route
+          airportDistance += distance * route.count;
+        }
+      }
+    });
+    return sum + airportDistance;
+  }, 0);
+
+  const mostVisitedAirport = airports.reduce((max, airport) =>
+    airport.visits > (max?.visits || 0) ? airport : max, airports[0]);
+
+  const mostConnectedAirport = airports.reduce((max, airport) =>
+    airport.routes.length > (max?.routes.length || 0) ? airport : max, airports[0]);
+
+  // Find the most flown route
+  const routeMap = new Map<string, number>();
+  airports.forEach(airport => {
+    airport.routes.forEach(route => {
+      const routeId = [route.from, route.to].sort().join('-');
+      if (!routeMap.has(routeId)) {
+        routeMap.set(routeId, route.count);
+      }
+    });
+  });
+
+  const [mostFlownRouteId, mostFlownCount] = Array.from(routeMap.entries())
+    .reduce(([maxId, maxCount], [id, count]) =>
+      count > maxCount ? [id, count] : [maxId, maxCount],
+      ['', 0]
+    );
+
+  const [from, to] = mostFlownRouteId.split('-');
+  const mostFlownRoute = { id: mostFlownRouteId, from, to, count: mostFlownCount };
+
+  const countriesVisited = new Set(airports.map(airport => airport.country)).size;
+
+  return {
+    totalVisits,
+    totalRoutes,
+    totalFlights,
+    totalDistance,
+    mostVisitedAirport,
+    mostConnectedAirport,
+    mostFlownRoute,
+    countriesVisited
+  };
+};
+
 export default function MapPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -112,14 +280,15 @@ export default function MapPage() {
   const [activeTab, setActiveTab] = useState("map")
 
   // Refs for map elements
-  const mapRef = useRef<LeafletMap | null>(null)
-  const pathLayerGroupRef = useRef<LayerGroup | null>(null)
-  const leafletRef = useRef<typeof import("leaflet") | null>(null)
+  const mapRef = useRef<mapboxgl.Map | null>(null)
+  const mapContainerRef = useRef<HTMLDivElement | null>(null)
+  const markersRef = useRef<mapboxgl.Marker[]>([])
 
   // Process flight data
   const processFlightData = useCallback((flights: Flight[]) => {
     const airportMap = new Map<string, Airport>();
     const routeMap = new Map<string, number>();
+    const visitedCountries = new Set<string>();
 
     // Helper function to extract IATA code from airport string
     const extractIATACode = (airportString: string) => {
@@ -151,77 +320,61 @@ export default function MapPage() {
       const arrCode = extractIATACode(flight.arrival_airport);
 
       // Process departure airport
-      if (!airportMap.has(depCode)) {
-        const airportInfo = airportData[depCode] || {
-          name: flight.departure_airport.split(' (')[0],
-          city: flight.departure_airport.split(' (')[0],
-          country: '',
-          lat: 0,
-          lng: 0
-        };
-
-        airportMap.set(depCode, {
-          code: depCode,
-          name: airportInfo.name,
-          city: airportInfo.city,
-          country: airportInfo.country,
-          lat: airportInfo.lat,
-          lng: airportInfo.lng,
-          visits: 1,
-          routes: []
-        });
-      } else {
-        const airport = airportMap.get(depCode)!;
-        airport.visits++;
+      if (depCode in airportData) {
+        if (!airportMap.has(depCode)) {
+          airportMap.set(depCode, {
+            code: depCode,
+            name: airportData[depCode].name,
+            city: airportData[depCode].city,
+            country: airportData[depCode].country,
+            lat: airportData[depCode].lat,
+            lng: airportData[depCode].lng,
+            visits: 1,
+            routes: []
+          });
+        } else {
+          const airport = airportMap.get(depCode)!;
+          airport.visits++;
+        }
       }
 
       // Process arrival airport
-      if (!airportMap.has(arrCode)) {
-        const airportInfo = airportData[arrCode] || {
-          name: flight.arrival_airport.split(' (')[0],
-          city: flight.arrival_airport.split(' (')[0],
-          country: '',
-          lat: 0,
-          lng: 0
-        };
-
-        airportMap.set(arrCode, {
-          code: arrCode,
-          name: airportInfo.name,
-          city: airportInfo.city,
-          country: airportInfo.country,
-          lat: airportInfo.lat,
-          lng: airportInfo.lng,
-          visits: 1,
-          routes: []
-        });
-      } else {
-        const airport = airportMap.get(arrCode)!;
-        airport.visits++;
+      if (arrCode in airportData) {
+        if (!airportMap.has(arrCode)) {
+          airportMap.set(arrCode, {
+            code: arrCode,
+            name: airportData[arrCode].name,
+            city: airportData[arrCode].city,
+            country: airportData[arrCode].country,
+            lat: airportData[arrCode].lat,
+            lng: airportData[arrCode].lng,
+            visits: 1,
+            routes: []
+          });
+        } else {
+          const airport = airportMap.get(arrCode)!;
+          airport.visits++;
+        }
       }
 
-      // Process route (count both directions)
-      const routeKey = getRouteKey(flight.departure_airport, flight.arrival_airport);
-      routeMap.set(routeKey, (routeMap.get(routeKey) || 0) + 1);
+      // Process route
+      if (depCode in airportData && arrCode in airportData) {
+        const routeKey = getRouteKey(depCode, arrCode);
+        routeMap.set(routeKey, (routeMap.get(routeKey) || 0) + 1);
+      }
     });
 
     // Convert maps to arrays and sort airports by visits
     const airportArray = Array.from(airportMap.values())
-      .filter(airport => airport.code in airportData) // Only include airports we have data for
       .sort((a, b) => b.visits - a.visits);
 
     // Process routes and assign them to airports
     const routeArray: Route[] = [];
     routeMap.forEach((count, key) => {
       const [airport1, airport2] = key.split('-');
-
-      // Only include routes where both airports are in our airportData
-      if (airport1 in airportData && airport2 in airportData) {
-        // Create routes in both directions
-        routeArray.push({ from: airport1, to: airport2, count });
-        if (airport1 !== airport2) {
-          routeArray.push({ from: airport2, to: airport1, count });
-        }
+      routeArray.push({ id: key, from: airport1, to: airport2, count });
+      if (airport1 !== airport2) {
+        routeArray.push({ id: key, from: airport2, to: airport1, count });
       }
     });
 
@@ -238,120 +391,70 @@ export default function MapPage() {
     return { airports: airportArray, routes: routeArray };
   }, []);
 
-  // Create flight path helper
+  // Update the createFlightPath function signature
   const createFlightPath = useCallback((
     fromAirport: Airport,
     toAirport: Airport,
     route: Route,
-    map: LeafletMap,
+    map: mapboxgl.Map,
     isHighlighted: boolean = false
   ) => {
-    if (typeof window === 'undefined' || !leafletRef.current) return null;
-    const L = leafletRef.current;
+    // Remove the map parameter since it's not used in this function
+    if (typeof window === 'undefined') return null;
 
-    // Calculate distance and midpoint for arc height
-    const distance = map.distance(
-      [fromAirport.lat, fromAirport.lng],
-      [toAirport.lat, toAirport.lng]
-    );
+    // Create a GeoJSON feature for the flight path
+    const feature = {
+      type: 'Feature' as const,
+      properties: {
+        from: route.from,
+        to: route.to,
+        count: route.count,
+        isHighlighted
+      },
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: [
+          [fromAirport.lng, fromAirport.lat],
+          [toAirport.lng, toAirport.lat]
+        ]
+      }
+    };
 
-    // Dynamic curve intensity based on distance
-    const curveIntensity = Math.min(0.3, distance / 3000000);
-    const numPoints = Math.max(100, Math.min(200, distance / 5000));
-
-    // Generate curved path points
-    const points: [number, number][] = [];
-    for (let i = 0; i <= numPoints; i++) {
-      const t = i / numPoints;
-
-      // Start and end points
-      const startLat = fromAirport.lat;
-      const startLng = fromAirport.lng;
-      const endLat = toAirport.lat;
-      const endLng = toAirport.lng;
-
-      // Calculate curved point
-      const lat = startLat * (1 - t) + endLat * t;
-      const lng = startLng * (1 - t) + endLng * t;
-
-      // Add altitude curve using sine wave
-      const alt = Math.sin(t * Math.PI) * curveIntensity;
-      const latOffset = alt * (endLat - startLat);
-      const lngOffset = alt * (endLng - startLng);
-
-      points.push([lat + latOffset, lng + lngOffset]);
-    }
-
-    // Create the path with animation
-    const path = L.polyline(points, {
-      color: "hsl(var(--color-flight))",
-      weight: 3,
-      opacity: 0.9,
-      className: "flight-path animate-draw",
-      interactive: true,
-      smoothFactor: 1,
-    });
-
-    // Add interactivity
-    path
-      .bindTooltip(
-        `<div class="flight-tooltip">
-          <div class="flight-route">
-            <span class="fi fi-${getCountryCode(fromAirport.country)}" style="margin-right: 4px;"></span>
-            ${route.from} → 
-            <span class="fi fi-${getCountryCode(toAirport.country)}" style="margin-left: 4px;"></span>
-            ${route.to}
-          </div>
-          <div class="flight-count">
-            ${route.count} flight${route.count > 1 ? 's' : ''}
-          </div>
-          <div class="flight-distance">
-            ${Math.round(distance / 1000)}km
-          </div>
-        </div>`,
-        {
-          permanent: false,
-          direction: 'top',
-          className: 'custom-tooltip'
-        }
-      );
-
-    return path;
+    return feature;
   }, []);
 
-  // Debounced path update function
+  // Update the updatePaths function
   const updatePaths = useMemo(() => debounce((filterAirport?: string) => {
-    if (!mapRef.current || !pathLayerGroupRef.current || !leafletRef.current || typeof window === 'undefined') return;
+    if (!mapRef.current || typeof window === 'undefined') return;
 
     const map = mapRef.current;
-    const layerGroup = pathLayerGroupRef.current;
-    const L = leafletRef.current;
-
-    // Clear existing paths
-    layerGroup.clearLayers();
 
     // Filter routes if needed
     const routesToDraw = filterAirport
       ? routes.filter((route) => route.from === filterAirport || route.to === filterAirport)
       : routes;
 
-    // Batch path creation
-    const paths: Layer[] = [];
-    routesToDraw.forEach((route) => {
+    // Create GeoJSON features for all paths
+    const features = routesToDraw.flatMap((route) => {
       const fromAirport = airports.find((a) => a.code === route.from);
       const toAirport = airports.find((a) => a.code === route.to);
 
       if (fromAirport && toAirport) {
         const path = createFlightPath(fromAirport, toAirport, route, map, !!filterAirport);
-        if (path) {
-          paths.push(path);
-        }
+        return path ? [path] : [];
       }
+      return [];
     });
 
-    // Add all paths at once
-    layerGroup.addLayer(L.layerGroup(paths));
-  }, 100) as DebouncedFunc<(filterAirport?: string) => void>, [routes, airports, createFlightPath]);
+    // Update the source data if it exists
+    const source = map.getSource('flights-paths') as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: 'FeatureCollection',
+        features
+      });
+    }
+  }, 100), [routes, airports, createFlightPath]);
 
   // Fetch flight data
   useEffect(() => {
@@ -393,204 +496,378 @@ export default function MapPage() {
     fetchFlights()
   }, [supabase, router, toast, processFlightData])
 
-  // Initialize map
-  useEffect(() => {
-    let map: LeafletMap | null = null;
-    let layerGroup: LayerGroup | null = null;
+  // Update the updateFlightPaths function
+  const updateFlightPaths = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !airports || airports.length === 0) return;
 
-    const initMap = async () => {
-      if (typeof window === "undefined" || activeTab !== "map") return
+    console.log('Updating flight paths...'); // Debug log
 
-      // Clean up existing map instance if it exists
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
-        pathLayerGroupRef.current = null
-      }
+    // Create features for all flight paths
+    const features = airports.flatMap((airport: Airport) => {
+      console.log(`Processing routes for airport ${airport.code}, routes:`, airport.routes); // Debug log
+      return airport.routes
+        .map((route) => {
+          const otherAirport = airports.find((a: Airport) =>
+            a.code === (route.from === airport.code ? route.to : route.from)
+          );
 
-      try {
-        const L = await import("leaflet")
-        leafletRef.current = L.default
+          if (!otherAirport) return null;
 
-        // Create map instance
-        map = L.default.map("map", {
-          center: [20, 0],
-          zoom: 2,
-          minZoom: 2,
-          maxZoom: 8,
-          maxBounds: L.default.latLngBounds(L.default.latLng(-90, -180), L.default.latLng(90, 180)),
-          maxBoundsViscosity: 1.0,
-          zoomControl: false,
-          attributionControl: false,
+          const feature: GeoJSON.Feature = {
+            type: 'Feature',
+            properties: {
+              from: route.from,
+              to: route.to,
+              count: route.count,
+              hover_airport: null
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [airport.lng, airport.lat],
+                [otherAirport.lng, otherAirport.lat]
+              ]
+            }
+          };
+
+          return feature;
         })
+        .filter((feature): feature is GeoJSON.Feature => feature !== null);
+    });
 
-        // Add custom map tiles
-        L.default.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
-          id: "mapbox/light-v11",
-          tileSize: 512,
-          zoomOffset: -1,
-          accessToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
-        }).addTo(map)
+    console.log('Created features:', features); // Debug log
 
-        // Get unique visited countries
-        const visitedCountries = new Set(airports.map(airport => airport.country));
+    // Update the source data
+    const source = map.getSource('flight-paths') as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: 'FeatureCollection',
+        features
+      });
+    } else {
+      console.log('Flight paths source not found!'); // Debug log
+    }
+  }, [airports]);
 
-        // Fetch and add GeoJSON data for country borders
-        const response = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson');
-        const geoData = await response.json();
+  // Update the map initialization
+  useEffect(() => {
+    if (mapContainerRef.current === null || mapRef.current !== null) return;
 
-        // Add GeoJSON layer with custom styling
-        L.default.geoJSON(geoData, {
-          style: (feature) => ({
-            fillColor: visitedCountries.has(feature?.properties?.ADMIN) ? 'hsl(var(--color-flight))' : 'transparent',
-            fillOpacity: visitedCountries.has(feature?.properties?.ADMIN) ? 0.1 : 0,
-            weight: visitedCountries.has(feature?.properties?.ADMIN) ? 1.5 : 0.5,
-            color: visitedCountries.has(feature?.properties?.ADMIN) ? 'hsl(var(--color-flight))' : '#666',
-            opacity: visitedCountries.has(feature?.properties?.ADMIN) ? 0.8 : 0.2
-          }),
-          interactive: true,
-          onEachFeature: (feature, layer) => {
-            if (visitedCountries.has(feature?.properties?.ADMIN)) {
-              layer.on({
-                mouseover: (e) => {
-                  const geoJSONLayer = e.target as GeoJSON;
-                  geoJSONLayer.setStyle({
-                    fillOpacity: 0.3,
-                    weight: 2,
-                    opacity: 1
-                  });
-                },
-                mouseout: (e) => {
-                  const geoJSONLayer = e.target as GeoJSON;
-                  geoJSONLayer.setStyle({
-                    fillOpacity: 0.1,
-                    weight: 1.5,
-                    opacity: 0.8
-                  });
-                }
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: 'mapbox://styles/mapbox/navigation-day-v1',
+      center: [-0.118092, 51.509865], // London
+      zoom: 5
+    });
+
+    mapRef.current = map;
+
+    map.on('load', () => {
+      console.log('Map style loaded, initializing layers...'); // Debug log
+
+      // Add flight paths source
+      map.addSource('flight-paths', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      // Add flight paths layer
+      map.addLayer({
+        id: 'flight-paths-layer',
+        type: 'line',
+        source: 'flight-paths',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+          'visibility': 'visible'
+        },
+        paint: {
+          'line-color': [
+            'case',
+            ['any',
+              ['==', ['get', 'from'], ['get', 'hover_airport']],
+              ['==', ['get', 'to'], ['get', 'hover_airport']]
+            ],
+            '#3b82f6', // Bright blue for connected routes
+            '#94a3b8'  // Gray for other routes
+          ],
+          'line-width': [
+            'case',
+            ['any',
+              ['==', ['get', 'from'], ['get', 'hover_airport']],
+              ['==', ['get', 'to'], ['get', 'hover_airport']]
+            ],
+            3,  // Thicker for connected routes
+            1.5 // Normal for other routes
+          ],
+          'line-opacity': [
+            'case',
+            ['any',
+              ['==', ['get', 'from'], ['get', 'hover_airport']],
+              ['==', ['get', 'to'], ['get', 'hover_airport']]
+            ],
+            0.8, // More visible for connected routes
+            0.4  // Less visible for other routes
+          ]
+        }
+      });
+
+      // Update flight paths if we have data
+      if (airports && airports.length > 0) {
+        console.log('Airports data available, updating flight paths...'); // Debug log
+        updateFlightPaths();
+      }
+    });
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  // Add effect to update flight paths when airports data changes
+  useEffect(() => {
+    if (!mapRef.current || !airports || airports.length === 0) return;
+
+    const map = mapRef.current;
+    if (map.isStyleLoaded()) {
+      console.log('Map style is loaded, updating flight paths...'); // Debug log
+      updateFlightPaths();
+    } else {
+      console.log('Waiting for map style to load...'); // Debug log
+      map.once('load', () => {
+        console.log('Map style loaded, updating flight paths...'); // Debug log
+        updateFlightPaths();
+      });
+    }
+  }, [airports, updateFlightPaths]);
+
+  // Function to update airport markers
+  const updateAirportMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !airports || airports.length === 0) return;
+
+    // Create GeoJSON features for airports
+    const airportFeatures = airports.map(airport => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [airport.lng, airport.lat]
+      },
+      properties: {
+        id: airport.code,
+        name: airport.name,
+        code: airport.code,
+        visits: airport.visits,
+        lat: airport.lat,
+        lng: airport.lng
+      }
+    }));
+
+    // Add or update the airports source
+    if (!map.getSource('airports')) {
+      map.addSource('airports', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: airportFeatures
+        }
+      });
+    } else {
+      (map.getSource('airports') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: airportFeatures
+      });
+    }
+
+    // Add the airports layer if it doesn't exist
+    if (!map.getLayer('airports-layer')) {
+      map.addLayer({
+        id: 'airports-layer',
+        type: 'circle',
+        source: 'airports',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['get', 'visits'],
+            1, 6,    // minimum size for 1 visit
+            10, 8,  // medium size for 10 visits
+            50, 10   // maximum size for 50+ visits
+          ],
+          'circle-color': '#0ea5e9', // Light blue color
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff', // White border
+          'circle-opacity': 0.7
+        }
+      });
+
+      // Update the other instance of airport labels layer
+      if (!map.getLayer('airport-labels')) {
+        map.addLayer({
+          id: 'airport-labels',
+          type: 'symbol',
+          source: 'airports',
+          layout: {
+            'text-field': ['get', 'code'],  // Show only airport code
+            'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+            'text-size': 12,
+            'text-offset': [0, 1.5],
+            'text-anchor': 'top',
+            'visibility': 'none'  // Hide labels completely
+          },
+          paint: {
+            'text-color': '#1e293b',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2,
+            'text-opacity': 1
+          }
+        });
+      }
+    }
+  }, [airports]);
+
+  // Update markers when airports data changes
+  useEffect(() => {
+    if (!mapRef.current || !airports || airports.length === 0) return;
+
+    const map = mapRef.current;
+
+    if (map.isStyleLoaded()) {
+      console.log('Map style is loaded, updating airport markers immediately');
+      updateAirportMarkers();
+    } else {
+      console.log('Waiting for map style to load...');
+      map.once('load', () => {
+        console.log('Map style loaded, updating airport markers');
+        updateAirportMarkers();
+      });
+    }
+  }, [airports, updateAirportMarkers]);
+
+  // Update hover interactions for airports
+  useEffect(() => {
+    if (!mapRef.current || !airports) return;
+
+    const map = mapRef.current;
+
+    const handleMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+      if (e.features && e.features.length > 0) {
+        map.getCanvas().style.cursor = 'pointer';
+
+        const feature = e.features[0];
+        const airportCode = feature.properties?.code;
+
+        if (airportCode) {
+          // Update the hover_airport property in the source data
+          const source = map.getSource('flight-paths') as mapboxgl.GeoJSONSource;
+          if (source) {
+            const data = source.serialize().data;
+            if (data && typeof data === 'object' && 'features' in data) {
+              source.setData({
+                type: 'FeatureCollection',
+                features: (data.features as any[]).map(f => ({
+                  ...f,
+                  properties: {
+                    ...f.properties,
+                    hover_airport: airportCode
+                  }
+                }))
               });
             }
           }
-        }).addTo(map);
 
-        // Create layer group for paths (but don't add any paths initially)
-        layerGroup = L.default.layerGroup().addTo(map)
+          // Show popup with airport info and connected routes
+          const airport = airports.find(a => a.code === airportCode);
+          if (airport) {
+            const connectedRoutes = airport.routes.length;
+            const totalKm = calculateTotalDistance(airport, airports);
+            const formattedDistance = new Intl.NumberFormat('en-US').format(totalKm);
 
-        // Store references
-        mapRef.current = map
-        pathLayerGroupRef.current = layerGroup
+            new mapboxgl.Popup({
+              closeButton: false,
+              closeOnClick: false,
+              className: 'airport-popup',
+              offset: [0, -10]
+            })
+              .setLngLat([airport.lng, airport.lat])
+              .setHTML(`
+                <div class="airport-tooltip">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="fi fi-${getCountryCode(airport.country)}"
+                          style="width: 1.25rem; height: 0.9375rem;"
+                          title="${airport.country}"></span>
+                    <span class="font-medium">${airport.name}</span>
+                  </div>
+                  <div class="text-sm text-muted-foreground">
+                    <span class="font-mono bg-muted px-1.5 py-0.5 rounded-md">${airport.code}</span>
+                    <span class="mx-1">•</span>
+                    ${airport.visits} visit${airport.visits !== 1 ? 's' : ''}
+                    <span class="mx-1">•</span>
+                    ${connectedRoutes} route${connectedRoutes !== 1 ? 's' : ''}
+                    <span class="mx-1">•</span>
+                    ${formattedDistance} km total
+                  </div>
+                </div>
+              `)
+              .addTo(map);
+          }
+        }
+      }
+    };
 
-        // Add markers for all airports
-        airports.forEach(airport => {
-          if (!map) return;
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
 
-          const marker = L.default.circleMarker([airport.lat, airport.lng], {
-            radius: 5,
-            fillColor: "hsl(var(--color-flight))",
-            color: "#fff",
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.8
-          }).bindTooltip(
-            `<div class="marker-tooltip">
-              <div class="font-medium">${airport.name}</div>
-              <div class="text-sm text-muted-foreground">${airport.code}</div>
-              <div class="text-xs text-muted-foreground">${airport.visits} visits</div>
-            </div>`,
-            {
-              direction: 'top',
-              className: 'custom-tooltip',
-              permanent: false,
-              offset: [0, -10],
-              opacity: 1
-            }
-          );
-
-          let currentPaths: Layer[] = [];
-
-          marker.on({
-            mouseover: () => {
-              if (!map) return;
-
-              // Clear existing paths
-              pathLayerGroupRef.current?.clearLayers();
-
-              // Find all routes for this airport
-              const airportRoutes = routes.filter(route =>
-                route.from === airport.code || route.to === airport.code
-              );
-
-              // Draw routes for this airport
-              airportRoutes.forEach(route => {
-                const fromAirport = airports.find(a => a.code === route.from);
-                const toAirport = airports.find(a => a.code === route.to);
-                if (fromAirport && toAirport && map) {
-                  const path = createFlightPath(fromAirport, toAirport, route, map, true);
-                  if (path) {
-                    currentPaths.push(path);
-                    pathLayerGroupRef.current?.addLayer(path);
-                  }
-                }
-              });
-
-              // Highlight the marker
-              marker.setStyle({
-                radius: 7,
-                fillOpacity: 1,
-                weight: 3
-              });
-            },
-            mouseout: (e) => {
-              const relatedTarget = e.originalEvent?.relatedTarget as HTMLElement;
-              // Only clear paths if we're not hovering over a path or tooltip
-              if (!relatedTarget?.closest('.leaflet-tooltip') &&
-                !relatedTarget?.closest('.flight-path')) {
-                // Clear flight paths
-                pathLayerGroupRef.current?.clearLayers();
-                currentPaths = [];
-
-                // Reset marker style
-                marker.setStyle({
-                  radius: 5,
-                  fillOpacity: 0.8,
-                  weight: 2
-                });
+      // Reset the hover_airport property
+      const source = map.getSource('flight-paths') as mapboxgl.GeoJSONSource;
+      if (source) {
+        const data = source.serialize().data;
+        if (data && typeof data === 'object' && 'features' in data) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: (data.features as any[]).map(f => ({
+              ...f,
+              properties: {
+                ...f.properties,
+                hover_airport: null
               }
-            },
-            click: () => {
-              if (!map) return;
-              // Zoom to airport
-              map.setView([airport.lat, airport.lng], 6, {
-                animate: true,
-                duration: 1
-              });
-            }
+            }))
           });
-
-          marker.addTo(map);
-        });
-
-        // Add zoom control
-        L.default.control.zoom({
-          position: "bottomright"
-        }).addTo(map)
-
-      } catch (error) {
-        console.error("Error initializing map:", error)
+        }
       }
+
+      // Remove all popups
+      const popups = document.getElementsByClassName('mapboxgl-popup');
+      while (popups[0]) {
+        popups[0].remove();
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      map.on('mouseenter', 'airports-layer', handleMouseEnter);
+      map.on('mouseleave', 'airports-layer', handleMouseLeave);
+    } else {
+      map.once('load', () => {
+        map.on('mouseenter', 'airports-layer', handleMouseEnter);
+        map.on('mouseleave', 'airports-layer', handleMouseLeave);
+      });
     }
 
-    initMap()
-
-    // Cleanup function
+    // Cleanup
     return () => {
-      if (map) {
-        map.remove()
-        mapRef.current = null
-        pathLayerGroupRef.current = null
-      }
-    }
-  }, [activeTab, airports, routes, createFlightPath])
+      map.off('mouseenter', 'airports-layer', handleMouseEnter);
+      map.off('mouseleave', 'airports-layer', handleMouseLeave);
+    };
+  }, [airports]);
 
   // If user is not authenticated, show login prompt
   useEffect(() => {
@@ -607,40 +884,65 @@ export default function MapPage() {
   // Add global styles for map
   const mapStyles = `
     .leaflet-container {
-      background: #f8f9fa;
+      background: hsl(var(--background));
     }
 
-    .leaflet-tile-pane {
-      filter: saturate(1.1) hue-rotate(-5deg);
+    .fi {
+      display: inline-block;
+      vertical-align: middle;
+      background-size: contain;
+      background-position: 50%;
+      background-repeat: no-repeat;
+      position: relative;
+      box-shadow: 0 0 1px rgba(0,0,0,0.2);
+      border-radius: 2px;
     }
 
     .leaflet-popup-content-wrapper {
-      background: white;
-      color: #333;
-      border: none;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
     }
 
     .leaflet-popup-tip {
-      background: white;
-      border: none;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
     }
 
     .custom-tooltip {
-      background: white;
-      color: #333;
-      border: none;
-      border-radius: 8px;
-      padding: 0.75rem;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 0.5rem;
       font-size: 0.875rem;
       line-height: 1.25rem;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      box-shadow: var(--shadow);
     }
 
-    .marker-tooltip {
+    .flight-tooltip {
       text-align: center;
+    }
+
+    .flight-route {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .flight-count,
+    .flight-distance {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.75rem;
+      line-height: 1rem;
+    }
+    
+    .flight-path {
+      transition: all 0.2s ease;
+    }
+
+    .plane-icon {
+      transition: all 0.3s ease;
     }
 
     .flight-path {
@@ -665,18 +967,167 @@ export default function MapPage() {
     .flight-path:hover {
       filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.2));
     }
+
+    .airport-popup .mapboxgl-popup-content {
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      font-family: var(--font-sans);
+    }
+    
+    .airport-tooltip {
+      min-width: 200px;
+    }
+    
+    .airport-tooltip .airport-name {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
   `
+
+  // Update the flyToAirport function
+  const flyToAirport = (airport: string) => {
+    if (!mapRef.current || !(airport in airportData)) return;
+
+    const { lat, lng } = airportData[airport];
+    mapRef.current.flyTo({
+      center: [lng, lat],
+      zoom: 8,
+      essential: true
+    });
+  };
+
+  // Update map view when selected airport changes
+  useEffect(() => {
+    if (selectedAirport && mapRef.current) {
+      const { lat, lng } = airportData[selectedAirport];
+      mapRef.current.flyTo({
+        center: [lng, lat],
+        zoom: 8,
+        essential: true
+      });
+    }
+  }, [selectedAirport]);
+
+  // Function to update visited countries highlighting
+  const updateVisitedCountries = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !airports || airports.length === 0) return;
+
+    console.log('Updating visited countries...');
+
+    // Get unique visited countries
+    const visitedCountries = Array.from(getVisitedCountries(airports));
+    console.log(`Found ${visitedCountries.length} visited countries:`, visitedCountries);
+
+    // Create filters for both layers using proper Mapbox expressions
+    const nameFilter = [
+      'match',
+      ['get', 'name_en'],
+      [
+        'United Kingdom of Great Britain and Northern Ireland',
+        'Ireland',
+        'Cyprus',
+        'Switzerland',
+        'Lithuania',
+        'Spain'
+      ],
+      true,
+      false
+    ] as mapboxgl.FilterSpecification;
+
+    const isoFilter = [
+      'match',
+      ['get', 'iso_3166_1_alpha_3'],
+      ['GBR', 'IRL', 'CYP', 'CHE', 'LTU', 'ESP'],
+      true,
+      false
+    ] as mapboxgl.FilterSpecification;
+
+    if (map.getLayer('visited-countries')) {
+      map.setFilter('visited-countries', nameFilter);
+    }
+    if (map.getLayer('visited-countries-border')) {
+      map.setFilter('visited-countries-border', isoFilter);
+    }
+  }, [airports]);
+
+  // Update visited countries when airports data changes
+  useEffect(() => {
+    if (!mapRef.current || !airports || airports.length === 0) return;
+
+    const map = mapRef.current;
+
+    if (map.isStyleLoaded()) {
+      console.log('Map style is loaded, updating visited countries immediately');
+      updateVisitedCountries();
+    } else {
+      console.log('Waiting for map style to load...');
+      map.once('load', () => {
+        console.log('Map style loaded, updating visited countries');
+        updateVisitedCountries();
+      });
+    }
+  }, [airports, updateVisitedCountries]);
+
+  // Add hover effect for visited countries
+  useEffect(() => {
+    if (!mapRef.current || !airports) return;
+
+    const map = mapRef.current;
+
+    const handleMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+      if (e.features && e.features.length > 0) {
+        map.getCanvas().style.cursor = 'pointer';
+
+        const countryName = e.features[0].properties?.name_en;
+        if (countryName) {
+          // Highlight the hovered country
+          map.setPaintProperty('visited-countries', 'fill-opacity', [
+            'case',
+            ['==', ['get', 'name_en'], countryName],
+            0.3, // Hovered opacity
+            0.1  // Default opacity
+          ]);
+        }
+      }
+    };
+
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
+      map.setPaintProperty('visited-countries', 'fill-opacity', 0.1);
+    };
+
+    if (map.isStyleLoaded()) {
+      map.on('mouseenter', 'visited-countries', handleMouseEnter);
+      map.on('mouseleave', 'visited-countries', handleMouseLeave);
+    } else {
+      map.once('load', () => {
+        map.on('mouseenter', 'visited-countries', handleMouseEnter);
+        map.on('mouseleave', 'visited-countries', handleMouseLeave);
+      });
+    }
+
+    // Cleanup
+    return () => {
+      map.off('mouseenter', 'visited-countries', handleMouseEnter);
+      map.off('mouseleave', 'visited-countries', handleMouseLeave);
+    };
+  }, [airports]);
 
   return (
     <div className="container mx-auto p-4 space-y-4">
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="map">Map View</TabsTrigger>
           <TabsTrigger value="list">Airport List</TabsTrigger>
+          <TabsTrigger value="stats">Statistics</TabsTrigger>
         </TabsList>
         <TabsContent value="map" className="space-y-4">
-          <div className="aspect-video rounded-lg border bg-background">
-            <div id="map" className="h-full w-full" />
+          <div className="relative w-full h-[calc(100vh-4rem)]">
+            <div ref={mapContainerRef} className="w-full h-full" />
           </div>
         </TabsContent>
         <TabsContent value="list">
@@ -734,7 +1185,7 @@ export default function MapPage() {
                               onClick={(e) => {
                                 e.stopPropagation()
                                 if (mapRef.current) {
-                                  mapRef.current.setView([airport.lat, airport.lng], 6)
+                                  mapRef.current.flyTo({ center: [airport.lat, airport.lng], zoom: 4 })
                                 }
                               }}
                             >
@@ -864,77 +1315,169 @@ export default function MapPage() {
             </div>
           </div>
         </TabsContent>
+        <TabsContent value="stats" className="space-y-6">
+          {loading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Card key={i} className="p-4">
+                  <Skeleton className="h-8 w-[100px] mb-4" />
+                  <Skeleton className="h-6 w-[60px]" />
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <>
+              {airports.length > 0 && (() => {
+                const stats = calculateStatistics(airports);
+                return (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <Card className="p-6 space-y-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">Total Visits</h3>
+                        <div className="text-2xl font-bold">{stats.totalVisits}</div>
+                      </Card>
+                      <Card className="p-6 space-y-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">Total Routes</h3>
+                        <div className="text-2xl font-bold">{stats.totalRoutes}</div>
+                      </Card>
+                      <Card className="p-6 space-y-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">Total Flights</h3>
+                        <div className="text-2xl font-bold">{stats.totalFlights}</div>
+                      </Card>
+                      <Card className="p-6 space-y-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">Countries Visited</h3>
+                        <div className="text-2xl font-bold">{stats.countriesVisited}</div>
+                      </Card>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Card className="p-6 space-y-4">
+                        <h3 className="text-lg font-semibold">Most Visited Airport</h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`fi fi-${getCountryCode(stats.mostVisitedAirport.country)}`}
+                              style={{ width: "1.5rem", height: "1.125rem" }}
+                              title={stats.mostVisitedAirport.country} />
+                            <span className="font-medium">{stats.mostVisitedAirport.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
+                              {stats.mostVisitedAirport.code}
+                            </span>
+                            <span>•</span>
+                            <span>{stats.mostVisitedAirport.visits} visits</span>
+                          </div>
+                        </div>
+                      </Card>
+
+                      <Card className="p-6 space-y-4">
+                        <h3 className="text-lg font-semibold">Most Connected Airport</h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`fi fi-${getCountryCode(stats.mostConnectedAirport.country)}`}
+                              style={{ width: "1.5rem", height: "1.125rem" }}
+                              title={stats.mostConnectedAirport.country} />
+                            <span className="font-medium">{stats.mostConnectedAirport.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
+                              {stats.mostConnectedAirport.code}
+                            </span>
+                            <span>•</span>
+                            <span>{stats.mostConnectedAirport.routes.length} routes</span>
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+
+                    <Card className="p-6 space-y-4">
+                      <h3 className="text-lg font-semibold">Most Flown Route</h3>
+                      {stats.mostFlownRoute && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')}`}
+                                style={{ width: "1.25rem", height: "0.9375rem" }} />
+                              <span className="font-mono">{stats.mostFlownRoute.from}</span>
+                            </div>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M5 12h14" />
+                              <path d="m12 5 7 7-7 7" />
+                            </svg>
+                            <div className="flex items-center gap-2">
+                              <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')}`}
+                                style={{ width: "1.25rem", height: "0.9375rem" }} />
+                              <span className="font-mono">{stats.mostFlownRoute.to}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
+                              <polyline points="14 2 14 8 20 8" />
+                              <path d="M10 12h2v6" />
+                              <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
+                            </svg>
+                            {stats.mostFlownRoute.count} flights
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+
+                    <Card className="p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Total Distance Flown</h3>
+                        <div className="text-2xl font-bold">
+                          {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
+                        </div>
+                      </div>
+                    </Card>
+                  </>
+                );
+              })()}
+            </>
+          )}
+        </TabsContent>
       </Tabs>
 
       <style jsx global>{`
-        .leaflet-container {
-          background: hsl(var(--background));
-        }
-
-        .fi {
-          display: inline-block;
-          vertical-align: middle;
-          background-size: contain;
-          background-position: 50%;
-          background-repeat: no-repeat;
-          position: relative;
-          box-shadow: 0 0 1px rgba(0,0,0,0.2);
-          border-radius: 2px;
-        }
-
-        .leaflet-popup-content-wrapper {
-          background: hsl(var(--background));
-          color: hsl(var(--foreground));
-          border: 1px solid hsl(var(--border));
-          border-radius: var(--radius);
-        }
-
-        .leaflet-popup-tip {
-          background: hsl(var(--background));
-          border: 1px solid hsl(var(--border));
-        }
-
-        .custom-tooltip {
-          background: hsl(var(--background));
-          color: hsl(var(--foreground));
-          border: 1px solid hsl(var(--border));
-          border-radius: var(--radius);
-          padding: 0.5rem;
-          font-size: 0.875rem;
-          line-height: 1.25rem;
-          box-shadow: var(--shadow);
-        }
-
-        .flight-tooltip {
-          text-align: center;
-        }
-
-        .flight-route {
-          font-weight: 500;
-          margin-bottom: 0.25rem;
-        }
-
-        .flight-count,
-        .flight-distance {
-          color: hsl(var(--muted-foreground));
-          font-size: 0.75rem;
-          line-height: 1rem;
-        }
-        
-        .flight-path {
-          transition: all 0.2s ease;
-        }
-
-        .plane-icon {
-          transition: all 0.3s ease;
-        }
-
         ${mapStyles}
+        @keyframes dash {
+          to {
+            stroke-dashoffset: -7;
+          }
+        }
+
+        .mapboxgl-canvas {
+          animation: dash 1s linear infinite;
+        }
+
+        .flight-path-connected {
+          animation: dash 1s linear infinite;
+          stroke-dasharray: 4, 3;
+        }
       `}</style>
     </div>
   )
 }
-
-
-
-

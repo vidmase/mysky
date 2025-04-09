@@ -92,20 +92,21 @@ function calculateFlightDuration(departureTime: string, arrivalTime: string): nu
 // Calculate distance between two points using Haversine formula
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371 // Earth's radius in kilometers
-
+  const lat1Rad = lat1 * Math.PI / 180
+  const lat2Rad = lat2 * Math.PI / 180
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLon = (lon2 - lon1) * Math.PI / 180
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2)
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
+  return Math.round(R * c) // Round to nearest kilometer
 }
 
-// Implement efficient batch fetching
+// Implement efficient batch fetching with flight counts
 const batchFetchFlightData = async (
   supabase: SupabaseClient,
   userId: string
@@ -131,7 +132,7 @@ const batchFetchFlightData = async (
   }
 }
 
-// Implement efficient statistics calculation
+// Implement efficient statistics calculation with improved distance tracking
 const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightStatistics> => {
   const airportMap = new Map(airports.map(airport => [
     airport.iata,
@@ -140,37 +141,52 @@ const calculateStatistics = (flights: any[], airports: any[]): Partial<FlightSta
 
   const uniqueIataCodes = new Set<string>()
   const airlineCounts = new Map<string, number>()
+  const processedRoutes = new Set<string>()
   let totalKilometers = 0
   let totalHours = 0
 
-  // Single pass through flights for all calculations
+  // Create a map to store route distances
+  const routeDistances = new Map<string, { distance: number, count: number }>()
+
+  // First pass: Calculate distances for each unique route
   flights.forEach(flight => {
-    if (flight.arrival_iata) {
-      uniqueIataCodes.add(flight.arrival_iata)
+    const departure = airportMap.get(flight.departure_iata)
+    const arrival = airportMap.get(flight.arrival_iata)
+
+    if (departure && arrival) {
+      // Create a consistent route key regardless of direction
+      const routeKey = [flight.departure_iata, flight.arrival_iata].sort().join('-')
+
+      if (!routeDistances.has(routeKey)) {
+        const distance = calculateDistance(
+          departure.lat,
+          departure.lon,
+          arrival.lat,
+          arrival.lon
+        )
+        routeDistances.set(routeKey, { distance, count: 1 })
+      } else {
+        const route = routeDistances.get(routeKey)!
+        route.count++
+      }
     }
 
-    // Track airline usage
+    // Track other statistics
+    if (flight.arrival_iata) uniqueIataCodes.add(flight.arrival_iata)
+    if (flight.departure_iata) uniqueIataCodes.add(flight.departure_iata)
     if (flight.airline) {
       airlineCounts.set(flight.airline, (airlineCounts.get(flight.airline) || 0) + 1)
     }
-
-    // Calculate distance if coordinates available
-    const departure = airportMap.get(flight.departure_iata)
-    const arrival = airportMap.get(flight.arrival_iata)
-    if (departure && arrival) {
-      totalKilometers += calculateDistance(
-        departure.lat,
-        departure.lon,
-        arrival.lat,
-        arrival.lon
-      )
-    }
-
-    // Calculate duration
     if (flight.departure_time && flight.arrival_time) {
       totalHours += calculateFlightDuration(flight.departure_time, flight.arrival_time)
     }
   })
+
+  // Calculate total distance by multiplying each route's distance by its flight count
+  totalKilometers = Array.from(routeDistances.values()).reduce(
+    (total, { distance, count }) => total + (distance * count),
+    0
+  )
 
   // Find most used airline
   let mostUsedAirline: { airline: string; count: number } | undefined

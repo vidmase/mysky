@@ -1,62 +1,68 @@
-# MySky - Flight History Tracker
+# ✈️ FlightTrack - Your Personal Flight Journey Companion
 
-A modern web application for tracking and managing your flight history. Built with Next.js 14, React, TypeScript, and Supabase.
+![FlightTrack Banner](banner.png)
 
-![MySky Screenshot](screenshot.png)
+FlightTrack is a modern, feature-rich flight tracking application that helps you visualize and manage your travel history. Built with Next.js 14, React, and Supabase, it offers a beautiful, interactive way to track your flights and analyze your travel patterns.
 
-## Features
+## 🌟 Key Features
 
-- 🛫 **Comprehensive Flight Tracking**
+### 📊 Comprehensive Analytics
+- Real-time flight statistics and visualizations
+- Total distance flown with accurate calculations
+- Countries visited tracking
+- Most frequent routes analysis
+- Airline usage breakdown
 
-  - Store detailed flight information including reservation numbers, flight numbers, and passenger details
-  - Track departure and arrival times, airports, and seat assignments
-  - Add personal notes for each flight
+### 🗺️ Interactive Map
+- Beautiful, interactive world map
+- Animated flight paths
+- Airport markers with detailed information
+- Real-time distance calculations
+- Country-based coloring
 
-- 🔍 **Advanced Search & Filtering**
+### ✨ Modern UI/UX
+- Dark mode by default
+- Responsive design for all devices
+- Beautiful gradients and animations
+- Interactive cards with hover effects
+- Real-time updates
 
-  - Search across multiple fields (airports, airlines, flight numbers, etc.)
-  - Filter by date range, airline, price range, and trip type
-  - Sort results by date, price, or airline
+### 🔄 Smart Sync
+- Automatic data synchronization
+- Offline support
+- Real-time updates
+- Efficient caching system
 
-- 📊 **Smart Organization**
-
-  - View flights in a clean, organized table layout
-  - Quick access to flight details with hover tooltips
-  - Visual indicators for flight status and trip types
-
-- 📱 **Responsive Design**
-  - Fully responsive layout that works on desktop and mobile devices
-  - Optimized interface for different screen sizes
-  - Touch-friendly controls and interactions
-
-## Tech Stack
+## 🛠️ Tech Stack
 
 - **Frontend**
-
   - Next.js 14 (App Router)
-  - React
+  - React 18
   - TypeScript
   - Tailwind CSS
   - shadcn/ui Components
-  - date-fns for date handling
+  - Leaflet for maps
   - Lucide Icons
 
 - **Backend**
   - Supabase (PostgreSQL)
   - Next.js API Routes
-  - Supabase Auth Helpers
+  - Supabase Auth
 
-## Getting Started
+- **Data Visualization**
+  - Recharts
+  - Leaflet
+  - Custom animations
+
+## 📦 Installation
 
 1. **Clone the repository**
-
    ```bash
-   git clone https://github.com/yourusername/mysky.git
-   cd mysky
+   git clone https://github.com/yourusername/flighttrack.git
+   cd flighttrack
    ```
 
 2. **Install dependencies**
-
    ```bash
    npm install
    # or
@@ -66,15 +72,13 @@ A modern web application for tracking and managing your flight history. Built wi
    ```
 
 3. **Set up environment variables**
-   Create a `.env.local` file in the root directory:
-
+   Create a `.env.local` file:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 4. **Run the development server**
-
    ```bash
    npm run dev
    # or
@@ -86,30 +90,42 @@ A modern web application for tracking and managing your flight history. Built wi
 5. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-mysky/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── flights/          # Flight pages
-│   └── components/       # React components
-├── components/            # Shared components
-│   └── ui/              # UI components
-├── lib/                   # Utility functions
-├── styles/                # Global styles
-└── types/                 # TypeScript types
+flighttrack/
+├── app/                # Next.js app directory
+│   ├── api/           # API routes
+│   ├── flights/       # Flight pages
+│   ├── map/          # Map visualization
+│   └── stats/        # Statistics pages
+├── components/        # React components
+│   ├── ui/           # Reusable UI components
+│   └── sections/     # Page sections
+├── lib/              # Utility functions
+├── contexts/         # React contexts
+└── types/           # TypeScript types
 ```
 
-## Key Components
+## 🔑 Key Components
 
-- **Flight List**: Main interface displaying all flights with sorting and filtering
-- **Flight Details**: Detailed view of individual flight information
-- **Date Range Picker**: Custom calendar for selecting flight date ranges
-- **Filter System**: Advanced filtering interface for finding specific flights
-- **Search**: Global search functionality across all flight data
+- **Flight Management**
+  - Add/Edit flights
+  - Bulk import support
+  - Rich flight details
 
-## Contributing
+- **Map Visualization**
+  - Interactive world map
+  - Animated flight paths
+  - Airport information
+
+- **Statistics Dashboard**
+  - Total distance flown
+  - Countries visited
+  - Airline analysis
+  - Time in air
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -117,14 +133,23 @@ mysky/
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - [Next.js](https://nextjs.org/)
 - [Supabase](https://supabase.com/)
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- [Leaflet](https://leafletjs.com/)
 - [Lucide Icons](https://lucide.dev/)
+
+## 🌐 Live Demo
+
+Check out the live demo at [flighttrack.example.com](https://flighttrack.example.com)
+
+---
+
+Made with ❤️ by [Your Name]
