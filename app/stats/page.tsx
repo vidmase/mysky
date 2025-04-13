@@ -85,24 +85,30 @@ export default function StatsPage() {
 
           {/* Basic Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-8">
-            <Card className="bg-muted/80 backdrop-blur-sm">
+            <Card className="bg-muted/80 backdrop-blur-sm relative">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Airports</CardTitle>
                 <Building className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{basicStats.totalAirports}</div>
+                <div className="text-2xl font-bold">137</div>
                 <p className="text-xs text-muted-foreground">Across Europe</p>
+                <div className="absolute -rotate-12 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-muted-foreground/20 text-lg md:text-xl font-bold uppercase tracking-[0.2em]">
+                  Example Data
+                </div>
               </CardContent>
             </Card>
-            <Card className="bg-muted/80 backdrop-blur-sm">
+            <Card className="bg-muted/80 backdrop-blur-sm relative">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Countries Covered</CardTitle>
                 <Globe className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{basicStats.totalCountries}</div>
+                <div className="text-2xl font-bold">32</div>
                 <p className="text-xs text-muted-foreground">European Nations</p>
+                <div className="absolute -rotate-12 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-muted-foreground/20 text-lg md:text-xl font-bold uppercase tracking-[0.2em]">
+                  Example Data
+                </div>
               </CardContent>
             </Card>
           </div>
