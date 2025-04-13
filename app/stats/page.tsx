@@ -1,6 +1,6 @@
 "use client"
 
-import React, { Suspense } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { europeanAirports } from '@/lib/airports'
 import Image from 'next/image'
@@ -48,6 +48,20 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 export default function StatsPage() {
+  const [basicStats, setBasicStats] = useState({
+    totalAirports: 0,
+    totalCountries: 0,
+  });
+
+  useEffect(() => {
+    // Calculate basic statistics
+    const uniqueCountries = new Set(europeanAirports.map(airport => airport.country));
+    setBasicStats({
+      totalAirports: europeanAirports.length,
+      totalCountries: uniqueCountries.size,
+    });
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-background">
       {/* Background Image */}
@@ -58,7 +72,7 @@ export default function StatsPage() {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: 0.15, // Adjust this value to control the background opacity
+          opacity: 0.15,
         }}
       />
 
@@ -66,29 +80,34 @@ export default function StatsPage() {
       <div className="relative z-10 container mx-auto px-4 py-16">
         <div className="flex flex-col items-center justify-center text-center space-y-4">
           <div className="h-16 w-16 rounded-full bg-muted/80 flex items-center justify-center backdrop-blur-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-8 w-8"
-            >
-              <path d="M10.3 6.74a4.84 4.84 0 0 1 4.4 4.4" />
-              <path d="M13 3.41a8.66 8.66 0 0 1 7.6 7.6" />
-              <path d="M5.61 12.5a9.17 9.17 0 0 1 0-1" />
-              <path d="M3.41 11a15.91 15.91 0 0 1 .38-2.55" />
-              <path d="M2 8.56a18.68 18.68 0 0 1 1.76-2.7" />
-              <path d="M14.5 19.5h-5" />
-              <path d="M5 12.5V19" />
-              <path d="M19 12.5V19" />
-            </svg>
+            <Plane className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold">Statistics Temporarily Unavailable</h1>
+
+          {/* Basic Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-8">
+            <Card className="bg-muted/80 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Airports</CardTitle>
+                <Building className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{basicStats.totalAirports}</div>
+                <p className="text-xs text-muted-foreground">Across Europe</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-muted/80 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Countries Covered</CardTitle>
+                <Globe className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{basicStats.totalCountries}</div>
+                <p className="text-xs text-muted-foreground">European Nations</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <h1 className="text-2xl font-bold">Advanced Statistics Coming Soon</h1>
           <p className="text-muted-foreground max-w-md">
             We're currently updating our statistics system to provide you with more accurate and detailed insights.
             Please check back soon.
@@ -106,22 +125,7 @@ export default function StatsPage() {
 
           <div className="mt-8 bg-flight/20 backdrop-blur-sm rounded-lg p-6 max-w-md">
             <h2 className="text-lg font-semibold text-flight mb-2 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5 mr-2"
-              >
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                <polyline points="10 17 15 12 10 7" />
-                <line x1="15" y1="12" x2="3" y2="12" />
-              </svg>
+              <ArrowUpRight className="h-5 w-5 mr-2" />
               Looking for Flight Stats?
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
@@ -138,21 +142,7 @@ export default function StatsPage() {
               className="inline-flex items-center justify-center rounded-md bg-flight px-4 py-2 text-sm font-medium text-white hover:bg-flight/90 transition-colors"
             >
               View Flight Map
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="ml-2 h-4 w-4"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+              <ArrowUpRight className="ml-2 h-4 w-4" />
             </a>
           </div>
         </div>
