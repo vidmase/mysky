@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft } from "lucide-react"
+import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft, X, Loader2, Check } from "lucide-react"
 import { format, isBefore } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
@@ -25,8 +25,93 @@ import { PassengerSelector } from "@/components/passenger-selector"
 import { Airport } from "@/lib/airports"
 import { Passenger } from "@/lib/passengers"
 
+interface FormState {
+  passenger_name: string
+  reservation_number: string
+  flight_number: string
+  departure_airport: string
+  arrival_airport: string
+  departure_date: Date
+  departure_time: string
+  arrival_time: string
+  total_receipt: string
+  purchased_date: string
+  purchase_time: string
+  airline: string | null
+  arrival_iata: string | null
+  departure_iata: string | null
+  seat: string | null
+  notes: string | null
+  departure_country: string | null
+  arrival_country: string | null
+  departure_flag: string | null
+  arrival_flag: string | null
+  arrival_date: Date
+  return_arrival_time: string | null
+  // These will be set by the API
+  departure_longitude?: number | null
+  departure_latitude?: number | null
+  arrival_longitude?: number | null
+  arrival_latitude?: number | null
+}
+
+function getFlagEmoji(countryName: string): string {
+  const countryToCode: { [key: string]: string } = {
+    'United Kingdom': 'GB',
+    'France': 'FR',
+    'Germany': 'DE',
+    'Spain': 'ES',
+    'Italy': 'IT',
+    'Netherlands': 'NL',
+    'Belgium': 'BE',
+    'Portugal': 'PT',
+    'Greece': 'GR',
+    'Ireland': 'IE',
+    'Sweden': 'SE',
+    'Denmark': 'DK',
+    'Finland': 'FI',
+    'Norway': 'NO',
+    'Switzerland': 'CH',
+    'Austria': 'AT',
+    'Poland': 'PL',
+    'Czech Republic': 'CZ',
+    'Hungary': 'HU',
+    'Croatia': 'HR',
+    'Romania': 'RO',
+    'Bulgaria': 'BG',
+    'Slovakia': 'SK',
+    'Slovenia': 'SI',
+    'Estonia': 'EE',
+    'Latvia': 'LV',
+    'Lithuania': 'LT',
+    'Cyprus': 'CY',
+    'Malta': 'MT',
+    'Luxembourg': 'LU',
+    'Iceland': 'IS',
+    'Egypt': 'EG'
+  }
+
+  const code = countryToCode[countryName] || ''
+  if (!code) return ''
+
+  // Convert country code to flag emoji
+  const codePoints = code
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0))
+
+  return String.fromCodePoint(...codePoints)
+}
+
 export default function AddFlightPage() {
   const router = useRouter()
+  const [selectedPassengers, setSelectedPassengers] = useState<Passenger[]>([])
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [flightNumber, setFlightNumber] = useState('')
+  const [airline, setAirline] = useState('')
+  const [aircraft, setAircraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [departureDate, setDepartureDate] = useState<Date>()
   const [arrivalDate, setArrivalDate] = useState<Date>()
   const [departureDateOpen, setDepartureDateOpen] = useState(false)
@@ -54,15 +139,29 @@ export default function AddFlightPage() {
 
   const handleDepartureDateSelect = (date: Date | undefined) => {
     setDepartureDate(date)
+    if (date) {
+      setFormData(prev => ({
+        ...prev,
+        departure_date: date
+      }))
+    }
 
     // If arrival date is before the new departure date, update it
     if (date && arrivalDate && isBefore(arrivalDate, date)) {
       setArrivalDate(date)
+      setFormData(prev => ({
+        ...prev,
+        arrival_date: date
+      }))
     }
 
     // If no arrival date is set, default to same day
     if (date && !arrivalDate) {
       setArrivalDate(date)
+      setFormData(prev => ({
+        ...prev,
+        arrival_date: date
+      }))
     }
 
     // Close the popover
@@ -73,65 +172,89 @@ export default function AddFlightPage() {
     if (date && departureDate && isBefore(date, departureDate)) {
       // Don't allow arrival date before departure date
       setArrivalDate(departureDate)
-    } else {
+      setFormData(prev => ({
+        ...prev,
+        arrival_date: departureDate
+      }))
+    } else if (date) {
       setArrivalDate(date)
+      setFormData(prev => ({
+        ...prev,
+        arrival_date: date
+      }))
     }
 
     // Close the popover
     setArrivalDateOpen(false)
   }
 
-  const [formData, setFormData] = useState({
-    departureAirport: '',
-    arrivalAirport: '',
-    departureIata: '',
-    arrivalIata: '',
-    arrivalCountry: '',
-    flightNumber: '',
-    reservationNumber: '',
-    airline: '',
-    seat: '',
-    notes: '',
-    departureTime: '',
-    arrivalTime: '',
-    passengerName: '',
-    passengerTitle: '',
+  const [formData, setFormData] = useState<FormState>({
+    passenger_name: '',
+    reservation_number: '',
+    flight_number: '',
+    departure_airport: '',
+    arrival_airport: '',
+    departure_date: new Date(),
+    departure_time: '',
+    arrival_time: '',
+    total_receipt: '',
+    purchased_date: format(new Date(), 'yyyy-MM-dd'),
+    purchase_time: format(new Date(), 'HH:mm'),
+    airline: null,
+    arrival_iata: null,
+    departure_iata: null,
+    seat: null,
+    notes: null,
+    departure_country: null,
+    arrival_country: null,
+    departure_flag: null,
+    arrival_flag: null,
+    arrival_date: new Date(),
+    return_arrival_time: null,
+    departure_longitude: null,
+    departure_latitude: null,
+    arrival_longitude: null,
+    arrival_latitude: null
   })
 
   const [selectedDepartureAirport, setSelectedDepartureAirport] = useState<Airport>()
   const [selectedArrivalAirport, setSelectedArrivalAirport] = useState<Airport>()
-  const [selectedPassenger, setSelectedPassenger] = useState<Passenger>()
 
   const handleAirportSelect = (airport: Airport, type: 'departure' | 'arrival') => {
     if (type === 'departure') {
       setSelectedDepartureAirport(airport)
       setFormData(prev => ({
         ...prev,
-        departureAirport: airport.name,
-        departureIata: airport.iata
+        departure_airport: airport.name,
+        departure_iata: airport.iata,
+        departure_country: airport.country,
+        departure_flag: getFlagEmoji(airport.country)
       }))
     } else {
       setSelectedArrivalAirport(airport)
       setFormData(prev => ({
         ...prev,
-        arrivalAirport: airport.name,
-        arrivalIata: airport.iata,
-        arrivalCountry: airport.country
+        arrival_airport: airport.name,
+        arrival_iata: airport.iata,
+        arrival_country: airport.country,
+        arrival_flag: getFlagEmoji(airport.country)
       }))
     }
   }
 
   const handlePassengerSelect = (passenger: Passenger) => {
-    setSelectedPassenger(passenger)
-    setFormData(prev => ({
-      ...prev,
-      passengerName: passenger.name,
-      passengerTitle: passenger.title
-    }))
+    if (!selectedPassengers.some(p => p.name === passenger.name)) {
+      setSelectedPassengers(prev => [...prev, passenger])
+      setFormData(prev => ({
+        ...prev,
+        passenger_name: passenger.title + ' ' + passenger.name
+      }))
+    }
   }
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const removePassenger = (passengerName: string) => {
+    setSelectedPassengers(prev => prev.filter(p => p.name !== passengerName))
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -141,40 +264,67 @@ export default function AddFlightPage() {
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
 
     try {
-      // Format dates to ISO string
-      const formattedDepartureDate = departureDate?.toISOString().split('T')[0]
-      const formattedArrivalDate = arrivalDate?.toISOString().split('T')[0]
-
-      // Prepare the flight data
-      const flightData = {
-        departure_airport: formData.departureAirport,
-        arrival_airport: formData.arrivalAirport,
-        departure_iata: formData.departureIata || null,
-        arrival_iata: formData.arrivalIata || null,
-        arrival_country: formData.arrivalCountry || null,
-        departure_date: formattedDepartureDate,
-        departure_time: formData.departureTime,
-        arrival_date: formattedArrivalDate,
-        arrival_time: formData.arrivalTime,
-        flight_number: formData.flightNumber,
-        reservation_number: formData.reservationNumber,
-        airline: formData.airline || null,
-        seat: formData.seat || null,
-        notes: formData.notes || null,
-        passenger_name: formData.passengerName || null,
-        passenger_title: formData.passengerTitle || null,
-        purchased_date: new Date().toISOString().split('T')[0],
-        purchase_time: new Date().toLocaleTimeString(),
-        total_receipt: "0 USD", // This can be updated later if needed
+      if (!formData.passenger_name) {
+        throw new Error('Passenger name is required')
       }
 
-      // Send the POST request
+      if (!selectedDepartureAirport || !selectedArrivalAirport) {
+        throw new Error('Please select both departure and arrival airports')
+      }
+
+      // Fetch coordinates for departure airport
+      const departureResponse = await fetch('/api/coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          searchQuery: selectedDepartureAirport.name,
+          type: 'departure'
+        }),
+      })
+
+      if (!departureResponse.ok) {
+        throw new Error('Failed to fetch departure airport coordinates')
+      }
+
+      const departureData = await departureResponse.json()
+
+      // Fetch coordinates for arrival airport
+      const arrivalResponse = await fetch('/api/coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          searchQuery: selectedArrivalAirport.name,
+          type: 'arrival'
+        }),
+      })
+
+      if (!arrivalResponse.ok) {
+        throw new Error('Failed to fetch arrival airport coordinates')
+      }
+
+      const arrivalData = await arrivalResponse.json()
+
+      // Format dates as text to match database schema
+      const flightData = {
+        ...formData,
+        departure_date: format(formData.departure_date, 'yyyy-MM-dd'),
+        arrival_date: format(formData.arrival_date, 'yyyy-MM-dd'),
+        departure_longitude: departureData.departure_longitude,
+        departure_latitude: departureData.departure_latitude,
+        arrival_longitude: arrivalData.arrival_longitude,
+        arrival_latitude: arrivalData.arrival_latitude
+      }
+
       const response = await fetch('/api/flights', {
         method: 'POST',
         headers: {
@@ -184,17 +334,31 @@ export default function AddFlightPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save flight')
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to add flight')
       }
 
-      // Redirect to flights page on success
       router.push('/flights')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred while saving the flight')
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const validateForm = (data: FormState) => {
+    const errors: { [key: string]: string } = {}
+
+    if (!data.departure_airport) {
+      errors.departure_airport = 'Departure airport is required'
+    }
+
+    if (!data.arrival_airport) {
+      errors.arrival_airport = 'Arrival airport is required'
+    }
+
+    // ... rest of validation ...
+    return errors
   }
 
   return (
@@ -241,91 +405,143 @@ export default function AddFlightPage() {
                   </div>
                 )}
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <AirportSelector
-                      value={selectedDepartureAirport}
-                      onChange={(airport) => handleAirportSelect(airport, 'departure')}
-                      label="Departure Airport *"
-                      required
-                    />
-                    <AirportSelector
-                      value={selectedArrivalAirport}
-                      onChange={(airport) => handleAirportSelect(airport, 'arrival')}
-                      label="Arrival Airport *"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <PassengerSelector
-                      value={selectedPassenger}
-                      onChange={handlePassengerSelect}
-                      label="Passenger"
-                      required
-                    />
-                    <div className="space-y-2">
-                      <Label htmlFor="reservationNumber" className="flex items-center">
-                        <FileText className="h-4 w-4 mr-1 text-flight" />
-                        Reservation Number *
+                  {/* 1. Passenger Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <User className="h-5 w-5 mr-2" />
+                      Passenger Information
+                    </h3>
+                    <div className="flex flex-col space-y-2">
+                      <Label className="flex items-center">
+                        <User className="h-4 w-4 mr-1 text-flight" />
+                        Passengers *
                       </Label>
-                      <div className="relative">
-                        <FileText className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="reservationNumber"
-                          name="reservationNumber"
-                          placeholder="e.g., ABC123"
-                          className="pl-9"
-                          required
-                          value={formData.reservationNumber}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="flightNumber" className="flex items-center">
-                        <Plane className="h-4 w-4 mr-1 text-flight" />
-                        Flight Number *
-                      </Label>
-                      <div className="relative">
-                        <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="flightNumber"
-                          name="flightNumber"
-                          placeholder="e.g., BA123"
-                          className="pl-9"
-                          required
-                          value={formData.flightNumber}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="departureDate" className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-1 text-flight" />
-                        Departure Date *
-                      </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="departureDate"
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !departureDate && "text-muted-foreground"
-                            )}
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {selectedPassengers.map((passenger) => (
+                          <div
+                            key={passenger.name}
+                            className="flex items-center gap-2 bg-muted px-3 py-1 rounded-full text-sm"
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {departureDate ? format(departureDate, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="p-0">
-                          <div className="bg-popover rounded-md border shadow-md">
+                            <span>{passenger.title} {passenger.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => removePassenger(passenger.name)}
+                              className="hover:text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                              <span className="sr-only">Remove {passenger.name}</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <PassengerSelector
+                        value={undefined}
+                        onChange={handlePassengerSelect}
+                        label="Add Passenger"
+                        required={selectedPassengers.length === 0}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Flight Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <Plane className="h-5 w-5 mr-2" />
+                      Flight Details
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="flightNumber" className="flex items-center">
+                          <Plane className="h-4 w-4 mr-1 text-flight" />
+                          Flight Number *
+                        </Label>
+                        <div className="relative">
+                          <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="flightNumber"
+                            name="flight_number"
+                            placeholder="e.g., BA123"
+                            className="pl-9"
+                            required
+                            value={formData.flight_number}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="reservationNumber" className="flex items-center">
+                          <FileText className="h-4 w-4 mr-1 text-flight" />
+                          Reservation Number *
+                        </Label>
+                        <div className="relative">
+                          <FileText className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="reservationNumber"
+                            name="reservation_number"
+                            placeholder="e.g., ABC123"
+                            className="pl-9"
+                            required
+                            value={formData.reservation_number}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="seat" className="flex items-center">
+                          <User className="h-4 w-4 mr-1 text-muted-foreground" />
+                          Seat
+                        </Label>
+                        <div className="relative">
+                          <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="seat"
+                            name="seat"
+                            placeholder="e.g., 12A"
+                            className="pl-9"
+                            value={formData.seat || ''}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Departure Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <MapPin className="h-5 w-5 mr-2" />
+                      Departure Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <AirportSelector
+                        value={selectedDepartureAirport}
+                        onChange={(airport) => handleAirportSelect(airport, 'departure')}
+                        label="Departure Airport *"
+                        required
+                      />
+
+                      <div className="space-y-2">
+                        <Label htmlFor="departureDate" className="flex items-center">
+                          <CalendarIcon className="h-4 w-4 mr-1 text-flight" />
+                          Departure Date *
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="departureDate"
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !departureDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {departureDate ? format(departureDate, "yyyy-MM-dd") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="p-0">
                             <Calendar
                               mode="single"
                               selected={departureDate}
@@ -334,52 +550,65 @@ export default function AddFlightPage() {
                               fromYear={2000}
                               toYear={new Date().getFullYear() + 1}
                             />
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="departureTime" className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1 text-flight" />
-                        Departure Time *
-                      </Label>
-                      <div className="relative">
-                        <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="time"
-                          id="departureTime"
-                          name="departureTime"
-                          className="pl-9"
-                          required
-                          value={formData.departureTime}
-                          onChange={handleInputChange}
-                        />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="departureTime" className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1 text-flight" />
+                          Departure Time *
+                        </Label>
+                        <div className="relative">
+                          <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            id="departureTime"
+                            name="departure_time"
+                            className="pl-9"
+                            required
+                            value={formData.departure_time}
+                            onChange={handleInputChange}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="arrivalDate" className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-1 text-flight" />
-                        Arrival Date *
-                      </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="arrivalDate"
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !arrivalDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {arrivalDate ? format(arrivalDate, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="p-0">
-                          <div className="bg-popover rounded-md border shadow-md">
+                  {/* 4. Arrival Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <MapPin className="h-5 w-5 mr-2" />
+                      Arrival Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <AirportSelector
+                        value={selectedArrivalAirport}
+                        onChange={(airport) => handleAirportSelect(airport, 'arrival')}
+                        label="Arrival Airport *"
+                        required
+                      />
+
+                      <div className="space-y-2">
+                        <Label htmlFor="arrivalDate" className="flex items-center">
+                          <CalendarIcon className="h-4 w-4 mr-1 text-flight" />
+                          Arrival Date *
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="arrivalDate"
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !arrivalDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {arrivalDate ? format(arrivalDate, "yyyy-MM-dd") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="p-0">
                             <Calendar
                               mode="single"
                               selected={arrivalDate}
@@ -389,75 +618,124 @@ export default function AddFlightPage() {
                               fromYear={2000}
                               toYear={new Date().getFullYear() + 1}
                             />
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="arrivalTime" className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1 text-flight" />
-                        Arrival Time *
-                      </Label>
-                      <div className="relative">
-                        <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="time"
-                          id="arrivalTime"
-                          name="arrivalTime"
-                          className="pl-9"
-                          required
-                          value={formData.arrivalTime}
-                          onChange={handleInputChange}
-                        />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="arrivalTime" className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1 text-flight" />
+                          Arrival Time *
+                        </Label>
+                        <div className="relative">
+                          <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            id="arrivalTime"
+                            name="arrival_time"
+                            className="pl-9"
+                            required
+                            value={formData.arrival_time}
+                            onChange={handleInputChange}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="seat" className="flex items-center">
-                        <User className="h-4 w-4 mr-1 text-muted-foreground" />
-                        Seat
-                      </Label>
-                      <div className="relative">
-                        <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="seat"
-                          name="seat"
-                          placeholder="e.g., 12A"
-                          className="pl-9"
-                          value={formData.seat}
-                          onChange={handleInputChange}
-                        />
+                  {/* 5. Booking Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <CreditCard className="h-5 w-5 mr-2" />
+                      Booking Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="totalReceipt" className="flex items-center">
+                          <CreditCard className="h-4 w-4 mr-1 text-flight" />
+                          Total Receipt *
+                        </Label>
+                        <div className="relative">
+                          <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="totalReceipt"
+                            name="total_receipt"
+                            placeholder="e.g., 299.99"
+                            className="pl-9"
+                            required
+                            value={formData.total_receipt}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="purchasedDate" className="flex items-center">
+                          <CalendarIcon className="h-4 w-4 mr-1 text-flight" />
+                          Purchase Date *
+                        </Label>
+                        <div className="relative">
+                          <CalendarIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="date"
+                            id="purchasedDate"
+                            name="purchased_date"
+                            className="pl-9"
+                            required
+                            value={formData.purchased_date}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="purchaseTime" className="flex items-center">
+                          <Clock className="h-4 w-4 mr-1 text-flight" />
+                          Purchase Time *
+                        </Label>
+                        <div className="relative">
+                          <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            id="purchaseTime"
+                            name="purchase_time"
+                            className="pl-9"
+                            required
+                            value={formData.purchase_time}
+                            onChange={handleInputChange}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
 
+                  {/* 6. Additional Notes */}
                   <div className="space-y-2">
                     <Label htmlFor="notes" className="flex items-center">
-                      <FileText className="h-4 w-4 mr-1 text-muted-foreground" />
-                      Notes
+                      <FileText className="h-4 w-4 mr-1 text-flight" />
+                      Additional Notes
                     </Label>
                     <Textarea
                       id="notes"
                       name="notes"
-                      placeholder="Any additional information about this flight"
-                      value={formData.notes}
+                      placeholder="Add any additional notes about your flight experience..."
+                      className="min-h-[100px]"
+                      value={formData.notes || ''}
                       onChange={handleInputChange}
                     />
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button 
-                    variant="outline" 
-                    type="button" 
+                  <Button
+                    variant="outline"
+                    type="button"
                     onClick={() => router.back()}
                     disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="bg-flight hover:bg-flight/90"
                     disabled={isSubmitting}
                   >

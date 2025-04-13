@@ -70,7 +70,15 @@ const airportData: Record<string, { name: string; city: string; country: string;
   "LGW": { lat: 51.1537, lng: -0.1821, name: "London Gatwick", city: "London", country: "United Kingdom" },
   "GVA": { lat: 46.2370, lng: 6.1091, name: "Geneva Airport", city: "Geneva", country: "Switzerland" },
   "ALC": { lat: 38.2822, lng: -0.5581, name: "Alicante Airport", city: "Alicante", country: "Spain" },
-  "MAD": { lat: 40.4983, lng: -3.5676, name: "Madrid Barajas", city: "Madrid", country: "Spain" }
+  "MAD": { lat: 40.4983, lng: -3.5676, name: "Madrid Barajas", city: "Madrid", country: "Spain" },
+  "CAI": { lat: 30.1219, lng: 31.4056, name: "Cairo International Airport", city: "Cairo", country: "Egypt" },
+  "HRG": { lat: 27.1783, lng: 33.7994, name: "Hurghada International Airport", city: "Hurghada", country: "Egypt" },
+  "SSH": { lat: 27.9773, lng: 34.3950, name: "Sharm El Sheikh International Airport", city: "Sharm El Sheikh", country: "Egypt" },
+  "LXR": { lat: 25.6710, lng: 32.7067, name: "Luxor International Airport", city: "Luxor", country: "Egypt" },
+  "ASW": { lat: 23.9644, lng: 32.8198, name: "Aswan International Airport", city: "Aswan", country: "Egypt" },
+  "AUE": { lat: 31.0167, lng: 31.1833, name: "Abu Simbel Airport", city: "Abu Simbel", country: "Egypt" },
+  "MUH": { lat: 31.3256, lng: 27.2217, name: "Mersa Matruh International Airport", city: "Mersa Matruh", country: "Egypt" },
+  "ALY": { lat: 31.1839, lng: 29.9489, name: "Alexandria International Airport", city: "Alexandria", country: "Egypt" }
 }
 
 // Add this helper function near the top of the file, after the types
@@ -91,7 +99,8 @@ const getCountryCode = (country: string): string => {
     "Poland": "pl",
     "Ireland": "ie",
     "Switzerland": "ch",
-    "Cyprus": "cy"
+    "Cyprus": "cy",
+    "Egypt": "eg"
   };
 
   const code = countryMap[normalizedCountry];
@@ -153,6 +162,19 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.round(R * c); // Return rounded kilometers
 };
 
+// Add this function after the calculateDistance function
+const calculateFlightDuration = (distance: number): number => {
+  // Average speeds for different flight phases (in km/h)
+  const TAXI_TIME = 30 / 60; // 30 minutes total for taxi, takeoff, and landing procedures
+  const AVG_CRUISE_SPEED = 840; // Average cruise speed for commercial flights
+
+  // Calculate cruise time in hours
+  const cruiseTime = distance / AVG_CRUISE_SPEED;
+
+  // Total flight time including taxi, takeoff, and landing
+  return cruiseTime + TAXI_TIME;
+};
+
 // Update the calculateTotalDistance function
 const calculateTotalDistance = (airport: Airport, airports: Airport[]): number => {
   let totalDistance = 0;
@@ -189,6 +211,9 @@ const calculateStatistics = (airports: Airport[]): {
   totalRoutes: number;
   totalFlights: number;
   totalDistance: number;
+  totalFlightHours: number;
+  longestRoute: { from: Airport; to: Airport; distance: number };
+  shortestRoute: { from: Airport; to: Airport; distance: number };
   mostVisitedAirport: Airport;
   mostConnectedAirport: Airport;
   mostFlownRoute: Route;
@@ -199,18 +224,60 @@ const calculateStatistics = (airports: Airport[]): {
   const totalFlights = airports.reduce((sum, airport) =>
     sum + airport.routes.reduce((routeSum, route) => routeSum + route.count, 0), 0) / 2;
 
-  // Improved total distance calculation
+  // Calculate longest and shortest routes
+  let longestRoute = {
+    from: airports[0],
+    to: airports[0],
+    distance: 0
+  };
+
+  let shortestRoute = {
+    from: airports[0],
+    to: airports[0],
+    distance: Infinity
+  };
+
+  // Find the longest and shortest distances between any two airports that have a route between them
+  airports.forEach(fromAirport => {
+    fromAirport.routes.forEach(route => {
+      const toAirport = airports.find(a => a.code === route.to);
+      if (toAirport) {
+        const distance = calculateDistance(
+          fromAirport.lat,
+          fromAirport.lng,
+          toAirport.lat,
+          toAirport.lng
+        );
+
+        // Update longest route
+        if (distance > longestRoute.distance) {
+          longestRoute = {
+            from: fromAirport,
+            to: toAirport,
+            distance
+          };
+        }
+
+        // Update shortest route (only if it's a valid route with distance > 0)
+        if (distance > 0 && distance < shortestRoute.distance) {
+          shortestRoute = {
+            from: fromAirport,
+            to: toAirport,
+            distance
+          };
+        }
+      }
+    });
+  });
+
+  // Rest of the existing calculations...
   const processedRoutes = new Set<string>();
   const totalDistance = airports.reduce((sum, fromAirport) => {
     let airportDistance = 0;
     fromAirport.routes.forEach(route => {
-      // Create a unique route identifier that's the same regardless of direction
       const routeId = [route.from, route.to].sort().join('-');
-
-      // Only process each route once
       if (!processedRoutes.has(routeId)) {
         processedRoutes.add(routeId);
-
         const toAirport = airports.find(a => a.code === (route.from === fromAirport.code ? route.to : route.from));
         if (toAirport) {
           const distance = calculateDistance(
@@ -219,7 +286,6 @@ const calculateStatistics = (airports: Airport[]): {
             toAirport.lat,
             toAirport.lng
           );
-          // Multiply distance by the number of flights on this route
           airportDistance += distance * route.count;
         }
       }
@@ -233,7 +299,6 @@ const calculateStatistics = (airports: Airport[]): {
   const mostConnectedAirport = airports.reduce((max, airport) =>
     airport.routes.length > (max?.routes.length || 0) ? airport : max, airports[0]);
 
-  // Find the most flown route
   const routeMap = new Map<string, number>();
   airports.forEach(airport => {
     airport.routes.forEach(route => {
@@ -255,11 +320,38 @@ const calculateStatistics = (airports: Airport[]): {
 
   const countriesVisited = new Set(airports.map(airport => airport.country)).size;
 
+  // Calculate total flight hours
+  let totalFlightHours = 0;
+  const processedTimeRoutes = new Set<string>();
+
+  airports.forEach(fromAirport => {
+    fromAirport.routes.forEach(route => {
+      const routeId = [route.from, route.to].sort().join('-');
+      if (!processedTimeRoutes.has(routeId)) {
+        processedTimeRoutes.add(routeId);
+        const toAirport = airports.find(a => a.code === (route.from === fromAirport.code ? route.to : route.from));
+        if (toAirport) {
+          const distance = calculateDistance(
+            fromAirport.lat,
+            fromAirport.lng,
+            toAirport.lat,
+            toAirport.lng
+          );
+          const flightDuration = calculateFlightDuration(distance);
+          totalFlightHours += flightDuration * route.count;
+        }
+      }
+    });
+  });
+
   return {
     totalVisits,
     totalRoutes,
     totalFlights,
     totalDistance,
+    totalFlightHours,
+    longestRoute,
+    shortestRoute,
     mostVisitedAirport,
     mostConnectedAirport,
     mostFlownRoute,
@@ -1333,16 +1425,16 @@ export default function MapPage() {
                   <>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                       <Card className="p-6 space-y-2">
+                        <h3 className="text-sm font-medium text-muted-foreground">Total Airports</h3>
+                        <div className="text-2xl font-bold">{airports.length}</div>
+                      </Card>
+                      <Card className="p-6 space-y-2">
                         <h3 className="text-sm font-medium text-muted-foreground">Total Visits</h3>
                         <div className="text-2xl font-bold">{stats.totalVisits}</div>
                       </Card>
                       <Card className="p-6 space-y-2">
                         <h3 className="text-sm font-medium text-muted-foreground">Total Routes</h3>
                         <div className="text-2xl font-bold">{stats.totalRoutes}</div>
-                      </Card>
-                      <Card className="p-6 space-y-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">Total Flights</h3>
-                        <div className="text-2xl font-bold">{stats.totalFlights}</div>
                       </Card>
                       <Card className="p-6 space-y-2">
                         <h3 className="text-sm font-medium text-muted-foreground">Countries Visited</h3>
@@ -1371,88 +1463,188 @@ export default function MapPage() {
                       </Card>
 
                       <Card className="p-6 space-y-4">
-                        <h3 className="text-lg font-semibold">Most Connected Airport</h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">Route Statistics</h3>
+                          <select
+                            className="text-sm bg-muted px-2 py-1 rounded-md border border-input hover:bg-accent hover:text-accent-foreground"
+                            defaultValue="longest-route"
+                            onChange={(e) => {
+                              const elements = document.querySelectorAll('.route-section');
+                              elements.forEach(el => {
+                                if (el instanceof HTMLElement) {
+                                  el.style.display = el.id === e.target.value ? 'block' : 'none';
+                                }
+                              });
+                            }}
+                          >
+                            <option value="longest-route">Longest Route</option>
+                            <option value="shortest-route">Shortest Route</option>
+                          </select>
+                        </div>
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`fi fi-${getCountryCode(stats.mostConnectedAirport.country)}`}
-                              style={{ width: "1.5rem", height: "1.125rem" }}
-                              title={stats.mostConnectedAirport.country} />
-                            <span className="font-medium">{stats.mostConnectedAirport.name}</span>
+                          <div id="longest-route" className="route-section">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(stats.longestRoute.from.country)}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-medium">{stats.longestRoute.from.name}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
+                                  {stats.longestRoute.from.code}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 pl-6">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-4 w-4 text-muted-foreground"
+                                >
+                                  <path d="M5 12h14" />
+                                  <path d="m12 5 7 7-7 7" />
+                                </svg>
+                                <span className="text-sm text-muted-foreground">
+                                  {new Intl.NumberFormat('en-US').format(stats.longestRoute.distance)} km
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(stats.longestRoute.to.country)}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-medium">{stats.longestRoute.to.name}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
+                                  {stats.longestRoute.to.code}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
-                              {stats.mostConnectedAirport.code}
-                            </span>
-                            <span>•</span>
-                            <span>{stats.mostConnectedAirport.routes.length} routes</span>
+                          <div id="shortest-route" className="route-section" style={{ display: 'none' }}>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(stats.shortestRoute.from.country)}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-medium">{stats.shortestRoute.from.name}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
+                                  {stats.shortestRoute.from.code}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 pl-6">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-4 w-4 text-muted-foreground"
+                                >
+                                  <path d="M5 12h14" />
+                                  <path d="m12 5 7 7-7 7" />
+                                </svg>
+                                <span className="text-sm text-muted-foreground">
+                                  {new Intl.NumberFormat('en-US').format(stats.shortestRoute.distance)} km
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(stats.shortestRoute.to.country)}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-medium">{stats.shortestRoute.to.name}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
+                                  {stats.shortestRoute.to.code}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </Card>
-                    </div>
 
-                    <Card className="p-6 space-y-4">
-                      <h3 className="text-lg font-semibold">Most Flown Route</h3>
-                      {stats.mostFlownRoute && (
+                      <Card className="p-6 space-y-4">
+                        <h3 className="text-lg font-semibold">Most Flown Route</h3>
+                        {stats.mostFlownRoute && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-mono">{stats.mostFlownRoute.from}</span>
+                              </div>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-4 w-4"
+                              >
+                                <path d="M5 12h14" />
+                                <path d="m12 5 7 7-7 7" />
+                              </svg>
+                              <div className="flex items-center gap-2">
+                                <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')}`}
+                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
+                                <span className="font-mono">{stats.mostFlownRoute.to}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-4 w-4"
+                              >
+                                <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <path d="M10 12h2v6" />
+                                <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
+                              </svg>
+                              {stats.mostFlownRoute.count} flights
+                            </div>
+                          </div>
+                        )}
+                      </Card>
+
+                      <Card className="p-6 space-y-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')}`}
-                                style={{ width: "1.25rem", height: "0.9375rem" }} />
-                              <span className="font-mono">{stats.mostFlownRoute.from}</span>
-                            </div>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-4 w-4"
-                            >
-                              <path d="M5 12h14" />
-                              <path d="m12 5 7 7-7 7" />
-                            </svg>
-                            <div className="flex items-center gap-2">
-                              <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')}`}
-                                style={{ width: "1.25rem", height: "0.9375rem" }} />
-                              <span className="font-mono">{stats.mostFlownRoute.to}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-4 w-4"
-                            >
-                              <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
-                              <polyline points="14 2 14 8 20 8" />
-                              <path d="M10 12h2v6" />
-                              <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
-                            </svg>
-                            {stats.mostFlownRoute.count} flights
+                          <h3 className="text-lg font-semibold">Total Distance Flown</h3>
+                          <div className="text-2xl font-bold">
+                            {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
                           </div>
                         </div>
-                      )}
-                    </Card>
+                      </Card>
 
-                    <Card className="p-6 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold">Total Distance Flown</h3>
-                        <div className="text-2xl font-bold">
-                          {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
+                      <Card className="p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">Total Hours in Air</h3>
+                          <div className="text-2xl font-bold">
+                            {Math.round(stats.totalFlightHours)} hours
+                          </div>
                         </div>
-                      </div>
-                    </Card>
+                        <div className="text-sm text-muted-foreground">
+                          Including taxi, takeoff, and landing times
+                        </div>
+                      </Card>
+                    </div>
                   </>
                 );
               })()}

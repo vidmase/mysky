@@ -15,11 +15,25 @@ import { use } from "react"
 // Add formatTime helper function after the imports
 const formatTime = (timeStr: string) => {
   try {
-    // Parse time string and ensure it's in HH:MM format
+    if (!timeStr) return ''
+
+    // If it's an ISO date string
+    if (timeStr.includes('T')) {
+      const date = new Date(timeStr)
+      return format(date, 'HH:mm')
+    }
+
+    // If it's already in HH:mm format, return as is
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+      return timeStr
+    }
+
+    // For any other format, try to extract hours and minutes
     const [hours, minutes] = timeStr.split(':').map(num => num.padStart(2, '0'))
     return `${hours}:${minutes}`
   } catch (error) {
-    return timeStr // Return original string if parsing fails
+    console.error('Error formatting time:', error)
+    return timeStr
   }
 }
 
@@ -53,12 +67,57 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
 
   const handleSubmit = async (formData: any) => {
     try {
+      // Fetch coordinates for departure airport
+      const departureResponse = await fetch('/api/coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          searchQuery: formData.departure_airport,
+          type: 'departure'
+        }),
+      })
+
+      if (!departureResponse.ok) {
+        throw new Error('Failed to fetch departure airport coordinates')
+      }
+
+      const departureData = await departureResponse.json()
+
+      // Fetch coordinates for arrival airport
+      const arrivalResponse = await fetch('/api/coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          searchQuery: formData.arrival_airport,
+          type: 'arrival'
+        }),
+      })
+
+      if (!arrivalResponse.ok) {
+        throw new Error('Failed to fetch arrival airport coordinates')
+      }
+
+      const arrivalData = await arrivalResponse.json()
+
+      // Add coordinates to form data
+      const updatedFormData = {
+        ...formData,
+        departure_longitude: departureData.departure_longitude,
+        departure_latitude: departureData.departure_latitude,
+        arrival_longitude: arrivalData.arrival_longitude,
+        arrival_latitude: arrivalData.arrival_latitude
+      }
+
       const response = await fetch(`/api/flights/${resolvedParams.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(updatedFormData),
       })
 
       if (!response.ok) {
@@ -109,18 +168,18 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
         <Card className="border-t-4 border-t-flight mb-8">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Flight Date */}
+              {/* Flight Details */}
               <div className="space-y-2">
                 <div className="flex items-center text-sm font-medium text-muted-foreground">
-                  <Clock className="h-4 w-4 mr-1 text-flight" />
-                  Flight Date
+                  <Plane className="h-4 w-4 mr-1 text-flight" />
+                  Flight Details
                 </div>
                 <div className="font-medium">
-                  {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
+                  {flight.airline} {flight.flight_number}
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
-                </div>
+                <Badge variant="outline" className="bg-muted/30 text-foreground">
+                  {flight.reservation_number}
+                </Badge>
               </div>
 
               {/* Passenger */}
@@ -135,29 +194,28 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
 
-              {/* Reservation & Flight Details */}
+              {/* Flight Date */}
               <div className="space-y-2">
                 <div className="flex items-center text-sm font-medium text-muted-foreground">
-                  <Plane className="h-4 w-4 mr-1 text-flight" />
-                  Flight Details
+                  <Clock className="h-4 w-4 mr-1 text-flight" />
+                  Flight Date
                 </div>
                 <div className="font-medium">
-                  {flight.airline} {flight.flight_number}
+                  {format(new Date(flight.departure_date), "yyyy-MM-dd", { locale: enUS })}
                 </div>
-                <Badge variant="outline" className="bg-muted/30 text-foreground">
-                  {flight.reservation_number}
-                </Badge>
+                <div className="text-sm text-muted-foreground">
+                  {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
+                </div>
               </div>
 
-              {/* Purchase Info */}
+              {/* Duration */}
               <div className="space-y-2">
                 <div className="flex items-center text-sm font-medium text-muted-foreground">
-                  <CreditCard className="h-4 w-4 mr-1 text-flight" />
-                  Purchase Info
+                  <Clock className="h-4 w-4 mr-1 text-flight" />
+                  Duration
                 </div>
-                <div className="font-medium">{flight.total_receipt}</div>
-                <div className="text-sm text-muted-foreground">
-                  {format(new Date(flight.purchased_date), "MMM d, yyyy", { locale: enUS })}
+                <div className="font-medium">
+                  {calculateDuration(flight.departure_time, flight.arrival_time)}
                 </div>
               </div>
 
@@ -177,7 +235,7 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center">
                   <Clock className="mr-1 h-3 w-3" />
-                  {formatTime(flight.departure_time)}
+                  {flight.departure_time}
                 </div>
               </div>
 
@@ -198,18 +256,19 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center">
                   <Clock className="mr-1 h-3 w-3" />
-                  {formatTime(flight.arrival_time)}
+                  {flight.arrival_time}
                 </div>
               </div>
 
-              {/* Duration */}
+              {/* Purchase Info */}
               <div className="space-y-2">
                 <div className="flex items-center text-sm font-medium text-muted-foreground">
-                  <Clock className="h-4 w-4 mr-1 text-flight" />
-                  Duration
+                  <CreditCard className="h-4 w-4 mr-1 text-flight" />
+                  Purchase Info
                 </div>
-                <div className="font-medium">
-                  {calculateDuration(flight.departure_time, flight.arrival_time)}
+                <div className="font-medium">{flight.total_receipt}</div>
+                <div className="text-sm text-muted-foreground">
+                  {format(new Date(flight.purchased_date), "MMM d, yyyy", { locale: enUS })}
                 </div>
               </div>
             </div>
@@ -229,22 +288,29 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
 
 // Helper function to calculate duration
 function calculateDuration(departureTime: string, arrivalTime: string): string {
-  const getMinutes = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number)
-    return hours * 60 + minutes
+  try {
+    if (!departureTime || !arrivalTime) return ''
+
+    const getMinutes = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number)
+      return hours * 60 + minutes
+    }
+
+    let depMinutes = getMinutes(departureTime)
+    let arrMinutes = getMinutes(arrivalTime)
+
+    // Handle overnight flights
+    if (arrMinutes < depMinutes) {
+      arrMinutes += 24 * 60 // Add 24 hours
+    }
+
+    const durationMinutes = arrMinutes - depMinutes
+    const hours = Math.floor(durationMinutes / 60)
+    const minutes = durationMinutes % 60
+
+    return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
+  } catch (error) {
+    console.error('Error calculating duration:', error)
+    return ''
   }
-
-  let depMinutes = getMinutes(departureTime)
-  let arrMinutes = getMinutes(arrivalTime)
-
-  // Handle overnight flights
-  if (arrMinutes < depMinutes) {
-    arrMinutes += 24 * 60 // Add 24 hours
-  }
-
-  const durationMinutes = arrMinutes - depMinutes
-  const hours = Math.floor(durationMinutes / 60)
-  const minutes = durationMinutes % 60
-
-  return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
 } 

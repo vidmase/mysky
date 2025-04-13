@@ -1095,8 +1095,8 @@ export default function FlightsPage() {
 
                   {/* Warning Message */}
                   <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
-                    <p className="font-medium">Warning:</p>
-                    <p>This will permanently delete this flight from your history. This action cannot be undone.</p>
+                    <div className="font-medium">Warning:</div>
+                    <div>This will permanently delete this flight from your history. This action cannot be undone.</div>
                   </div>
                 </div>
               </AlertDialogDescription>

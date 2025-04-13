@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,86 +102,181 @@ export async function POST(request: Request) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
 
-    // Verify authentication
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Please sign in to add flights' },
+        { message: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Get request body
+    // Get the flight data from the request
     const flightData = await request.json()
+    const { flightType, ...data } = flightData
 
-    // Validate required fields
-    const requiredFields = [
-      'passenger_name',
-      'reservation_number',
-      'flight_number',
-      'departure_airport',
-      'arrival_airport',
-      'departure_date',
-      'departure_time',
-      'arrival_time',
-      'total_receipt',
-      'purchased_date',
-      'purchase_time'
-    ]
+    // Add the owner_id to the flight data
+    const baseFlightData = {
+      ...data,
+      owner_id: user.id,
+      departure_longitude: data.departure_longitude || null,
+      departure_latitude: data.departure_latitude || null,
+      arrival_longitude: data.arrival_longitude || null,
+      arrival_latitude: data.arrival_latitude || null
+    }
 
-    const missingFields = requiredFields.filter(field => !flightData[field])
-    if (missingFields.length > 0) {
+    // For return flights, we'll create two entries
+    if (flightType === 'return') {
+      // Create outbound flight
+      const outboundFlight = {
+        ...baseFlightData,
+        flight_number: data.flight_number || data.flightNumber,
+        departure_date: data.departure_date,
+        arrival_date: data.arrival_date,
+        departure_time: data.departure_time || data.departureTime,
+        arrival_time: data.arrival_time || data.arrivalTime,
+        seat: data.seat,
+        total_receipt: data.total_receipt || data.totalReceipt,
+        purchased_date: data.purchased_date || data.purchasedDate,
+        purchase_time: data.purchase_time || data.purchaseTime,
+        passenger_name: data.passenger_name || data.passengerName,
+        reservation_number: data.reservation_number || data.reservationNumber,
+        notes: data.notes,
+        airline: data.airline
+      }
+
+      // Create return flight with swapped airports and coordinates
+      const returnFlight = {
+        ...baseFlightData,
+        flight_number: data.return_flight_number,
+        departure_date: data.return_departure_date,
+        arrival_date: data.return_arrival_date,
+        departure_time: data.return_departure_time,
+        arrival_time: data.return_arrival_time,
+        seat: data.return_seat,
+        total_receipt: data.total_receipt || data.totalReceipt,
+        purchased_date: data.purchased_date || data.purchasedDate,
+        purchase_time: data.purchase_time || data.purchaseTime,
+        passenger_name: data.passenger_name || data.passengerName,
+        reservation_number: data.reservation_number || data.reservationNumber,
+        notes: data.notes,
+        airline: data.airline,
+        // Swap departure and arrival for return flight
+        departure_airport: data.arrival_airport,
+        arrival_airport: data.departure_airport,
+        departure_iata: data.arrival_iata,
+        arrival_iata: data.departure_iata,
+        departure_country: data.arrival_country,
+        arrival_country: data.departure_country,
+        departure_flag: data.arrival_flag,
+        arrival_flag: data.departure_flag,
+        // Swap coordinates for return flight
+        departure_longitude: data.arrival_longitude,
+        departure_latitude: data.arrival_latitude,
+        arrival_longitude: data.departure_longitude,
+        arrival_latitude: data.departure_latitude
+      }
+
+      const { data: flights, error } = await supabase
+        .from('vidmaflights')
+        .insert([outboundFlight, returnFlight])
+        .select()
+
+      if (error) {
+        console.error('Error inserting flights:', error)
+        return NextResponse.json(
+          { message: 'Failed to add flights', error: error.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json(flights)
+    } else {
+      // For one-way flights, just insert the single flight
+      const singleFlight = {
+        ...baseFlightData,
+        flight_number: data.flight_number || data.flightNumber,
+        departure_date: data.departure_date,
+        arrival_date: data.arrival_date,
+        departure_time: data.departure_time || data.departureTime,
+        arrival_time: data.arrival_time || data.arrivalTime,
+        seat: data.seat,
+        total_receipt: data.total_receipt || data.totalReceipt,
+        purchased_date: data.purchased_date || data.purchasedDate,
+        purchase_time: data.purchase_time || data.purchaseTime,
+        passenger_name: data.passenger_name || data.passengerName,
+        reservation_number: data.reservation_number || data.reservationNumber,
+        notes: data.notes,
+        airline: data.airline
+      }
+
+      const { data: flight, error } = await supabase
+        .from('vidmaflights')
+        .insert([singleFlight])
+        .select()
+
+      if (error) {
+        console.error('Error inserting flight:', error)
+        return NextResponse.json(
+          { message: 'Failed to add flight', error: error.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json(flight)
+    }
+  } catch (error) {
+    console.error('Error in POST /api/flights:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
       return NextResponse.json(
-        { error: `Missing required fields: ${missingFields.join(', ')}` },
-        { status: 400 }
+        { message: 'Unauthorized' },
+        { status: 401 }
       )
     }
 
-    // Insert the flight data
-    const { data, error: insertError } = await supabase
+    // Get the flight data from the request
+    const flightData = await request.json()
+
+    // Update the flight with coordinates
+    const { data: flight, error } = await supabase
       .from('vidmaflights')
-      .insert([
-        {
-          passenger_name: flightData.passenger_name,
-          reservation_number: flightData.reservation_number,
-          flight_number: flightData.flight_number,
-          departure_airport: flightData.departure_airport,
-          arrival_airport: flightData.arrival_airport,
-          departure_date: flightData.departure_date,
-          departure_time: flightData.departure_time,
-          arrival_time: flightData.arrival_time,
-          total_receipt: flightData.total_receipt,
-          purchased_date: flightData.purchased_date,
-          purchase_time: flightData.purchase_time,
-          airline: flightData.airline || null,
-          arrival_country: flightData.arrival_country || null,
-          arrival_iata: flightData.arrival_iata || null,
-          departure_iata: flightData.departure_iata || null,
-          seat: flightData.seat || null,
-          notes: flightData.notes || null,
-          // owner_id will be automatically set by RLS policy
-        }
-      ])
+      .update({
+        ...flightData,
+        departure_longitude: flightData.departure_longitude || null,
+        departure_latitude: flightData.departure_latitude || null,
+        arrival_longitude: flightData.arrival_longitude || null,
+        arrival_latitude: flightData.arrival_latitude || null
+      })
+      .eq('id', params.id)
+      .eq('owner_id', user.id)
       .select()
 
-    if (insertError) {
-      console.error('Error inserting flight:', insertError)
+    if (error) {
+      console.error('Error updating flight:', error)
       return NextResponse.json(
-        { error: 'Failed to save flight details' },
+        { message: 'Failed to update flight', error: error.message },
         { status: 500 }
       )
     }
 
-    // Return the newly created flight
-    return NextResponse.json(
-      { message: 'Flight added successfully', flight: data[0] },
-      { status: 201 }
-    )
-
+    return NextResponse.json(flight)
   } catch (error) {
-    console.error('Error in POST /api/flights:', error)
+    console.error('Error in PUT /api/flights:', error)
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { message: 'Internal server error' },
       { status: 500 }
     )
   }
