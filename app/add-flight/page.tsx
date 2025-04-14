@@ -24,6 +24,8 @@ import { AirportSelector } from "@/components/airport-selector"
 import { PassengerSelector } from "@/components/passenger-selector"
 import { Airport } from "@/lib/airports"
 import { Passenger } from "@/lib/passengers"
+import { BoardingPassScanner } from "../components/boarding-pass-scanner"
+import { europeanAirports } from "@/lib/airports"
 
 interface FormState {
   passenger_name: string
@@ -359,6 +361,73 @@ export default function AddFlightPage() {
 
     // ... rest of validation ...
     return errors
+  }
+
+  // Handle extracted boarding pass data
+  const handleExtractedData = (data: any) => {
+    // Convert string dates to Date objects
+    const departureDateObj = data.departure_date ? new Date(data.departure_date) : new Date()
+    const arrivalDateObj = data.arrival_date ? new Date(data.arrival_date) : departureDateObj
+
+    // Find departure airport in europeanAirports
+    const departureAirport = europeanAirports.find(
+      (airport: Airport) => airport.iata === data.departure_iata ||
+        airport.name.toLowerCase().includes(data.departure_airport.toLowerCase())
+    )
+
+    // Find arrival airport in europeanAirports
+    const arrivalAirport = europeanAirports.find(
+      (airport: Airport) => airport.iata === data.arrival_iata ||
+        airport.name.toLowerCase().includes(data.arrival_airport.toLowerCase())
+    )
+
+    // Update selected airports
+    if (departureAirport) {
+      setSelectedDepartureAirport(departureAirport)
+    }
+    if (arrivalAirport) {
+      setSelectedArrivalAirport(arrivalAirport)
+    }
+
+    // Update form state
+    setFormData(prev => ({
+      ...prev,
+      passenger_name: data.passenger_name || '',
+      reservation_number: data.reservation_number || '',
+      flight_number: data.flight_number || '',
+      departure_airport: departureAirport ? departureAirport.name : data.departure_airport || '',
+      arrival_airport: arrivalAirport ? arrivalAirport.name : data.arrival_airport || '',
+      departure_date: departureDateObj,
+      departure_time: data.departure_time || '',
+      arrival_time: data.arrival_time || '',
+      total_receipt: data.total_receipt || '',
+      airline: data.airline || null,
+      arrival_iata: data.arrival_iata || null,
+      departure_iata: data.departure_iata || null,
+      seat: data.seat || null,
+      notes: data.notes || null,
+      departure_country: departureAirport ? departureAirport.country : data.departure_country || null,
+      arrival_country: arrivalAirport ? arrivalAirport.country : data.arrival_country || null,
+      departure_flag: data.departure_flag || null,
+      arrival_flag: data.arrival_flag || null,
+      arrival_date: arrivalDateObj,
+      return_arrival_time: data.return_arrival_time || null
+    }))
+
+    // Update other state variables
+    setDepartureDate(departureDateObj)
+    setArrivalDate(arrivalDateObj)
+    setFlightNumber(data.flight_number || '')
+    setAirline(data.airline || '')
+
+    // Update selected passengers if available
+    if (data.passengers && data.passengers.length > 0) {
+      setSelectedPassengers(data.passengers.map((p: any) => ({
+        name: p.name,
+        type: p.type || 'Adult',
+        age: p.age
+      })))
+    }
   }
 
   return (
@@ -778,25 +847,12 @@ export default function AddFlightPage() {
                     Scan Boarding Pass
                   </CardTitle>
                   <CardDescription>
-                    This feature is coming soon! You'll be able to scan your boarding pass to automatically fill in flight
-                    details.
+                    Upload your boarding pass image and we'll automatically extract the flight details.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center mb-6">
-                    <CreditCard className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">Feature Coming Soon</h3>
-                  <p className="text-muted-foreground max-w-md">
-                    We're working on adding the ability to scan your boarding pass or QR code to automatically fill in
-                    your flight details.
-                  </p>
+                <CardContent>
+                  <BoardingPassScanner onDataExtracted={handleExtractedData} />
                 </CardContent>
-                <CardFooter className="justify-center">
-                  <Button variant="outline" onClick={() => router.back()}>
-                    Go Back
-                  </Button>
-                </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>

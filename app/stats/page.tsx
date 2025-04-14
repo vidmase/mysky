@@ -2,8 +2,9 @@
 
 import React, { Suspense, useEffect, useState } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { europeanAirports } from '@/lib/airports'
+import { europeanAirports, Airport } from '@/lib/airports'
 import Image from 'next/image'
+import { Toaster, toast } from 'sonner'
 import {
   BarChart,
   Calendar,
@@ -15,6 +16,8 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
+  LogIn,
+  LogOut,
 } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,8 +26,11 @@ import { Badge } from "@/components/ui/badge"
 import { RecentActivity } from "../components/recent-activity"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
-// Create a map of IATA codes to airport data for faster lookups
-const airportMap = new Map(europeanAirports.map(airport => [airport.iata, airport]))
+// Create a map for faster lookups
+const airportMap = new Map<string, Airport>()
+europeanAirports.forEach(airport => {
+  airportMap.set(airport.iata, airport)
+})
 
 const ActivityLoadingFallback = () => (
   <Card>
@@ -34,36 +40,112 @@ const ActivityLoadingFallback = () => (
   </Card>
 )
 
-// Add the Haversine distance calculation function
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+// Haversine distance calculation function
+function calculateDistance(airport1: Airport, airport2: Airport): number {
+  if (!airport1.coordinates || !airport2.coordinates) return 0
+
+  const [lon1, lat1] = airport1.coordinates
+  const [lon2, lat2] = airport2.coordinates
+
+  const R = 6371 // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c); // Round to nearest kilometer
-};
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
 
 export default function StatsPage() {
   const [basicStats, setBasicStats] = useState({
     totalAirports: 0,
     totalCountries: 0,
-  });
+  })
+
+  interface Flight {
+    departure_airport: string;
+    arrival_airport: string;
+  }
+
+  const [flights, setFlights] = useState<Flight[]>([])
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     // Calculate basic statistics
-    const uniqueCountries = new Set(europeanAirports.map(airport => airport.country));
+    const uniqueCountries = new Set(europeanAirports.map(airport => airport.country))
     setBasicStats({
       totalAirports: europeanAirports.length,
       totalCountries: uniqueCountries.size,
-    });
-  }, []);
+    })
+
+    // Fetch flights data
+    async function fetchFlights() {
+      const { data: flightsData, error } = await supabase
+        .from('flights')
+        .select('departure_airport, arrival_airport')
+
+      if (error) {
+        console.error('Error fetching flights:', error)
+        return
+      }
+
+      setFlights(flightsData || [])
+    }
+
+    fetchFlights()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        toast.success('Welcome back!', {
+          icon: <LogIn className="h-5 w-5" />,
+          className: 'bg-background/80 backdrop-blur-sm border border-border',
+          description: `Signed in as ${session?.user?.email}`,
+          duration: 4000,
+          position: 'top-center',
+        })
+      }
+      if (event === 'SIGNED_OUT') {
+        toast('See you soon!', {
+          icon: <LogOut className="h-5 w-5" />,
+          className: 'bg-background/80 backdrop-blur-sm border border-border',
+          description: 'Successfully signed out',
+          duration: 4000,
+          position: 'top-center',
+        })
+      }
+    })
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
+  // Calculate total distance and unique countries
+  let totalDistance = 0
+  const uniqueCountries = new Set<string>()
+
+  // Process each flight
+  flights.forEach(flight => {
+    const departureAirport = airportMap.get(flight.departure_airport)
+    const arrivalAirport = airportMap.get(flight.arrival_airport)
+
+    if (departureAirport && arrivalAirport) {
+      totalDistance += calculateDistance(departureAirport, arrivalAirport)
+      uniqueCountries.add(departureAirport.country)
+      uniqueCountries.add(arrivalAirport.country)
+    }
+  })
+
+  console.log('Total distance:', totalDistance)
+  console.log('Unique countries:', uniqueCountries.size)
 
   return (
     <div className="relative min-h-screen bg-background">
+      <Toaster />
       {/* Background Image */}
       <div
         className="absolute inset-0 z-0"
