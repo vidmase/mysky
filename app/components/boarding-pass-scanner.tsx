@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CameraIcon } from "lucide-react"
+import { format } from 'date-fns'
 
 interface BoardingPassData {
     passenger_name: string
@@ -37,6 +38,8 @@ interface BoardingPassData {
     arrival_flag?: string
     arrival_date?: string
     return_arrival_time?: string
+    purchased_date?: string
+    purchase_time?: string
     passengers?: Array<{
         name: string
         type?: string
@@ -133,7 +136,11 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             // Parse the raw response to extract structured data
             const lines = rawData.raw_response.split('\n')
             let flightData: Partial<BoardingPassData> = {
-                passengers: []
+                passengers: [],
+                purchased_date: format(new Date(), 'yyyy-MM-dd'),  // Set current date as purchase date
+                purchase_time: format(new Date(), 'HH:mm'),        // Set current time as purchase time
+                total_receipt: '0',                                // Default value
+                airline: 'Unknown'                                 // Default value
             }
 
             let currentPassenger: { name: string; type?: string; age?: number } = { name: '' }
@@ -218,42 +225,142 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
     }
 
     const saveToSupabase = async () => {
-        if (!parsedData) return;
+        if (!parsedData) {
+            toast.error('No data to save', {
+                description: 'Please scan a boarding pass first.',
+            });
+            return;
+        }
 
         try {
+            // Get the current user
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+            if (authError || !user) {
+                toast.error('Authentication error', {
+                    description: 'Please sign in to save flight details.',
+                });
+                return;
+            }
+
+            // Validate required fields before saving
+            const requiredFields = {
+                passenger_name: parsedData.passenger_name,
+                flight_number: parsedData.flight_number,
+                departure_airport: parsedData.departure_airport,
+                arrival_airport: parsedData.arrival_airport,
+                departure_date: parsedData.departure_date,
+            };
+
+            const missingFields = Object.entries(requiredFields)
+                .filter(([_, value]) => !value)
+                .map(([key]) => key);
+
+            if (missingFields.length > 0) {
+                toast.error('Missing required fields', {
+                    description: `Please ensure ${missingFields.join(', ')} are filled.`
+                });
+                return;
+            }
+
+            // Prepare the data object with type checking
+            const flightData = {
+                passenger_name: parsedData.passenger_name || '',
+                reservation_number: parsedData.reservation_number || '',
+                flight_number: parsedData.flight_number || '',
+                departure_airport: parsedData.departure_airport || '',
+                arrival_airport: parsedData.arrival_airport || '',
+                departure_date: parsedData.departure_date || '',
+                departure_time: parsedData.departure_time || '',
+                arrival_time: parsedData.arrival_time || '',
+                total_receipt: parsedData.total_receipt || '0',
+                airline: parsedData.airline || 'Unknown',
+                seat: parsedData.seat || '',
+                departure_iata: parsedData.departure_iata || '',
+                arrival_iata: parsedData.arrival_iata || '',
+                departure_country: parsedData.departure_country || '',
+                arrival_country: parsedData.arrival_country || '',
+                departure_flag: parsedData.departure_flag || '',
+                arrival_flag: parsedData.arrival_flag || '',
+                arrival_date: parsedData.arrival_date || parsedData.departure_date || '',
+                return_arrival_time: parsedData.return_arrival_time || '',
+                purchased_date: parsedData.purchased_date || format(new Date(), 'yyyy-MM-dd'),
+                purchase_time: parsedData.purchase_time || format(new Date(), 'HH:mm'),
+                owner_id: user.id,
+                notes: parsedData.passengers
+                    ? `Additional passengers: ${parsedData.passengers
+                        .filter(p => p.name !== parsedData.passenger_name)
+                        .map(p => `${p.name} (${p.type}, Age: ${p.age || 'N/A'})`)
+                        .join('; ')}`
+                    : ''
+            };
+
+            // Log the data being sent
+            console.log('Attempting to save flight data:', flightData);
+
             const { error: supabaseError } = await supabase
                 .from('vidmaflights')
-                .insert([{
-                    passenger_name: parsedData.passenger_name || 'Unknown',
-                    reservation_number: parsedData.reservation_number || '',
-                    flight_number: parsedData.flight_number || '',
-                    departure_airport: parsedData.departure_airport || '',
-                    arrival_airport: parsedData.arrival_airport || '',
-                    departure_date: parsedData.departure_date || '',
-                    departure_time: parsedData.departure_time || '',
-                    arrival_time: parsedData.arrival_time || '',
-                    departure_iata: parsedData.departure_iata || '',
-                    arrival_iata: parsedData.arrival_iata || '',
-                    notes: parsedData.passengers
-                        ? `Additional passengers: ${parsedData.passengers
-                            .filter(p => p.name !== parsedData.passenger_name)
-                            .map(p => `${p.name} (${p.type}, Age: ${p.age || 'N/A'})`)
-                            .join('; ')}`
-                        : ''
-                }])
+                .insert([flightData]);
 
-            if (supabaseError) throw supabaseError
+            if (supabaseError) {
+                console.error('Supabase Error:', {
+                    code: supabaseError.code,
+                    message: supabaseError.message,
+                    details: supabaseError.details,
+                    hint: supabaseError.hint
+                });
 
+                let errorMessage = 'Failed to save flight details.';
+                switch (supabaseError.code) {
+                    case '23505':
+                        errorMessage = 'This flight record already exists.';
+                        break;
+                    case '23503':
+                        errorMessage = 'Invalid reference in flight data.';
+                        break;
+                    case '42P01':
+                        errorMessage = 'Database configuration error. Please contact support.';
+                        break;
+                    case '23502':
+                        errorMessage = `Required field missing: ${supabaseError.details}`;
+                        break;
+                    default:
+                        errorMessage = supabaseError.message;
+                }
+
+                toast.error('Save failed', {
+                    description: errorMessage
+                });
+                return;
+            }
+
+            // Success notification
             toast.success('Flight details saved successfully!', {
                 description: 'The flight information has been added to your records.',
-            })
+            });
+
+            // Reset the form after successful save
+            resetState();
+
         } catch (err) {
-            console.error('Failed to save:', err)
+            console.error('Save operation failed:', {
+                timestamp: new Date().toISOString(),
+                error: err instanceof Error ? {
+                    name: err.name,
+                    message: err.message,
+                    stack: err.stack
+                } : err,
+                flightData: {
+                    flightNumber: parsedData.flight_number,
+                    passenger: parsedData.passenger_name
+                }
+            });
+
             toast.error('Failed to save flight details', {
-                description: 'Please try again or contact support if the issue persists.',
-            })
+                description: err instanceof Error ? err.message : 'An unexpected error occurred.',
+            });
         }
-    }
+    };
 
     const formatDate = (dateStr: string | undefined) => {
         if (!dateStr) return 'N/A';
