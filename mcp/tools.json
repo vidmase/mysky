@@ -1,0 +1,8 @@
+[
+  {
+    "name": "getTime",
+    "description": "Fetches the current time from the PostgreSQL database",
+    "parameters": [],
+    "run": "getTime"
+  }
+]
