@@ -57,7 +57,10 @@
     "input-otp": "1.4.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.454.0",
+<<<<<<< HEAD
     "mapbox-gl": "^3.11.1",
+=======
+>>>>>>> a15be4c76ce051c6735065a4b88880a06a8d8bf3
     "next": "15.1.0",
     "next-themes": "^0.4.4",
     "react": "^18.3.1",
@@ -66,7 +69,11 @@
     "react-hook-form": "^7.54.1",
     "react-hot-toast": "^2.5.2",
     "react-intersection-observer": "^9.16.0",
+<<<<<<< HEAD
     "react-leaflet": "^4.2.1",
+=======
+    "react-leaflet": "^5.0.0",
+>>>>>>> a15be4c76ce051c6735065a4b88880a06a8d8bf3
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
     "sonner": "^1.7.4",
