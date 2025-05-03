@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
 import "/node_modules/flag-icons/css/flag-icons.min.css"
-import "mapbox-gl/dist/mapbox-gl.css"
 import mapboxgl from "mapbox-gl"
 
 // Types

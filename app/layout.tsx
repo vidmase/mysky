@@ -8,6 +8,7 @@ import { NotificationProvider } from '@/contexts/notification-context'
 import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
 import 'leaflet/dist/leaflet.css'
+import "mapbox-gl/dist/mapbox-gl.css"
 
 const inter = Inter({ subsets: ["latin"] })
 const jakarta = Plus_Jakarta_Sans({
