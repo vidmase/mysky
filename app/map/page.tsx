@@ -14,6 +14,9 @@ import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
 import "/node_modules/flag-icons/css/flag-icons.min.css"
 import mapboxgl from "mapbox-gl"
+import { Pause, Play, RotateCcw } from "lucide-react"
+import { Plane } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 // Types
 interface Airport {
@@ -358,6 +361,15 @@ const calculateStatistics = (airports: Airport[]): {
   };
 };
 
+// Add available Mapbox styles
+const MAP_STYLES = [
+  { label: "Day", value: "mapbox://styles/mapbox/navigation-day-v1" },
+  { label: "Night", value: "mapbox://styles/mapbox/navigation-night-v1" },
+  { label: "Streets", value: "mapbox://styles/mapbox/streets-v12" },
+  { label: "Satellite", value: "mapbox://styles/mapbox/satellite-v9" },
+  { label: "Outdoors", value: "mapbox://styles/mapbox/outdoors-v12" },
+];
+
 export default function MapPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -369,6 +381,16 @@ export default function MapPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("map")
+  const [flights, setFlights] = useState<any[]>([])
+  const [selectedFlight, setSelectedFlight] = useState<any | null>(null)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [animationProgress, setAnimationProgress] = useState(0)
+  const animationRef = useRef<number | null>(null)
+  const planeMarkerRef = useRef<mapboxgl.Marker | null>(null)
+  const pathLayerId = 'selected-flight-path'
+  const startMarkerId = 'selected-flight-start'
+  const endMarkerId = 'selected-flight-end'
 
   // Refs for map elements
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -844,119 +866,71 @@ export default function MapPage() {
     }
   }, [airports, updateAirportMarkers]);
 
-  // Update hover interactions for airports
+  // Add hover interactions for flight paths
   useEffect(() => {
     if (!mapRef.current || !airports) return;
-
     const map = mapRef.current;
 
-    const handleMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
-      if (e.features && e.features.length > 0) {
-        map.getCanvas().style.cursor = 'pointer';
+    // Helper to remove all popups
+    const removePopups = () => {
+      const popups = document.getElementsByClassName('mapboxgl-popup');
+      while (popups[0]) popups[0].remove();
+    };
 
-        const feature = e.features[0];
-        const airportCode = feature.properties?.code;
-
-        if (airportCode) {
-          // Update the hover_airport property in the source data
-          const source = map.getSource('flight-paths') as mapboxgl.GeoJSONSource;
-          if (source) {
-            const data = source.serialize().data;
-            if (data && typeof data === 'object' && 'features' in data) {
-              source.setData({
-                type: 'FeatureCollection',
-                features: (data.features as any[]).map(f => ({
-                  ...f,
-                  properties: {
-                    ...f.properties,
-                    hover_airport: airportCode
-                  }
-                }))
-              });
-            }
-          }
-
-          // Show popup with airport info and connected routes
-          const airport = airports.find(a => a.code === airportCode);
-          if (airport) {
-            const connectedRoutes = airport.routes.length;
-            const totalKm = calculateTotalDistance(airport, airports);
-            const formattedDistance = new Intl.NumberFormat('en-US').format(totalKm);
-
-            new mapboxgl.Popup({
-              closeButton: false,
-              closeOnClick: false,
-              className: 'airport-popup',
-              offset: [0, -10]
-            })
-              .setLngLat([airport.lng, airport.lat])
-              .setHTML(`
-                <div class="airport-tooltip">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="fi fi-${getCountryCode(airport.country)}"
-                          style="width: 1.25rem; height: 0.9375rem;"
-                          title="${airport.country}"></span>
-                    <span class="font-medium">${airport.name}</span>
-                  </div>
-                  <div class="text-sm text-muted-foreground">
-                    <span class="font-mono bg-muted px-1.5 py-0.5 rounded-md">${airport.code}</span>
-                    <span class="mx-1">•</span>
-                    ${airport.visits} visit${airport.visits !== 1 ? 's' : ''}
-                    <span class="mx-1">•</span>
-                    ${connectedRoutes} route${connectedRoutes !== 1 ? 's' : ''}
-                    <span class="mx-1">•</span>
-                    ${formattedDistance} km total
-                  </div>
-                </div>
-              `)
-              .addTo(map);
-          }
-        }
+    // Mouse enter handler for flight paths
+    const handleFlightPathMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+      if (!e.features || e.features.length === 0) return;
+      map.getCanvas().style.cursor = 'pointer';
+      removePopups();
+      const feature = e.features[0];
+      const { from, to, count } = feature.properties || {};
+      const fromAirport = airports.find(a => a.code === from);
+      const toAirport = airports.find(a => a.code === to);
+      if (fromAirport && toAirport) {
+        const distance = calculateDistance(fromAirport.lat, fromAirport.lng, toAirport.lat, toAirport.lng);
+        new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          className: 'flight-path-popup',
+          offset: 10
+        })
+          .setLngLat([(fromAirport.lng + toAirport.lng) / 2, (fromAirport.lat + toAirport.lat) / 2])
+          .setHTML(`
+            <div class="flight-tooltip">
+              <div class="flight-route">
+                <span class="fi fi-${getCountryCode(fromAirport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+                <span>${fromAirport.code}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline h-4 w-4 mx-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                <span class="fi fi-${getCountryCode(toAirport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+                <span>${toAirport.code}</span>
+              </div>
+              <div class="flight-count">Flights: <b>${count}</b></div>
+              <div class="flight-distance">Distance: <b>${distance} km</b></div>
+            </div>
+          `)
+          .addTo(map);
       }
     };
 
-    const handleMouseLeave = () => {
+    // Mouse leave handler for flight paths
+    const handleFlightPathMouseLeave = () => {
       map.getCanvas().style.cursor = '';
-
-      // Reset the hover_airport property
-      const source = map.getSource('flight-paths') as mapboxgl.GeoJSONSource;
-      if (source) {
-        const data = source.serialize().data;
-        if (data && typeof data === 'object' && 'features' in data) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: (data.features as any[]).map(f => ({
-              ...f,
-              properties: {
-                ...f.properties,
-                hover_airport: null
-              }
-            }))
-          });
-        }
-      }
-
-      // Remove all popups
-      const popups = document.getElementsByClassName('mapboxgl-popup');
-      while (popups[0]) {
-        popups[0].remove();
-      }
+      removePopups();
     };
 
     if (map.isStyleLoaded()) {
-      map.on('mouseenter', 'airports-layer', handleMouseEnter);
-      map.on('mouseleave', 'airports-layer', handleMouseLeave);
+      map.on('mouseenter', 'flight-paths-layer', handleFlightPathMouseEnter);
+      map.on('mouseleave', 'flight-paths-layer', handleFlightPathMouseLeave);
     } else {
       map.once('load', () => {
-        map.on('mouseenter', 'airports-layer', handleMouseEnter);
-        map.on('mouseleave', 'airports-layer', handleMouseLeave);
+        map.on('mouseenter', 'flight-paths-layer', handleFlightPathMouseEnter);
+        map.on('mouseleave', 'flight-paths-layer', handleFlightPathMouseLeave);
       });
     }
 
-    // Cleanup
     return () => {
-      map.off('mouseenter', 'airports-layer', handleMouseEnter);
-      map.off('mouseleave', 'airports-layer', handleMouseLeave);
+      map.off('mouseenter', 'flight-paths-layer', handleFlightPathMouseEnter);
+      map.off('mouseleave', 'flight-paths-layer', handleFlightPathMouseLeave);
     };
   }, [airports]);
 
@@ -1208,8 +1182,215 @@ export default function MapPage() {
     };
   }, [airports]);
 
+  // Add countries boundary source and layer using new Mapbox API method
+  const addVisitedCountriesLayer = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    // Only add source/layer if style is loaded
+    if (!map.isStyleLoaded()) {
+      map.once('style.load', addVisitedCountriesLayer);
+      return;
+    }
+    // Remove previous layers and sources if they exist
+    if (map.getLayer('visited-countries-boundary')) {
+      map.removeLayer('visited-countries-boundary');
+    }
+    if (map.getSource('countries')) {
+      map.removeSource('countries');
+    }
+    // Fetch the countries GeoJSON and add as a source
+    fetch('/countries.geojson')
+      .then(res => res.json())
+      .then((geojson) => {
+        map.addSource('countries', {
+          type: 'geojson',
+          data: geojson,
+        });
+        // Get visited country ISO3 codes
+        const visitedIsoCodes = new Set(
+          airports.map(a => a.country).map(country => {
+            // Try to find the matching feature in the GeoJSON by country name
+            const feature = geojson.features.find((f: any) => f.properties.name === country);
+            return feature ? feature.properties['ISO3166-1-Alpha-3'] : null;
+          }).filter(Boolean)
+        );
+        // Set feature-state for visited countries
+        geojson.features.forEach((feature: any) => {
+          const iso3 = feature.properties['ISO3166-1-Alpha-3'];
+          map.setFeatureState(
+            { source: 'countries', id: feature.id || iso3 },
+            { visited: visitedIsoCodes.has(iso3) }
+          );
+        });
+        // Add the boundary layer for visited countries using feature-state
+        map.addLayer({
+          id: 'visited-countries-boundary',
+          type: 'line',
+          source: 'countries',
+          paint: {
+            'line-color': [
+              'case',
+              ['boolean', ['feature-state', 'visited'], false],
+              '#f59e42',
+              'rgba(0,0,0,0)'
+            ],
+            'line-width': 2,
+            'line-opacity': 0.8,
+          },
+        });
+      });
+  }, [airports]);
+
+  // Call this function after style changes and on airports update
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const handleStyleData = () => {
+      updateAirportMarkers();
+      updateFlightPaths();
+      addVisitedCountriesLayer();
+    };
+    map.on('styledata', handleStyleData);
+    // Also call once on mount
+    handleStyleData();
+    return () => {
+      map.off('styledata', handleStyleData);
+    };
+  }, [updateAirportMarkers, updateFlightPaths, addVisitedCountriesLayer]);
+
+  // Fetch flights on mount
+  useEffect(() => {
+    fetch('/api/flights')
+      .then(res => res.json())
+      .then(data => setFlights(data.sort((a: any, b: any) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime())))
+      .catch(() => setFlights([]))
+  }, [])
+
+  // Animate selected flight
+  useEffect(() => {
+    if (!selectedFlight || !mapRef.current) return
+    const map = mapRef.current
+    // Remove previous path and markers
+    if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
+    if (map.getSource(pathLayerId)) map.removeSource(pathLayerId)
+    if (map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
+    if (map.getSource(startMarkerId)) map.removeSource(startMarkerId)
+    if (map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
+    if (map.getSource(endMarkerId)) map.removeSource(endMarkerId)
+    if (planeMarkerRef.current) { planeMarkerRef.current.remove(); planeMarkerRef.current = null }
+    setAnimationProgress(0)
+    setIsPaused(false)
+    setIsAnimating(true)
+
+    // Get coordinates
+    const depCode = Object.keys(airportData).find(code => selectedFlight.departure_iata === code || selectedFlight.departure_airport.includes(code) || selectedFlight.departure_airport.toLowerCase().includes(airportData[code].name.toLowerCase()))
+    const arrCode = Object.keys(airportData).find(code => selectedFlight.arrival_iata === code || selectedFlight.arrival_airport.includes(code) || selectedFlight.arrival_airport.toLowerCase().includes(airportData[code].name.toLowerCase()))
+    if (!depCode || !arrCode) return
+    const from = airportData[depCode]
+    const to = airportData[arrCode]
+    const start = [from.lng, from.lat]
+    const end = [to.lng, to.lat]
+    // Path as straight line (could be curved for realism)
+    const path = [start, end]
+    // Add path layer
+    map.addSource(pathLayerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: path } } })
+    map.addLayer({ id: pathLayerId, type: 'line', source: pathLayerId, paint: { 'line-color': '#f59e42', 'line-width': 4, 'line-opacity': 0.9 } })
+    // Add start/end markers
+    map.addSource(startMarkerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: start } } })
+    map.addLayer({ id: startMarkerId, type: 'circle', source: startMarkerId, paint: { 'circle-radius': 7, 'circle-color': '#22c55e', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } })
+    map.addSource(endMarkerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: end } } })
+    map.addLayer({ id: endMarkerId, type: 'circle', source: endMarkerId, paint: { 'circle-radius': 7, 'circle-color': '#ef4444', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } })
+    // Add plane marker
+    const el = document.createElement('div')
+    el.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19.5L21.5 12L2.5 4.5V10.5L17.5 12L2.5 13.5V19.5Z"/></svg>`
+    el.style.transform = 'translate(-16px, -16px)'
+    const marker = new mapboxgl.Marker(el).setLngLat([start[0], start[1]]).addTo(map)
+    planeMarkerRef.current = marker
+    // Animation
+    let startTime: number | null = null
+    let duration = 6000 // ms
+    let reqId: number
+    function animate(ts: number) {
+      if (!isAnimating || isPaused) { animationRef.current = null; return }
+      if (!startTime) startTime = ts
+      const t = Math.min((ts - startTime) / duration, 1)
+      const lng = start[0] + (end[0] - start[0]) * t
+      const lat = start[1] + (end[1] - start[1]) * t
+      marker.setLngLat([lng, lat])
+      setAnimationProgress(t)
+      if (t < 1) {
+        reqId = requestAnimationFrame(animate)
+        animationRef.current = reqId
+      } else {
+        setIsAnimating(false)
+        setAnimationProgress(1)
+      }
+    }
+    reqId = requestAnimationFrame(animate)
+    animationRef.current = reqId
+    // Center map
+    map.fitBounds([[start[0], start[1]], [end[0], end[1]]], { padding: 100 })
+    // Cleanup on unmount/flight change
+    return () => {
+      if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
+      if (map.getSource(pathLayerId)) map.removeSource(pathLayerId)
+      if (map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
+      if (map.getSource(startMarkerId)) map.removeSource(startMarkerId)
+      if (map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
+      if (map.getSource(endMarkerId)) map.removeSource(endMarkerId)
+      if (planeMarkerRef.current) { planeMarkerRef.current.remove(); planeMarkerRef.current = null }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current)
+    }
+  }, [selectedFlight])
+
+  // Animation controls
+  const handlePlay = () => { setIsPaused(false); setIsAnimating(true) }
+  const handlePause = () => { setIsPaused(true); setIsAnimating(false) }
+  const handleReplay = () => { setSelectedFlight(null); setTimeout(() => setSelectedFlight(selectedFlight), 100) }
+
   return (
     <div className="container mx-auto p-4 space-y-4">
+      {/* Floating flight selector panel */}
+      <div className="fixed top-6 right-6 z-50 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-lg p-4 w-80 max-w-full max-h-[80vh] overflow-y-auto border border-zinc-200 dark:border-zinc-800">
+        <h2 className="font-bold text-lg mb-2 flex items-center gap-2"><Plane className="h-5 w-5 text-flight" /> Replay a Flight</h2>
+        <div className="space-y-2">
+          {flights.length === 0 && <div className="text-muted-foreground text-sm">No flights found.</div>}
+          {flights.map((flight, idx) => {
+            const dep = flight.departure_iata || (flight.departure_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.departure_airport.slice(0,3)
+            const arr = flight.arrival_iata || (flight.arrival_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.arrival_airport.slice(0,3)
+            return (
+              <button
+                key={flight.id || idx}
+                className={`w-full text-left px-3 py-2 rounded-md border flex flex-col gap-0.5 transition-all ${selectedFlight === flight ? 'bg-flight/10 border-flight' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-flight/5'}`}
+                onClick={() => setSelectedFlight(flight)}
+                disabled={isAnimating && selectedFlight === flight}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1.5 py-0.5">{dep}</span>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1.5 py-0.5">{arr}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{flight.departure_date}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{flight.airline}</span>
+                  <span>{flight.flight_number}</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {/* Animation controls */}
+        {selectedFlight && (
+          <div className="flex items-center gap-2 mt-4 justify-center">
+            <button onClick={handlePlay} disabled={isAnimating && !isPaused} className="p-2 rounded-full bg-flight/90 text-white disabled:opacity-50"><Play className="h-4 w-4" /></button>
+            <button onClick={handlePause} disabled={!isAnimating || isPaused} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 disabled:opacity-50"><Pause className="h-4 w-4" /></button>
+            <button onClick={handleReplay} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"><RotateCcw className="h-4 w-4" /></button>
+            <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full mx-2 relative overflow-hidden">
+              <div className="bg-flight h-2 rounded-full transition-all" style={{ width: `${Math.round(animationProgress * 100)}%` }} />
+            </div>
+          </div>
+        )}
+      </div>
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="map">Map View</TabsTrigger>
