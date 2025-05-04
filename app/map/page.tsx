@@ -370,6 +370,49 @@ const MAP_STYLES = [
   { label: "Outdoors", value: "mapbox://styles/mapbox/outdoors-v12" },
 ];
 
+// Helper to calculate bearing between two points
+function getBearing(start: [number, number], end: [number, number]) {
+  const toRad = (deg: number) => deg * Math.PI / 180;
+  const toDeg = (rad: number) => rad * 180 / Math.PI;
+  const [lng1, lat1] = start;
+  const [lng2, lat2] = end;
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+  const brng = Math.atan2(y, x);
+  return (toDeg(brng) + 360) % 360;
+}
+
+// Simulate a typical commercial flight profile
+function getFlightProfile(durationMs: number) {
+  // Phases: takeoff (0-10%), climb (10-25%), cruise (25-75%), descent (75-90%), landing (90-100%)
+  return [
+    { pct: 0.0,   speed: 0,    alt: 0,      phase: 'Takeoff' },
+    { pct: 0.10,  speed: 160,  alt: 2000,   phase: 'Climb' },
+    { pct: 0.25,  speed: 250,  alt: 12000,  phase: 'Climb' },
+    { pct: 0.30,  speed: 450,  alt: 35000,  phase: 'Cruise' },
+    { pct: 0.75,  speed: 470,  alt: 37000,  phase: 'Cruise' },
+    { pct: 0.90,  speed: 250,  alt: 12000,  phase: 'Descent' },
+    { pct: 0.97,  speed: 160,  alt: 2000,   phase: 'Landing' },
+    { pct: 1.0,   speed: 0,    alt: 0,      phase: 'Landed' },
+  ];
+}
+
+function interpolateProfile(profile: any[], t: number) {
+  for (let i = 1; i < profile.length; i++) {
+    if (t <= profile[i].pct) {
+      const prev = profile[i-1], next = profile[i];
+      const localT = (t - prev.pct) / (next.pct - prev.pct);
+      return {
+        speed: Math.round(prev.speed + (next.speed - prev.speed) * localT),
+        alt: Math.round(prev.alt + (next.alt - prev.alt) * localT),
+        phase: localT < 0.5 ? prev.phase : next.phase
+      };
+    }
+  }
+  return { speed: 0, alt: 0, phase: 'Landed' };
+}
+
 export default function MapPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -391,6 +434,16 @@ export default function MapPage() {
   const pathLayerId = 'selected-flight-path'
   const startMarkerId = 'selected-flight-start'
   const endMarkerId = 'selected-flight-end'
+  const [flightOverlay, setFlightOverlay] = useState({ speed: 0, alt: 0, phase: 'Takeoff' })
+  const [panelPos, setPanelPos] = useState({ x: 40, y: 40 });
+  const [dragging, setDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [page, setPage] = useState(1);
+  const flightsPerPage = 10;
+  const totalPages = Math.ceil(flights.length / flightsPerPage);
+  const pagedFlights = flights.slice((page - 1) * flightsPerPage, page * flightsPerPage);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Refs for map elements
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -988,20 +1041,64 @@ export default function MapPage() {
 
     .flight-tooltip {
       text-align: center;
+      background: rgba(30,41,59,0.97); /* slate-900, high contrast */
+      color: #fff;
+      border-radius: 1rem;
+      box-shadow: 0 6px 32px 0 rgba(0,0,0,0.18), 0 1.5px 6px 0 rgba(0,0,0,0.12);
+      padding: 1.1rem 1.3rem 1.1rem 1.3rem;
+      min-width: 220px;
+      max-width: 320px;
+      font-family: var(--font-sans, 'Inter', 'Segoe UI', Arial, sans-serif);
+      transition: box-shadow 0.2s, transform 0.2s, background 0.2s;
+      font-size: 1rem;
+      position: relative;
+      opacity: 0.98;
+      border: none;
+      animation: tooltip-pop 0.18s cubic-bezier(.4,1.4,.6,1) both;
     }
-
-    .flight-route {
+    .flight-tooltip:hover {
+      box-shadow: 0 10px 40px 0 rgba(30,41,59,0.22), 0 2px 8px 0 rgba(0,0,0,0.16);
+      background: rgba(30,41,59,1);
+      transform: scale(1.025);
+      color: #fff;
+    }
+    @keyframes tooltip-pop {
+      0% { opacity: 0; transform: scale(0.95); }
+      100% { opacity: 0.98; transform: scale(1); }
+    }
+    .flight-tooltip .flight-route {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-size: 1.08rem;
+      letter-spacing: 0.01em;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4em;
+    }
+    .flight-tooltip .flight-route svg {
+      color: #38bdf8;
+      margin: 0 0.2em;
+    }
+    .flight-tooltip .flight-count, .flight-tooltip .flight-distance {
+      color: #e0e7ef;
+      font-size: 0.93rem;
+      margin-bottom: 0.1rem;
       font-weight: 500;
-      margin-bottom: 0.25rem;
+      letter-spacing: 0.01em;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.10);
+    }
+    .flight-tooltip .flight-count b, .flight-tooltip .flight-distance b {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+    .flight-tooltip .fi {
+      box-shadow: none;
+      border-radius: 3px;
+      border: 1px solid #334155;
     }
 
-    .flight-count,
-    .flight-distance {
-      color: hsl(var(--muted-foreground));
-      font-size: 0.75rem;
-      line-height: 1rem;
-    }
-    
     .flight-path {
       transition: all 0.2s ease;
     }
@@ -1290,7 +1387,7 @@ export default function MapPage() {
     const to = airportData[arrCode]
     const start = [from.lng, from.lat]
     const end = [to.lng, to.lat]
-    // Path as straight line (could be curved for realism)
+    // Path as straight line
     const path = [start, end]
     // Add path layer
     map.addSource(pathLayerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: path } } })
@@ -1302,14 +1399,16 @@ export default function MapPage() {
     map.addLayer({ id: endMarkerId, type: 'circle', source: endMarkerId, paint: { 'circle-radius': 7, 'circle-color': '#ef4444', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } })
     // Add plane marker
     const el = document.createElement('div')
-    el.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19.5L21.5 12L2.5 4.5V10.5L17.5 12L2.5 13.5V19.5Z"/></svg>`
+    el.innerHTML = `<svg id="plane-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19.5L21.5 12L2.5 4.5V10.5L17.5 12L2.5 13.5V19.5Z"/></svg>`
     el.style.transform = 'translate(-16px, -16px)'
     const marker = new mapboxgl.Marker(el).setLngLat([start[0], start[1]]).addTo(map)
     planeMarkerRef.current = marker
     // Animation
     let startTime: number | null = null
     let duration = 6000 // ms
+    const profile = getFlightProfile(duration)
     let reqId: number
+    // Make sure setFlightOverlay is in scope here
     function animate(ts: number) {
       if (!isAnimating || isPaused) { animationRef.current = null; return }
       if (!startTime) startTime = ts
@@ -1317,19 +1416,28 @@ export default function MapPage() {
       const lng = start[0] + (end[0] - start[0]) * t
       const lat = start[1] + (end[1] - start[1]) * t
       marker.setLngLat([lng, lat])
+      // Calculate bearing from previous to current position
+      let prevLng = start[0] + (end[0] - start[0]) * Math.max(t - 0.01, 0)
+      let prevLat = start[1] + (end[1] - start[1]) * Math.max(t - 0.01, 0)
+      const bearing = getBearing([prevLng, prevLat], [lng, lat])
+      const planeSvg = el.querySelector('#plane-svg') as SVGElement
+      if (planeSvg) {
+        planeSvg.style.transform = `rotate(${bearing + 90}deg)`
+      }
       setAnimationProgress(t)
+      // Use the functional form to ensure correct closure
+      setFlightOverlay(() => interpolateProfile(profile, t))
       if (t < 1) {
         reqId = requestAnimationFrame(animate)
         animationRef.current = reqId
       } else {
         setIsAnimating(false)
         setAnimationProgress(1)
+        setFlightOverlay(() => interpolateProfile(profile, 1))
       }
     }
     reqId = requestAnimationFrame(animate)
     animationRef.current = reqId
-    // Center map
-    map.fitBounds([[start[0], start[1]], [end[0], end[1]]], { padding: 100 })
     // Cleanup on unmount/flight change
     return () => {
       if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
@@ -1348,48 +1456,189 @@ export default function MapPage() {
   const handlePause = () => { setIsPaused(true); setIsAnimating(false) }
   const handleReplay = () => { setSelectedFlight(null); setTimeout(() => setSelectedFlight(selectedFlight), 100) }
 
+  // After the airport markers/layer are set up, add this effect:
+  useEffect(() => {
+    if (!mapRef.current || !airports || airports.length === 0) return;
+    const map = mapRef.current;
+
+    function handleAirportClick(e: any) {
+      if (!e.features || e.features.length === 0) return;
+      const props = e.features[0].properties;
+      if (!props) return;
+      const airport = airports.find(a => a.code === props.code);
+      if (!airport) return;
+      const html = `
+        <div class="airport-tooltip">
+          <div class="airport-name">${airport.name}</div>
+          <div class="airport-meta">
+            <span class="fi fi-${getCountryCode(airport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+            <span class="airport-code">${airport.code}</span>
+            <span class="airport-city">${airport.city}</span>
+            <span class="airport-country">${airport.country}</span>
+          </div>
+          <div class="airport-visits">Visits: <b>${airport.visits}</b></div>
+          <div class="airport-routes">
+            <div class="routes-title">Connected Routes:</div>
+            <ul>
+              ${airport.routes.map(route => {
+                const other = airports.find(a => a.code === (route.from === airport.code ? route.to : route.from));
+                return other
+                  ? `<li><span class=\"fi fi-${getCountryCode(other.country)}\"></span> ${airport.code} → ${other.code} (${route.count}x)</li>`
+                  : '';
+              }).join('')}
+            </ul>
+          </div>
+        </div>
+      `;
+      new mapboxgl.Popup({ closeButton: true, className: 'airport-popup', offset: 12 })
+        .setLngLat([airport.lng, airport.lat])
+        .setHTML(html)
+        .addTo(map);
+    }
+
+    map.off('click', 'airports-layer', handleAirportClick);
+    map.on('click', 'airports-layer', handleAirportClick);
+    return () => {
+      map.off('click', 'airports-layer', handleAirportClick);
+    };
+  }, [airports]);
+
+  // Drag handlers
+  function onPanelMouseDown(e: React.MouseEvent) {
+    if (panelRef.current && e.button === 0) {
+      setDragging(true);
+      setDragOffset({
+        x: e.clientX - panelPos.x,
+        y: e.clientY - panelPos.y,
+      });
+    }
+  }
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (dragging) {
+        setPanelPos({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
+      }
+    }
+    function onMouseUp() { setDragging(false); }
+    if (dragging) {
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [dragging, dragOffset]);
+
   return (
     <div className="container mx-auto p-4 space-y-4">
       {/* Floating flight selector panel */}
-      <div className="fixed top-6 right-6 z-50 bg-white/90 dark:bg-zinc-900/90 shadow-lg rounded-lg p-4 w-80 max-w-full max-h-[80vh] overflow-y-auto border border-zinc-200 dark:border-zinc-800">
-        <h2 className="font-bold text-lg mb-2 flex items-center gap-2"><Plane className="h-5 w-5 text-flight" /> Replay a Flight</h2>
-        <div className="space-y-2">
-          {flights.length === 0 && <div className="text-muted-foreground text-sm">No flights found.</div>}
-          {flights.map((flight, idx) => {
-            const dep = flight.departure_iata || (flight.departure_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.departure_airport.slice(0,3)
-            const arr = flight.arrival_iata || (flight.arrival_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.arrival_airport.slice(0,3)
-            return (
-              <button
-                key={flight.id || idx}
-                className={`w-full text-left px-3 py-2 rounded-md border flex flex-col gap-0.5 transition-all ${selectedFlight === flight ? 'bg-flight/10 border-flight' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-flight/5'}`}
-                onClick={() => setSelectedFlight(flight)}
-                disabled={isAnimating && selectedFlight === flight}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1.5 py-0.5">{dep}</span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 rounded px-1.5 py-0.5">{arr}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{flight.departure_date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{flight.airline}</span>
-                  <span>{flight.flight_number}</span>
-                </div>
-              </button>
-            )
-          })}
+      <div
+        ref={panelRef}
+        className={`fixed z-50 w-96 max-w-full ${collapsed ? 'h-auto' : 'max-h-[80vh]'} overflow-y-auto flex flex-col gap-4 cursor-grab transition-all duration-300`}
+        style={{ left: panelPos.x, top: panelPos.y, userSelect: dragging ? 'none' : undefined, minWidth: 240 }}
+      >
+        <div
+          className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg rounded-t-2xl pb-2 mb-2 flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 shadow-lg cursor-grab active:cursor-grabbing"
+          onMouseDown={onPanelMouseDown}
+        >
+          <Plane className="h-6 w-6 text-flight" />
+          <h2 className="font-bold text-xl tracking-tight select-none flex-1">Replay a Flight</h2>
+          <button
+            className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+            onClick={e => { e.stopPropagation(); setCollapsed(c => !c); }}
+            aria-label={collapsed ? 'Expand' : 'Collapse'}
+            tabIndex={0}
+            style={{ outline: 'none' }}
+          >
+            <svg className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+          </button>
         </div>
-        {/* Animation controls */}
-        {selectedFlight && (
-          <div className="flex items-center gap-2 mt-4 justify-center">
-            <button onClick={handlePlay} disabled={isAnimating && !isPaused} className="p-2 rounded-full bg-flight/90 text-white disabled:opacity-50"><Play className="h-4 w-4" /></button>
-            <button onClick={handlePause} disabled={!isAnimating || isPaused} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 disabled:opacity-50"><Pause className="h-4 w-4" /></button>
-            <button onClick={handleReplay} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"><RotateCcw className="h-4 w-4" /></button>
-            <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full mx-2 relative overflow-hidden">
-              <div className="bg-flight h-2 rounded-full transition-all" style={{ width: `${Math.round(animationProgress * 100)}%` }} />
-            </div>
+        <div className={`transition-all duration-300 ${collapsed ? 'h-0 opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ overflow: 'hidden' }}>
+          <div className="flex flex-col gap-4">
+            {pagedFlights.length === 0 && <div className="text-muted-foreground text-sm">No flights found.</div>}
+            {pagedFlights.map((flight, idx) => {
+              const dep = flight.departure_iata || (flight.departure_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.departure_airport.slice(0,3)
+              const arr = flight.arrival_iata || (flight.arrival_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.arrival_airport.slice(0,3)
+              const airlineLogo = flight.airline && `/${flight.airline.toLowerCase().replace(/\s/g, '')}.png`
+              return (
+                <button
+                  key={flight.id || idx}
+                  className={`group relative w-full flex items-center px-0 py-0 rounded-2xl border-0 shadow-lg transition-all duration-200 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md hover:bg-flight/10 hover:scale-[1.02] focus:outline-none ${selectedFlight === flight ? 'ring-2 ring-flight/60 bg-flight/10' : ''}`}
+                  onClick={() => setSelectedFlight(flight)}
+                  disabled={isAnimating && selectedFlight === flight}
+                  style={{ minHeight: 90 }}
+                >
+                  {/* Vertical accent bar */}
+                  <div className={`h-full w-1.5 rounded-l-2xl ${selectedFlight === flight ? 'bg-flight' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
+                  {/* Airline logo or fallback */}
+                  <div className="flex flex-col items-center justify-center px-4">
+                    {airlineLogo ? (
+                      <img src={airlineLogo} alt={flight.airline} className="h-14 w-14 object-contain rounded-full border border-zinc-200 dark:border-zinc-700 bg-white p-2 opacity-80" />
+                    ) : (
+                      <div className="h-14 w-14 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 opacity-80">
+                        <Plane className="h-7 w-7" />
+                      </div>
+                    )}
+                    <span className="text-xs text-muted-foreground mt-1 font-medium">{flight.airline}</span>
+                  </div>
+                  {/* Main info */}
+                  <div className="flex-1 flex flex-col gap-1 py-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-base bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 tracking-widest flex items-center gap-1">
+                        <span className={`fi fi-${getCountryCode(airportData[dep]?.country || '')}`} style={{ width: '1.25rem', height: '0.9375rem' }} />
+                        {dep}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-flight" />
+                      <span className="font-mono text-base bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 tracking-widest flex items-center gap-1">
+                        <span className={`fi fi-${getCountryCode(airportData[arr]?.country || '')}`} style={{ width: '1.25rem', height: '0.9375rem' }} />
+                        {arr}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-semibold">{flight.flight_number}</span>
+                    </div>
+                  </div>
+                  {/* Date badge */}
+                  <div className="flex flex-col items-center justify-center px-4">
+                    <span className="bg-flight/90 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm mb-1 tracking-wide">
+                      {flight.departure_date?.slice(0,10) || '—'}
+                    </span>
+                  </div>
+                  {/* Select indicator */}
+                  {selectedFlight === flight && (
+                    <div className="absolute right-2 top-2 bg-flight/90 text-white rounded-full px-2 py-0.5 text-xs font-semibold shadow">Selected</div>
+                  )}
+                </button>
+              )
+            })}
           </div>
-        )}
+          {/* Pagination controls */}
+          <div className="flex items-center justify-between mt-2 gap-2 px-2">
+            <button
+              className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold disabled:opacity-50"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >Prev</button>
+            <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+            <button
+              className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold disabled:opacity-50"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >Next</button>
+          </div>
+          {/* Animation controls */}
+          {selectedFlight && (
+            <div className="flex items-center gap-2 mt-2 justify-center">
+              <button onClick={handlePlay} disabled={isAnimating && !isPaused} className="p-2 rounded-full bg-flight/90 text-white disabled:opacity-50 shadow hover:scale-105 transition-transform"><Play className="h-4 w-4" /></button>
+              <button onClick={handlePause} disabled={!isAnimating || isPaused} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 disabled:opacity-50 shadow hover:scale-105 transition-transform"><Pause className="h-4 w-4" /></button>
+              <button onClick={handleReplay} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 shadow hover:scale-105 transition-transform"><RotateCcw className="h-4 w-4" /></button>
+              <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full mx-2 relative overflow-hidden">
+                <div className="bg-flight h-2 rounded-full transition-all" style={{ width: `${Math.round(animationProgress * 100)}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
