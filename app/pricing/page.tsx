@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
+import { useState } from 'react'
+import { cn } from "@/lib/utils"
 
 const features = {
   free: [
@@ -56,7 +58,27 @@ const features = {
   ]
 }
 
+const planPrices = {
+  monthly: { free: 0, basic: 9, pro: 19, enterprise: 49 },
+  annual: { free: 0, basic: 90, pro: 190, enterprise: 490 }, // 2 months free
+}
+const planLabels = { free: 'Free', basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' }
+const planDescriptions = {
+  free: 'Perfect for getting started',
+  basic: 'For occasional travelers',
+  pro: 'For frequent travelers',
+  enterprise: 'For teams and organizations',
+}
+const planIcons = {
+  free: <Star className="h-5 w-5 text-flight" />,
+  basic: <Plane className="h-5 w-5 text-flight" />,
+  pro: <Zap className="h-5 w-5 text-flight" />,
+  enterprise: <Crown className="h-5 w-5 text-flight" />,
+}
+const plans = ['free', 'basic', 'pro', 'enterprise'] as const
+
 export default function PricingPage() {
+  const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const handleSubscribe = (plan: string) => {
     toast.success(`🚀 Ready to soar with ${plan} plan! We'll set up your subscription shortly. ✈️`)
   }
@@ -70,6 +92,18 @@ export default function PricingPage() {
         </p>
       </div>
 
+      <div className="flex items-center justify-center gap-4 mb-8">
+        <span className={billing === 'monthly' ? 'font-bold text-flight' : 'text-muted-foreground'}>Monthly</span>
+        <button
+          className="relative inline-flex h-6 w-12 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none"
+          onClick={() => setBilling(billing === 'monthly' ? 'annual' : 'monthly')}
+          aria-label="Toggle billing period"
+        >
+          <span className={cn('inline-block h-5 w-5 transform rounded-full bg-flight transition-transform', billing === 'annual' ? 'translate-x-6' : 'translate-x-1')} />
+        </button>
+        <span className={billing === 'annual' ? 'font-bold text-flight' : 'text-muted-foreground'}>Annual <span className="ml-1 px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded text-xs align-middle">Save 17%</span></span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto">
         {/* Free Plan */}
         <Card className="relative border-2 hover:border-flight/50 transition-colors">
@@ -80,8 +114,8 @@ export default function PricingPage() {
             </CardTitle>
             <CardDescription>Perfect for getting started</CardDescription>
             <div className="mt-4">
-              <span className="text-3xl font-bold">$0</span>
-              <span className="text-muted-foreground">/month</span>
+              <span className="text-3xl font-bold">£{planPrices[billing].free}</span>
+              <span className="text-muted-foreground">/{billing === 'monthly' ? 'month' : 'year'}</span>
             </div>
           </CardHeader>
           <CardContent>
@@ -113,8 +147,8 @@ export default function PricingPage() {
             </CardTitle>
             <CardDescription>For occasional travelers</CardDescription>
             <div className="mt-4">
-              <span className="text-3xl font-bold">$9</span>
-              <span className="text-muted-foreground">/month</span>
+              <span className="text-3xl font-bold">£{planPrices[billing].basic}</span>
+              <span className="text-muted-foreground">/{billing === 'monthly' ? 'month' : 'year'}</span>
             </div>
           </CardHeader>
           <CardContent>
@@ -149,8 +183,8 @@ export default function PricingPage() {
             </CardTitle>
             <CardDescription>For frequent travelers</CardDescription>
             <div className="mt-4">
-              <span className="text-3xl font-bold">$19</span>
-              <span className="text-muted-foreground">/month</span>
+              <span className="text-3xl font-bold">£{planPrices[billing].pro}</span>
+              <span className="text-muted-foreground">/{billing === 'monthly' ? 'month' : 'year'}</span>
             </div>
           </CardHeader>
           <CardContent>
@@ -182,8 +216,8 @@ export default function PricingPage() {
             </CardTitle>
             <CardDescription>For teams and organizations</CardDescription>
             <div className="mt-4">
-              <span className="text-3xl font-bold">$49</span>
-              <span className="text-muted-foreground">/month</span>
+              <span className="text-3xl font-bold">£{planPrices[billing].enterprise}</span>
+              <span className="text-muted-foreground">/{billing === 'monthly' ? 'month' : 'year'}</span>
             </div>
           </CardHeader>
           <CardContent>

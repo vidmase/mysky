@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ArrowRight, Calendar, ChevronDown, Clock, Filter, Search, Plane, Building, Plus } from "lucide-react"
+import { DateTime } from 'luxon'
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { AirlineBadge } from "../../../app/components/ui/airline-badge"
 
 // Mock flight data
 const mockFlights = [
@@ -23,20 +27,24 @@ const mockFlights = [
     departureCity: "London",
     arrivalAirport: "JFK",
     arrivalCity: "New York",
+    departureTime: "10:00",
+    arrivalTime: "13:45",
     duration: "7h 45m",
     airline: "British Airways",
     flightNumber: "BA177",
   },
   {
     id: "2",
-    date: new Date(2023, 6, 22),
-    departureAirport: "JFK",
-    departureCity: "New York",
-    arrivalAirport: "LAX",
-    arrivalCity: "Los Angeles",
-    duration: "5h 30m",
-    airline: "Delta",
-    flightNumber: "DL123",
+    date: new Date(2025, 3, 19),
+    departureAirport: "KUN",
+    departureCity: "Kaunas",
+    arrivalAirport: "LTN",
+    arrivalCity: "London-Luton",
+    departureTime: "11:10",
+    arrivalTime: "12:05",
+    duration: "2h 55m",
+    airline: "Wizz Air",
+    flightNumber: "W9 5450",
   },
   {
     id: "3",
@@ -45,6 +53,8 @@ const mockFlights = [
     departureCity: "Los Angeles",
     arrivalAirport: "SFO",
     arrivalCity: "San Francisco",
+    departureTime: "09:00",
+    arrivalTime: "10:25",
     duration: "1h 25m",
     airline: "United",
     flightNumber: "UA456",
@@ -56,6 +66,8 @@ const mockFlights = [
     departureCity: "San Francisco",
     arrivalAirport: "LHR",
     arrivalCity: "London",
+    departureTime: "16:00",
+    arrivalTime: "10:15",
     duration: "10h 15m",
     airline: "British Airways",
     flightNumber: "BA284",
@@ -67,17 +79,107 @@ const mockFlights = [
     departureCity: "London",
     arrivalAirport: "CDG",
     arrivalCity: "Paris",
+    departureTime: "14:00",
+    arrivalTime: "16:15",
     duration: "1h 15m",
     airline: "Air France",
     flightNumber: "AF123",
   },
 ]
 
+// Add a robust IATA to timezone mapping for major world airports
+const airportTimeZones: Record<string, string> = {
+  // Europe
+  LHR: "Europe/London", LGW: "Europe/London", STN: "Europe/London", LTN: "Europe/London", LCY: "Europe/London", MAN: "Europe/London", BHX: "Europe/London", EDI: "Europe/London", GLA: "Europe/London", BRS: "Europe/London", NCL: "Europe/London",
+  DUB: "Europe/Dublin", SNN: "Europe/Dublin", ORK: "Europe/Dublin",
+  CDG: "Europe/Paris", ORY: "Europe/Paris", NCE: "Europe/Paris", LYS: "Europe/Paris", MRS: "Europe/Paris", TLS: "Europe/Paris",
+  FRA: "Europe/Berlin", MUC: "Europe/Berlin", BER: "Europe/Berlin", DUS: "Europe/Berlin", HAM: "Europe/Berlin", CGN: "Europe/Berlin",
+  MAD: "Europe/Madrid", BCN: "Europe/Madrid", PMI: "Europe/Madrid", ALC: "Europe/Madrid", AGP: "Europe/Madrid", IBZ: "Europe/Madrid",
+  FCO: "Europe/Rome", MXP: "Europe/Rome", VCE: "Europe/Rome", NAP: "Europe/Rome", BGY: "Europe/Rome", PSA: "Europe/Rome",
+  AMS: "Europe/Amsterdam", RTM: "Europe/Amsterdam", EIN: "Europe/Amsterdam",
+  BRU: "Europe/Brussels", CRL: "Europe/Brussels",
+  ZRH: "Europe/Zurich", GVA: "Europe/Zurich", BSL: "Europe/Zurich",
+  VIE: "Europe/Vienna", SZG: "Europe/Vienna",
+  LIS: "Europe/Lisbon", OPO: "Europe/Lisbon", FAO: "Europe/Lisbon",
+  CPH: "Europe/Copenhagen", BLL: "Europe/Copenhagen",
+  ARN: "Europe/Stockholm", GOT: "Europe/Stockholm", MMX: "Europe/Stockholm",
+  OSL: "Europe/Oslo", BGO: "Europe/Oslo", TRD: "Europe/Oslo",
+  HEL: "Europe/Helsinki", TMP: "Europe/Helsinki",
+  WAW: "Europe/Warsaw", KRK: "Europe/Warsaw", GDN: "Europe/Warsaw", WRO: "Europe/Warsaw", POZ: "Europe/Warsaw",
+  BUD: "Europe/Budapest",
+  PRG: "Europe/Prague",
+  ATH: "Europe/Athens", HER: "Europe/Athens", RHO: "Europe/Athens", SKG: "Europe/Athens",
+  MLA: "Europe/Malta",
+  VNO: "Europe/Vilnius", KUN: "Europe/Vilnius", PLQ: "Europe/Vilnius",
+  RIX: "Europe/Riga",
+  TLL: "Europe/Tallinn",
+  KEF: "Atlantic/Reykjavik",
+  // North America
+  JFK: "America/New_York", EWR: "America/New_York", BOS: "America/New_York", IAD: "America/New_York", DCA: "America/New_York", MIA: "America/New_York", ORD: "America/Chicago", DFW: "America/Chicago", ATL: "America/New_York", LAX: "America/Los_Angeles", SFO: "America/Los_Angeles", SEA: "America/Los_Angeles", DEN: "America/Denver", PHX: "America/Phoenix", LAS: "America/Los_Angeles", SJC: "America/Los_Angeles", SAN: "America/Los_Angeles", SLC: "America/Denver", MSP: "America/Chicago", DTW: "America/Detroit", CLT: "America/New_York", MCO: "America/New_York", FLL: "America/New_York", TPA: "America/New_York", PHL: "America/New_York", IAH: "America/Chicago", HOU: "America/Chicago", DAL: "America/Chicago", AUS: "America/Chicago", MEX: "America/Mexico_City", CUN: "America/Cancun",
+  // Add more as needed
+};
+
+// Utility to calculate duration between two airports with time zones
+const calculateDuration = (depIata: string, arrIata: string, depDate: Date, depTime: string, arrTime: string) => {
+  const depTz = airportTimeZones[depIata];
+  const arrTz = airportTimeZones[arrIata];
+  if (!depTz || !arrTz) return "N/A";
+  const [depHour, depMin] = depTime.split(":").map(Number);
+  const [arrHour, arrMin] = arrTime.split(":").map(Number);
+  const year = depDate.getFullYear();
+  const month = depDate.getMonth() + 1;
+  const day = depDate.getDate();
+  // Parse as local time in the correct zone
+  const dep = DateTime.fromObject(
+    { year, month, day, hour: depHour, minute: depMin },
+    { zone: depTz }
+  );
+  let arr = DateTime.fromObject(
+    { year, month, day, hour: arrHour, minute: arrMin },
+    { zone: arrTz }
+  );
+  if (arr < dep) arr = arr.plus({ days: 1 });
+  const diff = arr.toUTC().diff(dep.toUTC(), ["hours", "minutes"]);
+  const hours = Math.floor(diff.hours);
+  const minutes = Math.round(diff.minutes);
+  return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+};
+
+// Utility function to get airline logo path
+const getAirlineLogo = (airline: string) => {
+  if (!airline) return "/placeholder-logo.png";
+  const key = airline.toLowerCase().replace(/\s/g, "");
+  const known = ["ryanair", "wizzair", "easyjet", "airbaltic"];
+  if (known.includes(key)) return `/${key}.png`;
+  return "/placeholder-logo.png";
+};
+
 export default function FlightsPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [airline, setAirline] = useState<string>("")
   const [dateRange, setDateRange] = useState<string>("")
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    checkSession()
+  }, [supabase])
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      router.replace("/auth")
+    }
+  }, [isAuthenticated, router])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
 
   // Filter flights based on search term and filters
   const filteredFlights = mockFlights.filter((flight) => {
@@ -272,20 +374,26 @@ export default function FlightsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center">
-                        <Building className="h-4 w-4 mr-1 text-airline" />
-                        <span>{flight.airline}</span>
-                      </div>
+                      <AirlineBadge airline={flight.airline} />
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-2">
+                        <AirlineBadge airline={flight.airline} />
                       <Badge variant="outline" className="bg-flight/10 text-flight border-flight/20">
                         {flight.flightNumber}
                       </Badge>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center">
                         <Clock className="mr-1 h-3 w-3 text-muted-foreground" />
-                        {flight.duration}
+                        {calculateDuration(
+                          flight.departureAirport,
+                          flight.arrivalAirport,
+                          flight.date,
+                          flight.departureTime,
+                          flight.arrivalTime
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>

@@ -444,6 +444,7 @@ export default function MapPage() {
   const totalPages = Math.ceil(flights.length / flightsPerPage);
   const pagedFlights = flights.slice((page - 1) * flightsPerPage, page * flightsPerPage);
   const [collapsed, setCollapsed] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   // Refs for map elements
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -1440,12 +1441,12 @@ export default function MapPage() {
     animationRef.current = reqId
     // Cleanup on unmount/flight change
     return () => {
-      if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
-      if (map.getSource(pathLayerId)) map.removeSource(pathLayerId)
-      if (map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
-      if (map.getSource(startMarkerId)) map.removeSource(startMarkerId)
-      if (map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
-      if (map.getSource(endMarkerId)) map.removeSource(endMarkerId)
+      if (map && map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
+      if (map && map.getSource(pathLayerId)) map.removeSource(pathLayerId)
+      if (map && map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
+      if (map && map.getSource(startMarkerId)) map.removeSource(startMarkerId)
+      if (map && map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
+      if (map && map.getSource(endMarkerId)) map.removeSource(endMarkerId)
       if (planeMarkerRef.current) { planeMarkerRef.current.remove(); planeMarkerRef.current = null }
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
     }
@@ -1529,6 +1530,24 @@ export default function MapPage() {
       window.removeEventListener('mouseup', onMouseUp);
     };
   }, [dragging, dragOffset]);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    checkSession()
+  }, [supabase])
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      router.replace("/auth")
+    }
+  }, [isAuthenticated, router])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
 
   return (
     <div className="container mx-auto p-4 space-y-4">

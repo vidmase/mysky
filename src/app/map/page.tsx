@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from "next/navigation"
 import type L from "leaflet"
-import "leaflet/dist/leaflet.css"
+// @ts-ignore
+// 'leaflet/dist/leaflet.css' is imported dynamically in useEffect to avoid SSR issues and linter errors
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Globe, MapPin, Plane, ArrowRight } from "lucide-react"
+import { Globe, MapPin, Plane, ArrowRight, Navigation, BarChart3, Clock } from "lucide-react"
 
 // Define types for our data
 interface Airport {
@@ -27,6 +30,9 @@ interface Route {
 }
 
 export default function MapPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<{ [key: string]: L.Marker }>({})
@@ -97,6 +103,8 @@ export default function MapPage() {
     import("leaflet").then((L) => {
       // Only initialize the map if it doesn't exist
       if (!mapRef.current) {
+        // Import CSS dynamically
+        import("leaflet/dist/leaflet.css")
         // Create custom airport icon
         const airportIcon = L.divIcon({
           className: "custom-div-icon",
@@ -306,80 +314,161 @@ export default function MapPage() {
     import("leaflet/dist/leaflet.css")
   }, [])
 
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    checkSession()
+  }, [supabase])
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      router.replace("/auth")
+    }
+  }, [isAuthenticated, router])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
+
   return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col space-y-6">
+        <div className="flex flex-col space-y-8">
+          {/* Enhanced Header */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-airport/20 via-airport/10 to-airport/5 p-8 backdrop-blur-sm border border-airport/20">
+            <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:20px_20px]" />
+            <div className="relative">
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="p-2 rounded-xl bg-airport/20 backdrop-blur-sm">
+                  <Globe className="h-8 w-8 text-airport" />
+                </div>
         <div>
-          <h1 className="text-3xl font-bold flex items-center">
-            <Globe className="h-6 w-6 mr-2 text-airport" />
-            Travel Map
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-airport to-airport/60 bg-clip-text text-transparent">
+                    ✈️ Travel Map ✈️
           </h1>
-          <p className="text-muted-foreground">Visualize your journeys around the world</p>
+                  <p className="text-lg text-muted-foreground mt-1">
+                    Explore your aviation adventures across the globe
+                  </p>
+                </div>
+              </div>
+              
+              {/* Quick Stats */}
+              <div className="flex flex-wrap gap-6 mt-6">
+                <div className="flex items-center space-x-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <MapPin className="h-4 w-4 text-airport" />
+                  <span className="text-sm font-medium">{airports.length} Airports</span>
+                </div>
+                <div className="flex items-center space-x-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <Navigation className="h-4 w-4 text-flight" />
+                  <span className="text-sm font-medium">{routes.length} Routes</span>
+                </div>
+                <div className="flex items-center space-x-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <BarChart3 className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium">42 Total Flights</span>
+                </div>
+              </div>
+            </div>
         </div>
 
         <Tabs defaultValue="map" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="map" className="flex items-center gap-2">
+            <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50 backdrop-blur-sm">
+              <TabsTrigger value="map" className="flex items-center gap-2 data-[state=active]:bg-airport/10 data-[state=active]:text-airport">
               <Globe className="h-4 w-4" />
               Map View
             </TabsTrigger>
-            <TabsTrigger value="list" className="flex items-center gap-2">
+              <TabsTrigger value="list" className="flex items-center gap-2 data-[state=active]:bg-airport/10 data-[state=active]:text-airport">
               <MapPin className="h-4 w-4" />
               Airport List
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="map" className="space-y-4">
-            <Card className="border-t-4 border-t-airport shadow-md">
-              <CardContent className="p-0">
+            
+            <TabsContent value="map" className="space-y-6 mt-6">
+              {/* Enhanced Map Card */}
+              <Card className="overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm">
+                <div className="bg-gradient-to-r from-airport/10 via-airport/5 to-transparent p-1">
+                  <CardContent className="p-0 bg-background/95 backdrop-blur-sm rounded-lg m-1">
                 {/* Leaflet Map Container */}
+                    <div className="relative">
                 <div
                   ref={mapContainerRef}
-                  className="aspect-[16/9] rounded-md overflow-hidden"
-                  style={{ height: "500px" }}
+                        className="aspect-[16/9] rounded-lg overflow-hidden ring-1 ring-border/50"
+                        style={{ height: "600px" }}
                 />
 
-                {/* Map Legend */}
-                <div className="p-4 bg-muted/10 border-t">
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center">
-                      <div className="h-3 w-3 rounded-full bg-airport mr-2"></div>
-                      <span className="text-sm">Airports ({airports.length})</span>
+                      {/* Modern Floating Legend */}
+                      <div className="absolute bottom-4 left-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/20">
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="h-3 w-3 rounded-full bg-airport shadow-sm"></div>
+                            <span className="text-sm font-medium">Airports</span>
+                            <Badge variant="secondary" className="text-xs">{airports.length}</Badge>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="h-1 w-6 bg-flight rounded-full shadow-sm"></div>
+                            <span className="text-sm font-medium">Routes</span>
+                            <Badge variant="secondary" className="text-xs">{routes.length}</Badge>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <Plane className="h-3 w-3 text-flight" />
+                            <span className="text-sm font-medium">Flights</span>
+                            <Badge variant="secondary" className="text-xs">42</Badge>
+                          </div>
+                        </div>
                     </div>
-                    <div className="flex items-center">
-                      <div className="h-0.5 w-4 bg-flight mr-2"></div>
-                      <span className="text-sm">Flight Routes ({routes.length})</span>
+                      
+                      {/* Interactive Instruction */}
+                      {!selectedAirport && (
+                        <div className="absolute top-4 right-4 bg-airport/90 text-white backdrop-blur-md rounded-xl p-3 shadow-lg">
+                          <p className="text-sm font-medium flex items-center">
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Click any airport to explore
+                          </p>
                     </div>
-                    <div className="flex items-center">
-                      <Plane className="h-3 w-3 mr-2 text-flight" />
-                      <span className="text-sm">Total Flights (42)</span>
+                      )}
                     </div>
-                  </div>
+                  </CardContent>
                 </div>
-              </CardContent>
             </Card>
 
+              {/* Enhanced Selected Airport Card */}
             {selectedAirportData && (
-              <Card className="border-t-4 border-t-airport shadow-md animate-slide-up">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-airport" />
-                    {selectedAirportData.name} ({selectedAirportData.code})
+                <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-airport/5 via-background to-airport/5 backdrop-blur-sm animate-slide-up">
+                  <div className="bg-gradient-to-r from-airport/20 via-airport/10 to-transparent p-1">
+                    <div className="bg-background/95 backdrop-blur-sm rounded-lg m-1">
+                      <CardHeader className="pb-4 bg-gradient-to-r from-airport/5 to-transparent">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="flex items-center space-x-3 text-xl">
+                              <div className="p-2 rounded-xl bg-airport/20">
+                                <MapPin className="h-5 w-5 text-airport" />
+                              </div>
+                              <div>
+                                <div className="font-bold">{selectedAirportData.name}</div>
+                                <div className="text-lg font-mono text-airport">({selectedAirportData.code})</div>
+                              </div>
                   </CardTitle>
-                  <CardDescription>
-                    {selectedAirportData.city}, {selectedAirportData.country}
+                            <CardDescription className="mt-2 text-base">
+                              📍 {selectedAirportData.city}, {selectedAirportData.country}
                   </CardDescription>
+                          </div>
+                          <div className="text-right">
+                            <div className="bg-gradient-to-r from-airport to-airport/80 text-white rounded-xl px-4 py-2">
+                              <div className="text-2xl font-bold">{selectedAirportData.visits}</div>
+                              <div className="text-xs opacity-90">visits</div>
+                            </div>
+                          </div>
+                        </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-muted-foreground">Visits</span>
-                    <Badge className="bg-airport text-white">{selectedAirportData.visits}</Badge>
+                      <CardContent className="pt-2">
+                        <div className="space-y-4">
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <Navigation className="h-4 w-4" />
+                            <span>Connected Routes</span>
                   </div>
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium mb-2 flex items-center">
-                      <Plane className="h-4 w-4 mr-1 text-flight" />
-                      Connected Routes:
-                    </h4>
-                    <div className="space-y-2">
+                          
+                          <div className="grid gap-3">
                       {routes
                         .filter(
                           (route) => route.from === selectedAirportData.code || route.to === selectedAirportData.code,
@@ -392,46 +481,65 @@ export default function MapPage() {
                           return (
                             <div
                               key={index}
-                              className="flex items-center justify-between text-sm p-2 rounded-md bg-muted/50 hover:bg-muted/80 transition-colors"
+                                    className="group flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-muted/30 via-muted/20 to-muted/10 hover:from-flight/10 hover:via-flight/5 hover:to-flight/10 transition-all duration-300 cursor-pointer border border-transparent hover:border-flight/20"
                             >
-                              <div className="flex items-center">
+                                    <div className="flex items-center space-x-3">
+                                      <div className={`p-2 rounded-lg ${isOrigin ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                                 {isOrigin ? (
-                                  <ArrowRight className="h-4 w-4 mr-1 text-flight" />
+                                          <ArrowRight className="h-4 w-4" />
                                 ) : (
-                                  <ArrowRight className="h-4 w-4 mr-1 text-flight rotate-180" />
+                                          <ArrowRight className="h-4 w-4 rotate-180" />
                                 )}
-                                <span className="font-medium">
-                                  {isOrigin ? "To: " : "From: "}
+                                      </div>
+                                      <div>
+                                        <div className="font-semibold text-sm">
+                                          {isOrigin ? "Destination" : "Origin"}
+                                        </div>
+                                        <div className="font-medium">
                                   {connectedAirport?.city} ({connectedCode})
-                                </span>
+                                        </div>
+                                      </div>
                               </div>
-                              <Badge variant="outline" className="bg-flight/10 text-flight border-flight/20">
+                                    <div className="flex items-center space-x-2">
+                                      <Badge variant="outline" className="bg-flight/10 text-flight border-flight/30 font-medium">
                                 {route.count}x
                               </Badge>
+                                      <Clock className="h-4 w-4 text-muted-foreground group-hover:text-flight transition-colors" />
+                                    </div>
                             </div>
                           )
                         })}
                     </div>
                   </div>
                 </CardContent>
+                    </div>
+                  </div>
               </Card>
             )}
           </TabsContent>
-          <TabsContent value="list">
-            <Card className="border-t-4 border-t-airport shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center text-airport">
-                  <MapPin className="h-5 w-5 mr-2" />
-                  Visited Airports
+            
+            <TabsContent value="list" className="mt-6">
+              {/* Enhanced Airport List */}
+              <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm">
+                <div className="bg-gradient-to-r from-airport/10 via-airport/5 to-transparent p-1">
+                  <div className="bg-background/95 backdrop-blur-sm rounded-lg m-1">
+                    <CardHeader className="bg-gradient-to-r from-airport/5 to-transparent">
+                      <CardTitle className="flex items-center space-x-3 text-airport">
+                        <div className="p-2 rounded-xl bg-airport/20">
+                          <MapPin className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold">Visited Airports</div>
+                          <div className="text-sm font-normal text-muted-foreground">Your global aviation journey</div>
+                        </div>
                 </CardTitle>
-                <CardDescription>All airports you've visited on your journeys</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {airports.map((airport) => (
+                    <CardContent className="p-6">
+                      <div className="grid gap-4">
+                        {airports.map((airport, index) => (
                     <div
                       key={airport.code}
-                      className="flex items-center justify-between p-3 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                            className="group flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-muted/20 via-background to-muted/10 hover:from-airport/10 hover:via-airport/5 hover:to-airport/10 transition-all duration-300 cursor-pointer border border-transparent hover:border-airport/20 hover:shadow-lg"
                       onClick={() => {
                         setSelectedAirport(airport.code)
                         document
@@ -439,30 +547,48 @@ export default function MapPage() {
                           ?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
                       }}
                     >
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-airport/10 flex items-center justify-center mr-3">
-                          <MapPin className="h-5 w-5 text-airport" />
+                            <div className="flex items-center space-x-4">
+                              <div className="relative">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-airport/20 to-airport/10 flex items-center justify-center group-hover:from-airport/30 group-hover:to-airport/20 transition-all duration-300">
+                                  <MapPin className="h-6 w-6 text-airport" />
+                                </div>
+                                <div className="absolute -top-1 -right-1 h-5 w-5 bg-flight rounded-full flex items-center justify-center">
+                                  <span className="text-xs font-bold text-white">{index + 1}</span>
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-semibold text-base group-hover:text-airport transition-colors">
+                                  {airport.name}
                         </div>
-                        <div>
-                          <div className="font-medium">
-                            {airport.name} ({airport.code})
+                                <div className="text-sm text-muted-foreground mb-1">
+                                  📍 {airport.city}, {airport.country}
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {airport.city}, {airport.country}
+                                <div className="text-xs font-mono text-airport bg-airport/10 rounded px-2 py-1 inline-block">
+                                  {airport.code}
                           </div>
                         </div>
                       </div>
-                      <Badge className="bg-airport text-white">{airport.visits} visits</Badge>
+                            <div className="flex items-center space-x-3">
+                              <div className="text-right">
+                                <div className="bg-gradient-to-r from-airport to-airport/80 text-white rounded-xl px-3 py-2">
+                                  <div className="text-lg font-bold">{airport.visits}</div>
+                                  <div className="text-xs opacity-90">visits</div>
+                                </div>
+                              </div>
+                              <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-airport group-hover:translate-x-1 transition-all duration-300" />
+                            </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
+                  </div>
+                </div>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Add global styles for Leaflet customization */}
+        {/* Enhanced Global Styles */}
       <style jsx global>{`
         .leaflet-container {
           font-family: inherit;
@@ -471,14 +597,22 @@ export default function MapPage() {
         .leaflet-tooltip {
           font-family: inherit;
           font-size: 0.875rem;
-          padding: 0.5rem;
-          border-radius: 0.375rem;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
           border: none;
-          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.95);
+          }
+          
+          .dark .leaflet-tooltip {
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
         }
         
         .flight-path {
           animation: dash 30s linear infinite;
+            filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.3));
         }
         
         @keyframes dash {
@@ -486,7 +620,13 @@ export default function MapPage() {
             stroke-dashoffset: -1000;
           }
         }
+          
+          .bg-grid-white {
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+          }
       `}</style>
+      </div>
     </div>
   )
 }

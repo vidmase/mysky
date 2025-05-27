@@ -34,6 +34,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import * as React from 'react'
 import dynamic from 'next/dynamic'
+import { DateTime } from 'luxon'
+
 
 interface Flight {
   id: number
@@ -85,6 +87,151 @@ const FlightMap = dynamic(
   () => import('@/app/components/FlightMap'),
   { ssr: false }
 )
+
+// Minimal IATA to timezone mapping (expand as needed)
+const airportTimeZones: Record<string, string> = {
+  // United Kingdom
+  LHR: "Europe/London", // London Heathrow
+  LGW: "Europe/London", // London Gatwick
+  STN: "Europe/London", // London Stansted
+  LTN: "Europe/London", // London Luton
+  LCY: "Europe/London", // London City
+  MAN: "Europe/London", // Manchester
+  BHX: "Europe/London", // Birmingham
+  EDI: "Europe/London", // Edinburgh
+  GLA: "Europe/London", // Glasgow
+  BRS: "Europe/London", // Bristol
+  NCL: "Europe/London", // Newcastle
+
+  // Ireland
+  DUB: "Europe/Dublin", // Dublin
+  SNN: "Europe/Dublin", // Shannon
+  ORK: "Europe/Dublin", // Cork
+
+  // France
+  CDG: "Europe/Paris", // Paris Charles de Gaulle
+  ORY: "Europe/Paris", // Paris Orly
+  NCE: "Europe/Paris", // Nice
+  LYS: "Europe/Paris", // Lyon
+  MRS: "Europe/Paris", // Marseille
+  TLS: "Europe/Paris", // Toulouse
+
+  // Germany
+  FRA: "Europe/Berlin", // Frankfurt
+  MUC: "Europe/Berlin", // Munich
+  BER: "Europe/Berlin", // Berlin Brandenburg
+  DUS: "Europe/Berlin", // Dusseldorf
+  HAM: "Europe/Berlin", // Hamburg
+  CGN: "Europe/Berlin", // Cologne
+
+  // Spain
+  MAD: "Europe/Madrid", // Madrid
+  BCN: "Europe/Madrid", // Barcelona
+  PMI: "Europe/Madrid", // Palma de Mallorca
+  ALC: "Europe/Madrid", // Alicante
+  AGP: "Europe/Madrid", // Malaga
+  IBZ: "Europe/Madrid", // Ibiza
+
+  // Italy
+  FCO: "Europe/Rome", // Rome Fiumicino
+  MXP: "Europe/Rome", // Milan Malpensa
+  VCE: "Europe/Rome", // Venice
+  NAP: "Europe/Rome", // Naples
+  BGY: "Europe/Rome", // Milan Bergamo
+  PSA: "Europe/Rome", // Pisa
+
+  // Netherlands
+  AMS: "Europe/Amsterdam", // Amsterdam Schiphol
+  RTM: "Europe/Amsterdam", // Rotterdam
+  EIN: "Europe/Amsterdam", // Eindhoven
+
+  // Belgium
+  BRU: "Europe/Brussels", // Brussels
+  CRL: "Europe/Brussels", // Charleroi
+
+  // Switzerland
+  ZRH: "Europe/Zurich", // Zurich
+  GVA: "Europe/Zurich", // Geneva
+  BSL: "Europe/Zurich", // Basel
+
+  // Austria
+  VIE: "Europe/Vienna", // Vienna
+  SZG: "Europe/Vienna", // Salzburg
+
+  // Portugal
+  LIS: "Europe/Lisbon", // Lisbon
+  OPO: "Europe/Lisbon", // Porto
+  FAO: "Europe/Lisbon", // Faro
+
+  // Denmark
+  CPH: "Europe/Copenhagen", // Copenhagen
+  BLL: "Europe/Copenhagen", // Billund
+
+  // Sweden
+  ARN: "Europe/Stockholm", // Stockholm Arlanda
+  GOT: "Europe/Stockholm", // Gothenburg
+  MMX: "Europe/Stockholm", // Malmo
+
+  // Norway
+  OSL: "Europe/Oslo", // Oslo
+  BGO: "Europe/Oslo", // Bergen
+  TRD: "Europe/Oslo", // Trondheim
+
+  // Finland
+  HEL: "Europe/Helsinki", // Helsinki
+  TMP: "Europe/Helsinki", // Tampere
+
+  // Poland
+  WAW: "Europe/Warsaw", // Warsaw
+  KRK: "Europe/Warsaw", // Krakow
+  GDN: "Europe/Warsaw", // Gdansk
+  WRO: "Europe/Warsaw", // Wroclaw
+  POZ: "Europe/Warsaw", // Poznan
+
+  // Hungary
+  BUD: "Europe/Budapest", // Budapest
+
+  // Czech Republic
+  PRG: "Europe/Prague", // Prague
+
+  // Greece
+  ATH: "Europe/Athens", // Athens
+  HER: "Europe/Athens", // Heraklion
+  RHO: "Europe/Athens", // Rhodes
+  SKG: "Europe/Athens", // Thessaloniki
+
+  // Malta
+  MLA: "Europe/Malta", // Malta
+
+  // Lithuania
+  VNO: "Europe/Vilnius", // Vilnius
+  KUN: "Europe/Vilnius", // Kaunas
+  PLQ: "Europe/Vilnius", // Palanga
+
+  // Latvia
+  RIX: "Europe/Riga", // Riga
+
+  // Estonia
+  TLL: "Europe/Tallinn", // Tallinn
+
+  // Iceland
+  KEF: "Atlantic/Reykjavik", // Keflavik
+
+  // Add more as needed
+}
+
+// Airline color mapping (expand as needed)
+const airlineColors: Record<string, string> = {
+  wizzair: '#c6007e',
+  ryanair: '#073590',
+  easyjet: '#ff6600',
+  lufthansa: '#05164d',
+  britishairways: '#075aaa',
+  turkishairlines: '#e30a17',
+  airbaltic: '#b7d900',
+  lot: '#1a2a6c',
+  // Add more as needed
+}
 
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -205,27 +352,36 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
   const calculateDuration = () => {
     try {
-      // Combine date and time strings
-      const departureDateTime = `${flight.departure_date}T${flight.departure_time}`
-      const arrivalDateTime = `${flight.departure_date}T${flight.arrival_time}`
-
-      // Parse the combined strings into Date objects
-      const departureDate = new Date(departureDateTime)
-      const arrivalDate = new Date(arrivalDateTime)
-
-      // Handle case where arrival is next day
-      if (arrivalDate < departureDate) {
-        arrivalDate.setDate(arrivalDate.getDate() + 1)
+      if (
+        !flight ||
+        !flight.departure_date ||
+        !flight.departure_time ||
+        !flight.arrival_time ||
+        !flight.departure_iata ||
+        !flight.arrival_iata
+      ) {
+        return "Duration N/A"
       }
-
-      const diff = arrivalDate.getTime() - departureDate.getTime()
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      return `${hours}h ${minutes}m`
+      const depTz = airportTimeZones[flight.departure_iata];
+      const arrTz = airportTimeZones[flight.arrival_iata];
+      if (!depTz || !arrTz) return "Duration N/A";
+      const [depYear, depMonth, depDay] = flight.departure_date.split("-").map(Number);
+      const [depHour, depMin] = flight.departure_time.split(":").map(Number);
+      const [arrHour, arrMin] = flight.arrival_time.split(":").map(Number);
+      const dep = DateTime.fromObject({ year: depYear, month: depMonth, day: depDay, hour: depHour, minute: depMin }, { zone: depTz });
+      let arr = DateTime.fromObject({ year: depYear, month: depMonth, day: depDay, hour: arrHour, minute: arrMin }, { zone: arrTz });
+      if (arr < dep) arr = arr.plus({ days: 1 });
+      const diff = arr.toUTC().diff(dep.toUTC(), ["hours", "minutes"]);
+      const hours = Math.floor(diff.hours);
+      const minutes = Math.round(diff.minutes);
+      return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
     } catch (error) {
       return "Duration N/A"
     }
   }
+
+  // Get airline color (fallback to default)
+  const airlineColor = flight.airline ? airlineColors[flight.airline.replace(/\s+/g, '').toLowerCase()] || '#38bdf8' : '#38bdf8';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -246,14 +402,26 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                 Flight Details
               </h1>
               <p className="text-muted-foreground">
-                {flight.departure_airport} to {flight.arrival_airport} • {flight.departure_date}
+                {flight.departure_airport} to {flight.arrival_airport} • {format(new Date(flight.departure_date), "MMM d, yyyy")}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="relative rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg">
-          <div className="bg-gradient-to-r from-airline to-flight/80 p-4 text-white">
+        <div
+          className="relative rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg"
+          style={{ border: `3px solid ${airlineColor}` }}
+        >
+          {/* Modernized Flight Card Visuals: glassmorphism, gradient, animated border, airline branding */}
+          <div className="absolute inset-0 z-0 animate-gradient-x bg-gradient-to-r from-flight/30 via-airport/20 to-stats/30 blur-[2px] opacity-70" />
+          <div className="absolute inset-0 z-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[8px]" />
+          <div className="absolute inset-0 z-10 rounded-xl border-2 border-flight/30 dark:border-airport/30 animate-border-glow pointer-events-none" />
+          <div
+            className="p-4 text-white relative z-20"
+            style={{
+              background: `linear-gradient(90deg, ${airlineColor} 0%, #38bdf8 100%)`,
+            }}
+          >
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-3">
                 <TooltipProvider>
@@ -292,7 +460,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          <div className="p-6 relative">
+          <div className="p-6 relative z-20">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-r-full"></div>
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-l-full"></div>
 
@@ -304,25 +472,61 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                 <div className="space-y-1">
                   <div className="text-sm font-medium">{flight.departure_airport}</div>
                   <div className="text-2xl font-semibold">{formatTime(flight.departure_time)}</div>
-                  <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
+                  <div className="text-sm text-muted-foreground">{format(new Date(flight.departure_date), "MMM d, yyyy")}</div>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center py-4">
-                <div className="relative w-40 md:w-64">
-                  <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gradient-to-r from-flight to-airport"></div>
-                  <div className="absolute top-1/2 left-0 right-0 flex justify-center">
-                    <div className="bg-white dark:bg-slate-900 p-2 -mt-4 rounded-full shadow-md">
-                      <PlaneIcon className="h-6 w-6 text-airline" />
-                    </div>
-                  </div>
-                  <div className="absolute -top-2 left-0 w-3 h-3 rounded-full bg-flight shadow-md"></div>
-                  <div className="absolute -top-2 right-0 w-3 h-3 rounded-full bg-airport shadow-md"></div>
+              <div className="flex flex-col items-center w-full max-w-xs md:max-w-sm">
+                <div className="relative w-full h-8 flex items-center justify-center">
+                  <div className="absolute left-0 right-0 top-1/2 h-2 bg-gradient-to-r from-flight via-blue-400 to-airport rounded-full shadow-inner" style={{ transform: 'translateY(-50%)' }} />
+                  {(() => {
+                    let progress = 0;
+                    try {
+                      const depIata = flight.departure_iata;
+                      const arrIata = flight.arrival_iata;
+                      if (depIata && arrIata) {
+                        const depTz = airportTimeZones[depIata];
+                        const arrTz = airportTimeZones[arrIata];
+                        if (depTz && arrTz) {
+                          const datePart = flight.departure_date.split('T')[0];
+                          const dep = DateTime.fromISO(`${datePart}T${flight.departure_time}`, { zone: depTz });
+                          const arr = DateTime.fromISO(`${datePart}T${flight.arrival_time}`, { zone: arrTz });
+                          let arrAdjusted = arr;
+                          if (arr < dep) arrAdjusted = arr.plus({ days: 1 });
+                          const now = DateTime.now().setZone(depTz);
+                          if (now < dep) progress = 0;
+                          else if (now > arrAdjusted) progress = 1;
+                          else {
+                            const total = arrAdjusted.toUTC().toMillis() - dep.toUTC().toMillis();
+                            const elapsed = now.toUTC().toMillis() - dep.toUTC().toMillis();
+                            progress = total > 0 ? elapsed / total : 0;
+                          }
+                          progress = Math.max(0, Math.min(1, progress));
+                        }
+                      }
+                    } catch {}
+                    const left = `calc(${progress * 100}% - 16px)`;
+                    return (
+                      <div
+                        className="absolute top-1/2 animate-plane-float"
+                        style={{
+                          left,
+                          filter: 'drop-shadow(0 4px 12px rgba(56,189,248,0.25)) drop-shadow(0 0 8px #a855f7aa)',
+                          zIndex: 30,
+                          transform: 'translateY(-50%)',
+                        }}
+                      >
+                        <PlaneIcon
+                          className={`h-9 w-9 text-airline transition-all duration-700 ${progress === 0 ? 'opacity-60' : progress === 1 ? 'opacity-60' : 'opacity-100'}`}
+                        />
+                      </div>
+                    );
+                  })()}
+                  <div className="absolute left-0 top-1/2 w-4 h-4 bg-flight rounded-full border-2 border-white shadow" style={{ transform: 'translateY(-50%)' }} />
+                  <div className="absolute right-0 top-1/2 w-4 h-4 bg-airport rounded-full border-2 border-white shadow" style={{ transform: 'translateY(-50%)' }} />
                 </div>
-                <div className="mt-6 text-center">
-                  <Badge variant="outline" className="bg-muted font-medium">
-                    {calculateDuration()}
-                  </Badge>
+                <div className="mt-2 text-xs text-muted-foreground font-medium text-center">
+                  {calculateDuration()}
                 </div>
               </div>
 
@@ -336,7 +540,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                     {flight.arrival_country && ` (${flight.arrival_country})`}
                   </div>
                   <div className="text-2xl font-semibold">{formatTime(flight.arrival_time)}</div>
-                  <div className="text-sm text-muted-foreground">{flight.departure_date}</div>
+                  <div className="text-sm text-muted-foreground">{format(new Date(flight.departure_date), "MMM d, yyyy")}</div>
                 </div>
               </div>
             </div>
@@ -367,7 +571,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             <div className="mt-6 text-sm text-muted-foreground flex justify-between items-center">
-              <div>Purchased: {flight.purchased_date} {flight.purchase_time}</div>
+              <div>Purchased: {format(new Date(flight.purchased_date), "MMM d, yyyy")} {flight.purchase_time}</div>
               <div className="flex items-center space-x-2">
                 <Wifi className="h-4 w-4" />
                 <Utensils className="h-4 w-4" />

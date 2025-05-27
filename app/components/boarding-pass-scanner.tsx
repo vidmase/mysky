@@ -59,7 +59,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
     const [error, setError] = useState<string | null>(null)
     const [extractedData, setExtractedData] = useState<BoardingPassData | null>(null)
     const [rawResponse, setRawResponse] = useState<string | null>(null)
-    const [parsedData, setParsedData] = useState<Partial<BoardingPassData> | null>(null)
+    const [parsedData, setParsedData] = useState<Partial<BoardingPassData>[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClientComponentClient()
 
@@ -71,7 +71,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         setError(null)
         setExtractedData(null)
         setRawResponse(null)
-        setParsedData(null)
+        setParsedData([])
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
@@ -111,7 +111,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         setProgress(0)
         setError(null)
         setRawResponse(null)
-        setParsedData(null)
+        setParsedData([])
 
         try {
             const progressInterval = setInterval(() => {
@@ -133,83 +133,14 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             const rawData = await response.json()
             setRawResponse(rawData.raw_response)
 
-            // Parse the raw response to extract structured data
-            const lines = rawData.raw_response.split('\n')
-            let flightData: Partial<BoardingPassData> = {
-                passengers: [],
-                purchased_date: format(new Date(), 'yyyy-MM-dd'),  // Set current date as purchase date
-                purchase_time: format(new Date(), 'HH:mm'),        // Set current time as purchase time
-                total_receipt: '0',                                // Default value
-                airline: 'Unknown'                                 // Default value
+            let flights = [];
+            if (Array.isArray(rawData.flights)) {
+                flights = rawData.flights;
+            } else if (rawData && typeof rawData === 'object') {
+                flights = [rawData];
             }
+            setParsedData(flights)
 
-            let currentPassenger: { name: string; type?: string; age?: number } = { name: '' }
-
-            for (const line of lines) {
-                const trimmedLine = line.trim()
-
-                // Extract booking reference
-                if (trimmedLine.startsWith('Booking reference:')) {
-                    flightData.reservation_number = trimmedLine.split(':')[1].trim()
-                }
-
-                // Extract passenger details
-                if (trimmedLine.startsWith('- Name:')) {
-                    if (currentPassenger.name) {
-                        flightData.passengers?.push({ ...currentPassenger })
-                    }
-                    currentPassenger = { name: trimmedLine.split(':')[1].trim() }
-                }
-                if (trimmedLine.startsWith('Type:')) {
-                    currentPassenger.type = trimmedLine.split(':')[1].trim()
-                }
-                if (trimmedLine.startsWith('Age:')) {
-                    const age = trimmedLine.split(':')[1].trim()
-                    currentPassenger.age = age === 'None' ? undefined : parseInt(age)
-                }
-
-                // Extract flight details
-                if (trimmedLine.startsWith('Flight number:')) {
-                    flightData.flight_number = trimmedLine.split(':')[1].trim()
-                }
-                if (trimmedLine.startsWith('Departure airport:')) {
-                    const airport = trimmedLine.split(':')[1].trim()
-                    flightData.departure_airport = airport.replace(/\([^)]*\)/g, '').trim()
-                    flightData.departure_iata = airport.match(/\(([^)]+)\)/)?.[1] || ''
-                }
-                if (trimmedLine.startsWith('Arrival airport:')) {
-                    const airport = trimmedLine.split(':')[1].trim()
-                    flightData.arrival_airport = airport.replace(/\([^)]*\)/g, '').trim()
-                    flightData.arrival_iata = airport.match(/\(([^)]+)\)/)?.[1] || ''
-                }
-                if (trimmedLine.startsWith('Departure date:')) {
-                    flightData.departure_date = trimmedLine.split(':')[1].trim()
-                }
-                if (trimmedLine.startsWith('Departure time:')) {
-                    // Extract everything after "Departure time:" while preserving the exact format
-                    const fullLine = trimmedLine.substring('Departure time:'.length).trim()
-                    flightData.departure_time = fullLine
-                }
-                if (trimmedLine.startsWith('Arrival time:')) {
-                    // Extract everything after "Arrival time:" while preserving the exact format
-                    const fullLine = trimmedLine.substring('Arrival time:'.length).trim()
-                    flightData.arrival_time = fullLine
-                }
-            }
-
-            // Add the last passenger if exists
-            if (currentPassenger.name) {
-                flightData.passengers?.push({ ...currentPassenger })
-            }
-
-            // Set the main passenger as the first adult or first passenger
-            const mainPassenger = flightData.passengers?.find(p => p.type === 'Adult') || flightData.passengers?.[0]
-            if (mainPassenger) {
-                flightData.passenger_name = mainPassenger.name
-            }
-
-            // Instead of saving directly, store the parsed data
-            setParsedData(flightData)
             clearInterval(progressInterval)
             setProgress(100)
 
@@ -224,8 +155,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         }
     }
 
-    const saveToSupabase = async () => {
-        if (!parsedData) {
+    const saveToSupabase = async (flightData: Partial<BoardingPassData>) => {
+        if (!flightData) {
             toast.error('No data to save', {
                 description: 'Please scan a boarding pass first.',
             });
@@ -245,11 +176,11 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
 
             // Validate required fields before saving
             const requiredFields = {
-                passenger_name: parsedData.passenger_name,
-                flight_number: parsedData.flight_number,
-                departure_airport: parsedData.departure_airport,
-                arrival_airport: parsedData.arrival_airport,
-                departure_date: parsedData.departure_date,
+                passenger_name: flightData.passenger_name,
+                flight_number: flightData.flight_number,
+                departure_airport: flightData.departure_airport,
+                arrival_airport: flightData.arrival_airport,
+                departure_date: flightData.departure_date,
             };
 
             const missingFields = Object.entries(requiredFields)
@@ -264,43 +195,43 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             }
 
             // Prepare the data object with type checking
-            const flightData = {
-                passenger_name: parsedData.passenger_name || '',
-                reservation_number: parsedData.reservation_number || '',
-                flight_number: parsedData.flight_number || '',
-                departure_airport: parsedData.departure_airport || '',
-                arrival_airport: parsedData.arrival_airport || '',
-                departure_date: parsedData.departure_date || '',
-                departure_time: parsedData.departure_time || '',
-                arrival_time: parsedData.arrival_time || '',
-                total_receipt: parsedData.total_receipt || '0',
-                airline: parsedData.airline || 'Unknown',
-                seat: parsedData.seat || '',
-                departure_iata: parsedData.departure_iata || '',
-                arrival_iata: parsedData.arrival_iata || '',
-                departure_country: parsedData.departure_country || '',
-                arrival_country: parsedData.arrival_country || '',
-                departure_flag: parsedData.departure_flag || '',
-                arrival_flag: parsedData.arrival_flag || '',
-                arrival_date: parsedData.arrival_date || parsedData.departure_date || '',
-                return_arrival_time: parsedData.return_arrival_time || '',
-                purchased_date: parsedData.purchased_date || format(new Date(), 'yyyy-MM-dd'),
-                purchase_time: parsedData.purchase_time || format(new Date(), 'HH:mm'),
+            const flightDataToSave = {
+                passenger_name: flightData.passenger_name || '',
+                reservation_number: flightData.reservation_number || '',
+                flight_number: flightData.flight_number || '',
+                departure_airport: flightData.departure_airport || '',
+                arrival_airport: flightData.arrival_airport || '',
+                departure_date: flightData.departure_date || '',
+                departure_time: flightData.departure_time || '',
+                arrival_time: flightData.arrival_time || '',
+                total_receipt: flightData.total_receipt || '0',
+                airline: flightData.airline || 'Unknown',
+                seat: flightData.seat || '',
+                departure_iata: flightData.departure_iata || '',
+                arrival_iata: flightData.arrival_iata || '',
+                departure_country: flightData.departure_country || '',
+                arrival_country: flightData.arrival_country || '',
+                departure_flag: flightData.departure_flag || '',
+                arrival_flag: flightData.arrival_flag || '',
+                arrival_date: flightData.arrival_date || flightData.departure_date || '',
+                return_arrival_time: flightData.return_arrival_time || '',
+                purchased_date: flightData.purchased_date || format(new Date(), 'yyyy-MM-dd'),
+                purchase_time: flightData.purchase_time || format(new Date(), 'HH:mm'),
                 owner_id: user.id,
-                notes: parsedData.passengers
-                    ? `Additional passengers: ${parsedData.passengers
-                        .filter(p => p.name !== parsedData.passenger_name)
+                notes: flightData.passengers
+                    ? `Additional passengers: ${flightData.passengers
+                        .filter(p => p.name !== flightData.passenger_name)
                         .map(p => `${p.name} (${p.type}, Age: ${p.age || 'N/A'})`)
                         .join('; ')}`
                     : ''
             };
 
             // Log the data being sent
-            console.log('Attempting to save flight data:', flightData);
+            console.log('Attempting to save flight data:', flightDataToSave);
 
             const { error: supabaseError } = await supabase
                 .from('vidmaflights')
-                .insert([flightData]);
+                .insert([flightDataToSave]);
 
             if (supabaseError) {
                 console.error('Supabase Error:', {
@@ -339,8 +270,19 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 description: 'The flight information has been added to your records.',
             });
 
-            // Reset the form after successful save
-            resetState();
+            // Remove the saved flight from parsedData
+            setParsedData(prev => prev.filter(f =>
+                f.flight_number !== flightData.flight_number ||
+                f.departure_date !== flightData.departure_date
+            ));
+
+            // If all flights are saved, reset the form
+            setTimeout(() => {
+                setParsedData(current => {
+                    if (current.length === 0) resetState();
+                    return current;
+                });
+            }, 100);
 
         } catch (err) {
             console.error('Save operation failed:', {
@@ -351,8 +293,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                     stack: err.stack
                 } : err,
                 flightData: {
-                    flightNumber: parsedData.flight_number,
-                    passenger: parsedData.passenger_name
+                    flightNumber: flightData.flight_number,
+                    passenger: flightData.passenger_name
                 }
             });
 
@@ -395,15 +337,15 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 )}
 
                 {/* Structured Data Preview */}
-                {parsedData && (
-                    <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                {parsedData.map((flight, idx) => (
+                    <div key={idx} className="mb-4 p-4 border rounded">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2 text-xl font-semibold">
                                 <Plane className="h-6 w-6" />
                                 Extracted Flight Data
                             </div>
                             <Button
-                                onClick={saveToSupabase}
+                                onClick={() => saveToSupabase(flight)}
                                 className="bg-green-600 hover:bg-green-700 text-white"
                             >
                                 <Save className="mr-2 h-4 w-4" />
@@ -418,11 +360,11 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-muted-foreground text-sm">Booking Reference</p>
-                                        <p className="font-medium">{parsedData.reservation_number || 'N/A'}</p>
+                                        <p className="font-medium">{flight.reservation_number || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p className="text-muted-foreground text-sm">Flight Number</p>
-                                        <p className="font-medium">{parsedData.flight_number || 'N/A'}</p>
+                                        <p className="font-medium">{flight.flight_number || 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -433,30 +375,30 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                 <div className="grid grid-cols-2 gap-8">
                                     <div>
                                         <p className="text-muted-foreground text-sm">Departure</p>
-                                        <p className="font-medium">{parsedData.departure_airport || 'N/A'}</p>
+                                        <p className="font-medium">{flight.departure_airport || 'N/A'}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                                {parsedData.departure_iata || 'N/A'}
+                                                {flight.departure_iata || 'N/A'}
                                             </span>
-                                            {parsedData.departure_country && (
+                                            {flight.departure_country && (
                                                 <span className="text-xs text-muted-foreground">
-                                                    {parsedData.departure_country}
-                                                    {parsedData.departure_flag && ` ${parsedData.departure_flag}`}
+                                                    {flight.departure_country}
+                                                    {flight.departure_flag && ` ${flight.departure_flag}`}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div>
                                         <p className="text-muted-foreground text-sm">Arrival</p>
-                                        <p className="font-medium">{parsedData.arrival_airport || 'N/A'}</p>
+                                        <p className="font-medium">{flight.arrival_airport || 'N/A'}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                                {parsedData.arrival_iata || 'N/A'}
+                                                {flight.arrival_iata || 'N/A'}
                                             </span>
-                                            {parsedData.arrival_country && (
+                                            {flight.arrival_country && (
                                                 <span className="text-xs text-muted-foreground">
-                                                    {parsedData.arrival_country}
-                                                    {parsedData.arrival_flag && ` ${parsedData.arrival_flag}`}
+                                                    {flight.arrival_country}
+                                                    {flight.arrival_flag && ` ${flight.arrival_flag}`}
                                                 </span>
                                             )}
                                         </div>
@@ -470,23 +412,23 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                 <div className="grid grid-cols-2 gap-8">
                                     <div>
                                         <p className="text-muted-foreground text-sm">Departure</p>
-                                        <p className="font-medium">{formatDate(parsedData.departure_date)}</p>
+                                        <p className="font-medium">{formatDate(flight.departure_date)}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-sm font-medium text-blue-600">
-                                                {formatTime(parsedData.departure_time)}
+                                                {formatTime(flight.departure_time)}
                                             </span>
                                         </div>
                                     </div>
                                     <div>
                                         <p className="text-muted-foreground text-sm">Arrival</p>
-                                        <p className="font-medium">{formatDate(parsedData.arrival_date || parsedData.departure_date)}</p>
+                                        <p className="font-medium">{formatDate(flight.arrival_date || flight.departure_date)}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-sm font-medium text-blue-600">
-                                                {formatTime(parsedData.arrival_time)}
+                                                {formatTime(flight.arrival_time)}
                                             </span>
-                                            {parsedData.return_arrival_time && (
+                                            {flight.return_arrival_time && (
                                                 <span className="text-xs text-muted-foreground">
-                                                    (Return: {formatTime(parsedData.return_arrival_time)})
+                                                    (Return: {formatTime(flight.return_arrival_time)})
                                                 </span>
                                             )}
                                         </div>
@@ -498,7 +440,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                             <div className="space-y-3">
                                 <h3 className="font-semibold text-base border-b pb-2">Passenger Information</h3>
                                 <div className="space-y-4">
-                                    {parsedData.passengers?.map((passenger, i) => (
+                                    {flight.passengers?.map((passenger, i) => (
                                         <div key={i} className="flex items-start gap-4 p-3 rounded-md bg-muted/50">
                                             <div className="flex-1">
                                                 <p className="font-medium">{passenger.name}</p>
@@ -513,7 +455,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                                     )}
                                                 </div>
                                             </div>
-                                            {passenger.name === parsedData.passenger_name && (
+                                            {passenger.name === flight.passenger_name && (
                                                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
                                                     Main Passenger
                                                 </span>
@@ -527,35 +469,35 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                             <div className="space-y-3">
                                 <h3 className="font-semibold text-base border-b pb-2">Additional Information</h3>
                                 <div className="grid grid-cols-3 gap-4">
-                                    {parsedData.airline && (
+                                    {flight.airline && (
                                         <div>
                                             <p className="text-muted-foreground text-sm">Airline</p>
-                                            <p className="font-medium">{parsedData.airline}</p>
+                                            <p className="font-medium">{flight.airline}</p>
                                         </div>
                                     )}
-                                    {parsedData.seat && (
+                                    {flight.seat && (
                                         <div>
                                             <p className="text-muted-foreground text-sm">Seat</p>
-                                            <p className="font-medium">{parsedData.seat}</p>
+                                            <p className="font-medium">{flight.seat}</p>
                                         </div>
                                     )}
-                                    {parsedData.total_receipt && (
+                                    {flight.total_receipt && (
                                         <div>
                                             <p className="text-muted-foreground text-sm">Total Cost</p>
-                                            <p className="font-medium">{parsedData.total_receipt}</p>
+                                            <p className="font-medium">{flight.total_receipt}</p>
                                         </div>
                                     )}
                                 </div>
-                                {parsedData.notes && (
+                                {flight.notes && (
                                     <div className="mt-3">
                                         <p className="text-muted-foreground text-sm">Notes</p>
-                                        <p className="font-medium text-sm">{parsedData.notes}</p>
+                                        <p className="font-medium text-sm">{flight.notes}</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                )}
+                ))}
             </div>
         );
     };

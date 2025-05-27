@@ -80,12 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (insertError) {
         throw insertError
       }
-    } catch (error) {
-      console.error('Error creating user profile:', error)
+    } catch (error: any) {
+      // Log more details for debugging
+      console.error('Error creating user profile:', error, JSON.stringify(error));
+
+      // Handle duplicate profile error gracefully (Postgres code 23505 or duplicate message)
+      if (error?.code === '23505' || (typeof error?.message === 'string' && error.message.includes('duplicate'))) {
+        // Profile already exists, do not show notification
+        return;
+      }
+
       showNotification(
         'Failed to create user profile. Please update your profile information.',
         'error'
-      )
+      );
     }
   }
 

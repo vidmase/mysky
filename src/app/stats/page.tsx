@@ -16,62 +16,38 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { getUserStats } from "../../../lib/services/stats"
+import { createClient } from "@/utils/supabase/client"
+import { useEffect, useState } from "react"
 
 export default function StatsPage() {
-  // Mock data for stats
-  const stats = {
-    totalFlights: 42,
-    totalCountries: 12,
-    totalHours: 187,
-    totalDistance: "215,432 km",
-    mostFlownAirline: "British Airways",
-    mostFrequentRoute: "LHR ↔ JFK",
-    longestFlight: {
-      from: "LHR",
-      to: "SYD",
-      duration: "21h 35m",
-      distance: "17,016 km",
-    },
-    shortestFlight: {
-      from: "LHR",
-      to: "CDG",
-      duration: "1h 15m",
-      distance: "344 km",
-    },
-    airlines: [
-      { name: "British Airways", flights: 18 },
-      { name: "Lufthansa", flights: 8 },
-      { name: "Delta", flights: 6 },
-      { name: "United", flights: 5 },
-      { name: "Air France", flights: 5 },
-    ],
-    airports: [
-      { code: "LHR", name: "London Heathrow", visits: 24 },
-      { code: "JFK", name: "New York JFK", visits: 12 },
-      { code: "CDG", name: "Paris Charles de Gaulle", visits: 8 },
-      { code: "FRA", name: "Frankfurt", visits: 6 },
-      { code: "LAX", name: "Los Angeles", visits: 4 },
-    ],
-    flightsByYear: [
-      { year: 2020, count: 4 },
-      { year: 2021, count: 8 },
-      { year: 2022, count: 12 },
-      { year: 2023, count: 18 },
-    ],
-    flightsByMonth: [
-      { month: "Jan", count: 2 },
-      { month: "Feb", count: 1 },
-      { month: "Mar", count: 3 },
-      { month: "Apr", count: 4 },
-      { month: "May", count: 5 },
-      { month: "Jun", count: 6 },
-      { month: "Jul", count: 7 },
-      { month: "Aug", count: 5 },
-      { month: "Sep", count: 3 },
-      { month: "Oct", count: 2 },
-      { month: "Nov", count: 2 },
-      { month: "Dec", count: 2 },
-    ],
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true)
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setStats(null)
+        setLoading(false)
+        return
+      }
+      const userStats = await getUserStats(supabase, user.id)
+      setStats(userStats)
+      setLoading(false)
+    }
+    fetchStats()
+  }, [])
+
+  if (loading) {
+    return <div className="container mx-auto px-4 py-8">Loading...</div>
+  }
+  if (!stats) {
+    return <div className="container mx-auto px-4 py-8">No stats available.</div>
   }
 
   return (
@@ -270,7 +246,7 @@ export default function StatsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {stats.airports.map((airport, index) => (
+                  {stats.airports.map((airport: any, index: number) => (
                     <div
                       key={airport.code}
                       className={`flex items-center justify-between p-3 rounded-md ${index === 0 ? "bg-airport/10" : "hover:bg-muted/50"} transition-colors`}
@@ -307,7 +283,7 @@ export default function StatsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {stats.airlines.map((airline, index) => (
+                  {stats.airlines.map((airline: any, index: number) => (
                     <div key={airline.name} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -358,7 +334,7 @@ export default function StatsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {stats.flightsByYear.map((item) => (
+                    {stats.flightsByYear.map((item: any) => (
                       <div key={item.year} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
@@ -373,7 +349,7 @@ export default function StatsPage() {
                           <div
                             className="h-full bg-stats rounded-full airline-bar"
                             style={{
-                              width: `${(item.count / Math.max(...stats.flightsByYear.map((i) => i.count))) * 100}%`,
+                              width: `${(item.count / Math.max(...stats.flightsByYear.map((i: any) => i.count))) * 100}%`,
                             }}
                           />
                         </div>
@@ -392,7 +368,7 @@ export default function StatsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64 flex items-end justify-between gap-1 pt-6">
-                    {stats.flightsByMonth.map((item) => (
+                    {stats.flightsByMonth.map((item: any) => (
                       <div key={item.month} className="flex flex-col items-center group">
                         <div className="text-xs text-muted-foreground mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {item.count}
@@ -400,7 +376,7 @@ export default function StatsPage() {
                         <div
                           className="w-8 bg-stats rounded-t-sm month-bar relative"
                           style={{
-                            height: `${(item.count / Math.max(...stats.flightsByMonth.map((i) => i.count))) * 100}%`,
+                            height: `${(item.count / Math.max(...stats.flightsByMonth.map((i: any) => i.count))) * 100}%`,
                           }}
                         >
                           <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>

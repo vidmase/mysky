@@ -268,6 +268,9 @@ function getAirlineLogo(airline: string | null): string {
 }
 
 export default function FlightsPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const supabase = createClientComponentClient()
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
@@ -282,7 +285,6 @@ export default function FlightsPage() {
   const [airlines, setAirlines] = useState<string[]>([])
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>("USD")
   const { showSuccess, showError, showInfo } = useNotification()
-  const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -290,6 +292,24 @@ export default function FlightsPage() {
 
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    checkSession()
+  }, [supabase])
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      router.replace("/auth")
+    }
+  }, [isAuthenticated, router])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
 
   useEffect(() => {
     const fetchFlights = async () => {

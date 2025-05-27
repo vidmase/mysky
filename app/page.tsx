@@ -4,8 +4,38 @@ import Link from "next/link"
 import { PlaneTakeoff, Plus, Globe } from "lucide-react"
 import Image from 'next/image'
 import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function Home() {
+  // Add immediate heartbeat on homepage load
+  useEffect(() => {
+    const updateLastActive = async () => {
+      try {
+        const supabase = createClientComponentClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        
+        const timestamp = new Date().toISOString()
+        
+        const { error } = await supabase
+          .from('profiles')
+          .update({ last_active_at: timestamp })
+          .eq('id', user.id)
+        
+        if (error) {
+          console.error('Home page heartbeat error:', error.message)
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log('Home page heartbeat updated at:', new Date().toLocaleTimeString())
+        }
+      } catch (err) {
+        console.error('Home page heartbeat error:', err)
+      }
+    }
+    
+    updateLastActive()
+  }, [])
+
   return (
     <main className="min-h-screen">
       <div className="relative h-screen w-full overflow-hidden">

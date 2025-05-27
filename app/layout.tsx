@@ -37,16 +37,16 @@ export default function RootLayout({
       </head>
       <body className="font-jakarta font-light tracking-wide">
         <Heartbeat>
-          <AuthProvider>
-            <NotificationProvider>
-              <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
-                <div className="flex min-h-screen flex-col">
-                  <MainNav />
-                  <div className="flex-1">{children}</div>
-                </div>
-              </ThemeProvider>
-            </NotificationProvider>
-          </AuthProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
+              <div className="flex min-h-screen flex-col">
+                <MainNav />
+                <div className="flex-1">{children}</div>
+              </div>
+            </ThemeProvider>
+          </NotificationProvider>
+        </AuthProvider>
         </Heartbeat>
       </body>
     </html>

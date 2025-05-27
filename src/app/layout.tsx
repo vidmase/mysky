@@ -5,6 +5,7 @@ import "./globals.css"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
+import { DisabledUserMessage } from '@/components/DisabledUserMessage'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,6 +27,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
+          <DisabledUserMessage />
           <div className="flex min-h-screen flex-col">
             <MainNav />
             <div className="flex-1">{children}</div>

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard } from "lucide-react"
+import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard, MessageCircle } from "lucide-react"
 import { useState } from "react"
 
 import { cn } from "@/lib/utils"
@@ -53,6 +53,13 @@ export function MainNav() {
       icon: BarChart3,
       color: "text-stats",
       bgColor: "bg-stats/10",
+    },
+    {
+      name: "Chat",
+      href: "/chat",
+      icon: MessageCircle,
+      color: "text-purple-400",
+      bgColor: "bg-purple-400/10",
     },
     {
       name: "Pricing",
@@ -109,8 +116,13 @@ export function MainNav() {
               </>
             ) : (
               <Link href="/auth">
-                <Button variant="ghost" className="text-foreground/60">
-                  Sign In
+                <Button 
+                  variant="default" 
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-medium px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-300 animate-pulse-subtle"
+                >
+                  <span className="flex items-center gap-1">
+                    Sign In
+                  </span>
                 </Button>
               </Link>
             )}

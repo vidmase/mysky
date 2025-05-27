@@ -26,6 +26,7 @@ import { Airport } from "@/lib/airports"
 import { Passenger } from "@/lib/passengers"
 import { BoardingPassScanner } from "../components/boarding-pass-scanner"
 import { europeanAirports } from "@/lib/airports"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface FormState {
   passenger_name: string
@@ -107,6 +108,8 @@ function getFlagEmoji(countryName: string): string {
 
 export default function AddFlightPage() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [selectedPassengers, setSelectedPassengers] = useState<Passenger[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [flightNumber, setFlightNumber] = useState('')
@@ -138,6 +141,24 @@ export default function AddFlightPage() {
       setArrivalDate(departureDate)
     }
   }, [departureDate, arrivalDate])
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+    checkSession()
+  }, [supabase])
+
+  useEffect(() => {
+    if (isAuthenticated === false) {
+      router.replace("/auth")
+    }
+  }, [isAuthenticated, router])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
 
   const handleDepartureDateSelect = (date: Date | undefined) => {
     setDepartureDate(date)

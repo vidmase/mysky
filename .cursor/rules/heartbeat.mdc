@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Heartbeat Component User Activity Rule
+
+The [heartbeat.tsx](mdc:app/components/heartbeat.tsx) component is responsible for updating the `last_active_at` timestamp for the currently authenticated user in the `profiles` table. It uses Supabase's `auth.getUser()` to fetch the user and retries up to 5 times if the user is not immediately available (e.g., due to session loading delays).
+
+- If no user is found after retries, it logs a warning and does not attempt to update the database.
+- The update runs every 10 seconds while the component is mounted.
+- The component should only be used in contexts where a user is expected to be authenticated.
+
+**Key logic:**
+- Retry fetching the user up to 5 times with a 500ms delay between attempts.
+- Only update `last_active_at` if a user is found.
+- Designed to be robust against session loading delays.
+
+
+See [heartbeat.tsx](mdc:app/components/heartbeat.tsx) for implementation details.

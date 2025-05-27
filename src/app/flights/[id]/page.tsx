@@ -15,12 +15,19 @@ import {
   Wifi,
   Utensils,
 } from "lucide-react"
+import { DateTime } from 'luxon'
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Add a robust IATA to timezone mapping for major world airports
+const airportTimeZones: Record<string, string> = {
+  LHR: "Europe/London", JFK: "America/New_York", KUN: "Europe/Vilnius", LTN: "Europe/London",
+  // Add more as needed
+};
 
 export default function FlightDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -65,10 +72,26 @@ export default function FlightDetailPage({ params }: { params: { id: string } })
   }
 
   const calculateDuration = () => {
-    const diff = flight.arrivalDate.getTime() - flight.departureDate.getTime()
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    return `${hours}h ${minutes}m`
+    const depIata = flight.departureAirport.code;
+    const arrIata = flight.arrivalAirport.code;
+    const depTz = airportTimeZones[depIata];
+    const arrTz = airportTimeZones[arrIata];
+    if (!depTz || !arrTz) return "N/A";
+    const depDate = flight.departureDate;
+    const arrDate = flight.arrivalDate;
+    const dep = DateTime.fromObject(
+      { year: depDate.getFullYear(), month: depDate.getMonth() + 1, day: depDate.getDate(), hour: depDate.getHours(), minute: depDate.getMinutes() },
+      { zone: depTz }
+    );
+    let arr = DateTime.fromObject(
+      { year: arrDate.getFullYear(), month: arrDate.getMonth() + 1, day: arrDate.getDate(), hour: arrDate.getHours(), minute: arrDate.getMinutes() },
+      { zone: arrTz }
+    );
+    if (arr < dep) arr = arr.plus({ days: 1 });
+    const diff = arr.toUTC().diff(dep.toUTC(), ["hours", "minutes"]);
+    const hours = Math.floor(diff.hours);
+    const minutes = Math.round(diff.minutes);
+    return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
   }
 
   return (

@@ -128,209 +128,158 @@ interface FlightData {
     booking_type?: 'OUTBOUND' | 'RETURN'
 }
 
-function parseGeminiResponse(text: string): FlightData {
-    const lines = text.split('\n')
-    let currentSection = ''
-    let currentPassenger: Partial<PassengerInfo> = {}
-    const passengers: PassengerInfo[] = []
-    const data: { [key: string]: any } = {
-        passengers: [],
-        is_direct: false,
-        booking_type: 'OUTBOUND'
-    }
+function parseGeminiResponse(text: string): FlightData[] {
+    const lines = text.split('\n');
+    let currentSection: 'none' | 'passengers' | 'outbound' | 'return' = 'none';
+    let currentPassenger: Partial<PassengerInfo> = {};
+    const passengers: PassengerInfo[] = [];
+    let outbound: any = {};
+    let ret: any = {};
+    let booking_reference = '';
+    let total_receipt = '';
 
-    // Process lines and organize by sections
     lines.forEach(line => {
-        line = line.trim()
-        if (!line) return
+        line = line.trim();
+        if (!line) return;
 
-        // Detect sections
-        if (line.toLowerCase().includes('booking reference:')) {
-            currentSection = 'booking'
-            const [, value] = line.split(':').map(s => s.trim())
-            data.booking_reference = value
-            return
+        if (line.toLowerCase().startsWith('booking reference:')) {
+            booking_reference = line.split(':')[1].trim();
+            return;
         }
         if (line === 'Passengers:') {
-            currentSection = 'passengers'
-            return
+            currentSection = 'passengers';
+            return;
         }
         if (line === 'Outbound Flight:') {
-            currentSection = 'outbound'
-            data.booking_type = 'OUTBOUND'
-            return
+            currentSection = 'outbound';
+            return;
         }
         if (line === 'Return Flight:') {
-            currentSection = 'return'
-            return
+            currentSection = 'return';
+            return;
+        }
+        if (line.toLowerCase().startsWith('total receipt:')) {
+            total_receipt = line.split(':')[1].trim();
+            return;
         }
 
-        // Process passenger information
+        // Passengers
         if (currentSection === 'passengers') {
             if (line.startsWith('- Name:')) {
-                if (Object.keys(currentPassenger).length > 0) {
-                    passengers.push(currentPassenger as PassengerInfo)
-                }
-                currentPassenger = {
-                    name: line.split(':')[1].trim()
-                }
+                if (currentPassenger.name) passengers.push(currentPassenger as PassengerInfo);
+                currentPassenger = { name: line.split(':')[1].trim() };
             } else if (line.startsWith('  Type:')) {
-                currentPassenger.type = line.split(':')[1].trim()
+                currentPassenger.type = line.split(':')[1].trim();
             } else if (line.startsWith('  Age:')) {
-                currentPassenger.age = parseInt(line.split(':')[1].trim())
+                const age = line.split(':')[1].trim();
+                currentPassenger.age = age === 'None' ? undefined : parseInt(age);
             }
-            return
+            return;
         }
 
-        // Process flight information
+        // Flights
         if (currentSection === 'outbound' || currentSection === 'return') {
-            const [key, value] = line.split(':').map(s => s.trim())
-            const normalizedKey = key.toLowerCase().replace(/\s+/g, '_')
-
-            switch (normalizedKey) {
-                case 'flight_number':
-                    if (currentSection === 'outbound') {
-                        data.flight_number = value
+            const [rawKey, ...rest] = line.split(':');
+            if (!rawKey || rest.length === 0) return;
+            const value = rest.join(':').trim();
+            const target = currentSection === 'outbound' ? outbound : ret;
+            switch (rawKey.trim().toLowerCase()) {
+                case 'flight number':
+                    target.flight_number = value;
+                    break;
+                case 'departure airport': {
+                    const match = value.match(/^(.*) \(([A-Z]{3})\)$/);
+                    if (match) {
+                        target.departure_airport = match[1].trim();
+                        target.departure_iata = match[2];
                     } else {
-                        data.return_flight_number = value
+                        target.departure_airport = value;
                     }
-                    break
-                case 'departure_airport':
-                    if (currentSection === 'outbound') {
-                        data.departure_airport = value.replace(/\([A-Z]{3}\)/, '').trim()
-                        data.departure_iata = (value.match(/\(([A-Z]{3})\)/) || [])[1]
+                    break;
+                }
+                case 'arrival airport': {
+                    const match = value.match(/^(.*) \(([A-Z]{3})\)$/);
+                    if (match) {
+                        target.arrival_airport = match[1].trim();
+                        target.arrival_iata = match[2];
                     } else {
-                        data.return_departure_airport = value.replace(/\([A-Z]{3}\)/, '').trim()
-                        data.return_departure_iata = (value.match(/\(([A-Z]{3})\)/) || [])[1]
+                        target.arrival_airport = value;
                     }
-                    break
-                case 'arrival_airport':
-                    if (currentSection === 'outbound') {
-                        data.arrival_airport = value.replace(/\([A-Z]{3}\)/, '').trim()
-                        data.arrival_iata = (value.match(/\(([A-Z]{3})\)/) || [])[1]
-                    } else {
-                        data.return_arrival_airport = value.replace(/\([A-Z]{3}\)/, '').trim()
-                        data.return_arrival_iata = (value.match(/\(([A-Z]{3})\)/) || [])[1]
-                    }
-                    break
-                case 'departure_date':
-                    if (currentSection === 'outbound') {
-                        data.departure_date = value
-                    } else {
-                        data.return_departure_date = value
-                    }
-                    break
-                case 'departure_time':
-                    if (currentSection === 'outbound') {
-                        const [hours, minutes] = value.split(':')
-                        data.departure_time = `${hours.padStart(2, '0')}:${minutes || '00'}`
-                    } else {
-                        const [hours, minutes] = value.split(':')
-                        data.return_departure_time = `${hours.padStart(2, '0')}:${minutes || '00'}`
-                    }
-                    break
-                case 'arrival_time':
-                    if (currentSection === 'outbound') {
-                        const [hours, minutes] = value.split(':')
-                        data.arrival_time = `${hours.padStart(2, '0')}:${minutes || '00'}`
-                    } else {
-                        const [hours, minutes] = value.split(':')
-                        data.return_arrival_time = `${hours.padStart(2, '0')}:${minutes || '00'}`
-                    }
-                    break
+                    break;
+                }
+                case 'departure date':
+                    target.departure_date = value;
+                    break;
+                case 'departure time':
+                    target.departure_time = value;
+                    break;
+                case 'arrival time':
+                    target.arrival_time = value;
+                    break;
                 case 'duration':
-                    if (currentSection === 'outbound') {
-                        data.flight_duration = value
-                    } else {
-                        data.return_flight_duration = value
-                    }
-                    break
+                    target.flight_duration = value;
+                    break;
                 case 'direct':
-                    if (currentSection === 'outbound') {
-                        data.is_direct = value.toLowerCase() === 'yes'
-                    } else {
-                        data.return_is_direct = value.toLowerCase() === 'yes'
-                    }
-                    break
+                    target.is_direct = value.toLowerCase() === 'yes';
+                    break;
             }
         }
+    });
+    if (currentPassenger.name) passengers.push(currentPassenger as PassengerInfo);
 
-        // Process total receipt
-        if (line.startsWith('Total receipt:')) {
-            data.total_receipt = line.split(':')[1].trim()
-        }
-    })
-
-    // Add the last passenger if exists
-    if (Object.keys(currentPassenger).length > 0) {
-        passengers.push(currentPassenger as PassengerInfo)
-    }
-
-    // Get current time for purchase timestamp
-    const now = new Date()
-    const purchasedDate = now.toISOString().split('T')[0]
-    const purchaseTime = now.toTimeString().split(' ')[0].substring(0, 5)
-
-    // Helper function to get value or "None"
-    const getValue = (value: any): string => {
-        if (!value || String(value).trim() === '') return 'None'
-        // Handle time values
-        if (typeof value === 'string' && /^\d{1,2}$/.test(value)) {
-            return value.padStart(2, '0') + ':00'
-        }
-        return String(value).trim()
-    }
-
-    // Construct the flight data object
-    const flightData: FlightData = {
-        // Required fields
-        passenger_name: getValue(passengers[0]?.name), // Lead passenger
-        reservation_number: getValue(data.booking_reference),
-        flight_number: getValue(data.flight_number),
-        departure_airport: getValue(data.departure_airport),
-        arrival_airport: getValue(data.arrival_airport),
-        departure_date: getValue(data.departure_date),
-        departure_time: getValue(data.departure_time),
-        arrival_time: getValue(data.arrival_time),
-        total_receipt: getValue(data.total_receipt),
+    // Compose outbound flight
+    const now = new Date();
+    const purchasedDate = now.toISOString().split('T')[0];
+    const purchaseTime = now.toTimeString().split(' ')[0].substring(0, 5);
+    const outboundFlight: FlightData = {
+        passenger_name: passengers[0]?.name || '',
+        reservation_number: booking_reference,
+        flight_number: outbound.flight_number || '',
+        departure_airport: outbound.departure_airport || '',
+        arrival_airport: outbound.arrival_airport || '',
+        departure_date: outbound.departure_date || '',
+        departure_time: outbound.departure_time || '',
+        arrival_time: outbound.arrival_time || '',
+        total_receipt: total_receipt,
         purchased_date: purchasedDate,
         purchase_time: purchaseTime,
-
-        // Optional fields
-        departure_iata: data.departure_iata,
-        arrival_iata: data.arrival_iata,
-        flight_duration: data.flight_duration,
-        is_direct: data.is_direct,
+        departure_iata: outbound.departure_iata,
+        arrival_iata: outbound.arrival_iata,
+        flight_duration: outbound.flight_duration,
+        is_direct: outbound.is_direct,
         passengers: passengers,
-        booking_type: data.booking_type,
+        booking_type: 'OUTBOUND',
         is_return_flight: false,
-
-        // Return flight data (if available)
-        return_arrival_time: data.return_arrival_time
+    };
+    // Compose return flight if present
+    let flights: FlightData[] = [outboundFlight];
+    if (ret.flight_number || ret.departure_airport || ret.arrival_airport) {
+        const returnFlight: FlightData = {
+            ...outboundFlight,
+            flight_number: ret.flight_number || '',
+            departure_airport: ret.departure_airport || '',
+            arrival_airport: ret.arrival_airport || '',
+            departure_date: ret.departure_date || '',
+            departure_time: ret.departure_time || '',
+            arrival_time: ret.arrival_time || '',
+            flight_duration: ret.flight_duration,
+            is_direct: ret.is_direct,
+            booking_type: 'RETURN',
+            is_return_flight: true,
+            departure_iata: ret.departure_iata,
+            arrival_iata: ret.arrival_iata,
+        };
+        flights.push(returnFlight);
     }
-
-    // Enrich with airport data
-    if (flightData.departure_iata) {
-        const departureAirport = airportMap.get(flightData.departure_iata)
-        if (departureAirport) {
-            flightData.departure_longitude = departureAirport.coordinates?.[0]
-            flightData.departure_latitude = departureAirport.coordinates?.[1]
-            flightData.departure_country = departureAirport.country
-            flightData.departure_flag = getFlagEmoji(departureAirport.country)
-        }
+    // Split total price if two flights and total_receipt is present
+    if (flights.length === 2 && total_receipt && !isNaN(Number(total_receipt.replace(/[^0-9.]/g, '')))) {
+        const price = parseFloat(total_receipt.replace(/[^0-9.]/g, ''));
+        const currency = total_receipt.replace(/[0-9.\s]/g, '').trim();
+        const splitPrice = (price / 2).toFixed(2);
+        flights[0].total_receipt = `${splitPrice} ${currency}`;
+        flights[1].total_receipt = `${splitPrice} ${currency}`;
     }
-
-    if (flightData.arrival_iata) {
-        const arrivalAirport = airportMap.get(flightData.arrival_iata)
-        if (arrivalAirport) {
-            flightData.arrival_longitude = arrivalAirport.coordinates?.[0]
-            flightData.arrival_latitude = arrivalAirport.coordinates?.[1]
-            flightData.arrival_country = arrivalAirport.country
-            flightData.arrival_flag = getFlagEmoji(arrivalAirport.country)
-        }
-    }
-
-    return flightData
+    return flights;
 }
 
 export async function POST(request: Request) {
@@ -349,8 +298,8 @@ export async function POST(request: Request) {
         const buffer = await file.arrayBuffer()
         const base64Data = Buffer.from(buffer).toString('base64')
 
-        // Initialize Gemini 1.5 Pro model - optimized for OCR and text extraction
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' })
+        // Initialize Gemini 1.5 Flash model - optimized for OCR and text extraction
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
         // Enhanced prompt for better OCR accuracy
         const prompt = `Extract text from this boarding pass or flight confirmation image with high precision.
@@ -415,50 +364,15 @@ For unclear text, use OCR best practices to infer the most likely value.`
         console.log('Raw Gemini response:', text) // Debug log
 
         // Parse the response and create flight records
-        const extractedData = parseGeminiResponse(text)
+        const extractedFlights = parseGeminiResponse(text)
 
-        // Debug log
-        console.log('Parsed flight data:', JSON.stringify(extractedData, null, 2))
+        console.log('Parsed flight data:', JSON.stringify(extractedFlights, null, 2))
 
-        // If this is a round trip booking, create two flight records
-        const flightRecords = []
-        if (extractedData.booking_type === 'OUTBOUND') {
-            flightRecords.push(extractedData)
-
-            // Create return flight record if available
-            if (extractedData.return_arrival_time) {
-                const returnFlight = { ...extractedData }
-                returnFlight.booking_type = 'RETURN'
-                returnFlight.is_return_flight = true
-
-                // Swap airports for return flight
-                returnFlight.departure_airport = extractedData.arrival_airport
-                returnFlight.arrival_airport = extractedData.departure_airport
-                returnFlight.departure_iata = extractedData.arrival_iata
-                returnFlight.arrival_iata = extractedData.departure_iata
-
-                // Update flight specific details
-                returnFlight.flight_number = extractedData.return_flight_number || returnFlight.flight_number
-                returnFlight.departure_date = extractedData.return_departure_date || returnFlight.departure_date
-                returnFlight.departure_time = extractedData.return_departure_time || returnFlight.departure_time
-                returnFlight.arrival_time = extractedData.return_arrival_time || returnFlight.arrival_time
-                returnFlight.flight_duration = extractedData.return_flight_duration || returnFlight.flight_duration
-                returnFlight.is_direct = extractedData.return_is_direct ?? returnFlight.is_direct
-
-                flightRecords.push(returnFlight)
-            }
-        }
-
-        const response_data = flightRecords.length > 0 ? flightRecords : extractedData
-        console.log('Final response:', JSON.stringify(response_data, null, 2)) // Debug log
-
-        // Create the response object with both parsed data and raw response
-        const responseData = {
-            ...response_data,
-            raw_response: text // Include the raw response
-        }
-
-        return NextResponse.json(responseData)
+        // Use extractedFlights directly for response
+        return NextResponse.json({
+            flights: extractedFlights,
+            raw_response: text
+        })
     } catch (error) {
         console.error('Error processing boarding pass:', error)
         return NextResponse.json(
