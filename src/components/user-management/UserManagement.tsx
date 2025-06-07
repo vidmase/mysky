@@ -7,7 +7,7 @@ import { UserEditModal } from './UserEditModal';
 import { UserActivityLog } from './UserActivityLog';
 import { UserMessageModal } from './UserMessageModal';
 import { Button } from '../ui/button';
-import { useToast } from '../ui/use-toast';
+import { useToast } from '../../../components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { LogoutButton } from '../LogoutButton';
@@ -34,10 +34,15 @@ export function UserManagement() {
   const loadUsers = async (page: number) => {
     try {
       setLoading(true);
+      const effectiveFilters = {
+        ...filters,
+        role: filters.role === 'all' ? undefined : filters.role,
+        disabled: typeof filters.disabled === 'string' && filters.disabled === 'all' ? undefined : filters.disabled,
+      };
       const response = await userManagementService.listUsers({
         pageNumber: page,
         pageSize: 10,
-        filters,
+        filters: effectiveFilters,
       });
       setUsers(response.users);
       setTotalPages(response.pagination.total_pages);

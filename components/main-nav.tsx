@@ -99,33 +99,7 @@ export function MainNav() {
             </Button>
           ))}
           <div className="ml-2">
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : user ? (
-              <>
-                <span className="text-sm text-foreground/60">
-                  {user.email}
-                </span>
-                <Button
-                  variant="ghost"
-                  className="text-foreground/60"
-                  onClick={() => signOut()}
-                >
-                  Sign Out
-                </Button>
-              </>
-            ) : (
-              <Link href="/auth">
-                <Button 
-                  variant="default" 
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-medium px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-300 animate-pulse-subtle"
-                >
-                  <span className="flex items-center gap-1">
-                    Sign In
-                  </span>
-                </Button>
-              </Link>
-            )}
+            <UserMenu />
           </div>
         </nav>
 

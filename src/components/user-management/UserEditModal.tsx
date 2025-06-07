@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { UserProfile, UserUpdatePayload } from '@/lib/types/user';
+import { UserProfile, UserUpdatePayload } from '../../lib/types/user';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../../components/ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import {
@@ -17,8 +18,8 @@ import {
   SelectValue,
 } from '../ui/select';
 import { Button } from '../ui/button';
-import { useToast } from '../ui/use-toast';
-import { userManagementService } from '@/lib/services/userManagement';
+import { useToast } from '../../../components/ui/use-toast';
+import { userManagementService } from '../../lib/services/userManagement';
 
 interface UserEditModalProps {
   user: UserProfile | null;

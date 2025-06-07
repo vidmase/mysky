@@ -425,26 +425,6 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("map")
   const [flights, setFlights] = useState<any[]>([])
-  const [selectedFlight, setSelectedFlight] = useState<any | null>(null)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [animationProgress, setAnimationProgress] = useState(0)
-  const animationRef = useRef<number | null>(null)
-  const planeMarkerRef = useRef<mapboxgl.Marker | null>(null)
-  const pathLayerId = 'selected-flight-path'
-  const startMarkerId = 'selected-flight-start'
-  const endMarkerId = 'selected-flight-end'
-  const [flightOverlay, setFlightOverlay] = useState({ speed: 0, alt: 0, phase: 'Takeoff' })
-  const [panelPos, setPanelPos] = useState({ x: 40, y: 40 });
-  const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const [page, setPage] = useState(1);
-  const flightsPerPage = 10;
-  const totalPages = Math.ceil(flights.length / flightsPerPage);
-  const pagedFlights = flights.slice((page - 1) * flightsPerPage, page * flightsPerPage);
-  const [collapsed, setCollapsed] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   // Refs for map elements
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -641,6 +621,7 @@ export default function MapPage() {
         const { data: flights, error: flightsError } = await supabase
           .from("vidmaflights")
           .select("departure_airport, arrival_airport")
+          .eq("owner_id", session.user.id)
 
         if (flightsError) {
           throw flightsError
@@ -717,8 +698,9 @@ export default function MapPage() {
     }
   }, [airports]);
 
-  // Update the map initialization
+  // Update map initialization to depend on activeTab
   useEffect(() => {
+    if (activeTab !== "map") return;
     if (mapContainerRef.current === null || mapRef.current !== null) return;
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
@@ -761,8 +743,8 @@ export default function MapPage() {
               ['==', ['get', 'from'], ['get', 'hover_airport']],
               ['==', ['get', 'to'], ['get', 'hover_airport']]
             ],
-            '#3b82f6', // Bright blue for connected routes
-            '#94a3b8'  // Gray for other routes
+            '#3b82f6',
+            '#94a3b8'
           ],
           'line-width': [
             'case',
@@ -770,8 +752,8 @@ export default function MapPage() {
               ['==', ['get', 'from'], ['get', 'hover_airport']],
               ['==', ['get', 'to'], ['get', 'hover_airport']]
             ],
-            3,  // Thicker for connected routes
-            1.5 // Normal for other routes
+            3,
+            1.5
           ],
           'line-opacity': [
             'case',
@@ -779,8 +761,8 @@ export default function MapPage() {
               ['==', ['get', 'from'], ['get', 'hover_airport']],
               ['==', ['get', 'to'], ['get', 'hover_airport']]
             ],
-            0.8, // More visible for connected routes
-            0.4  // Less visible for other routes
+            0.8,
+            0.4
           ]
         }
       });
@@ -798,7 +780,7 @@ export default function MapPage() {
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [activeTab]);
 
   // Add effect to update flight paths when airports data changes
   useEffect(() => {
@@ -1356,309 +1338,31 @@ export default function MapPage() {
     };
   }, [updateAirportMarkers, updateFlightPaths, addVisitedCountriesLayer]);
 
-  // Fetch flights on mount
+  // Fetch only the current user's flights on mount
   useEffect(() => {
-    fetch('/api/flights')
-      .then(res => res.json())
-      .then(data => setFlights(data.sort((a: any, b: any) => new Date(a.departure_date).getTime() - new Date(b.departure_date).getTime())))
-      .catch(() => setFlights([]))
-  }, [])
-
-  // Animate selected flight
-  useEffect(() => {
-    if (!selectedFlight || !mapRef.current) return
-    const map = mapRef.current
-    // Remove previous path and markers
-    if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
-    if (map.getSource(pathLayerId)) map.removeSource(pathLayerId)
-    if (map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
-    if (map.getSource(startMarkerId)) map.removeSource(startMarkerId)
-    if (map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
-    if (map.getSource(endMarkerId)) map.removeSource(endMarkerId)
-    if (planeMarkerRef.current) { planeMarkerRef.current.remove(); planeMarkerRef.current = null }
-    setAnimationProgress(0)
-    setIsPaused(false)
-    setIsAnimating(true)
-
-    // Get coordinates
-    const depCode = Object.keys(airportData).find(code => selectedFlight.departure_iata === code || selectedFlight.departure_airport.includes(code) || selectedFlight.departure_airport.toLowerCase().includes(airportData[code].name.toLowerCase()))
-    const arrCode = Object.keys(airportData).find(code => selectedFlight.arrival_iata === code || selectedFlight.arrival_airport.includes(code) || selectedFlight.arrival_airport.toLowerCase().includes(airportData[code].name.toLowerCase()))
-    if (!depCode || !arrCode) return
-    const from = airportData[depCode]
-    const to = airportData[arrCode]
-    const start = [from.lng, from.lat]
-    const end = [to.lng, to.lat]
-    // Path as straight line
-    const path = [start, end]
-    // Add path layer
-    map.addSource(pathLayerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: path } } })
-    map.addLayer({ id: pathLayerId, type: 'line', source: pathLayerId, paint: { 'line-color': '#f59e42', 'line-width': 4, 'line-opacity': 0.9 } })
-    // Add start/end markers
-    map.addSource(startMarkerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: start } } })
-    map.addLayer({ id: startMarkerId, type: 'circle', source: startMarkerId, paint: { 'circle-radius': 7, 'circle-color': '#22c55e', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } })
-    map.addSource(endMarkerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: end } } })
-    map.addLayer({ id: endMarkerId, type: 'circle', source: endMarkerId, paint: { 'circle-radius': 7, 'circle-color': '#ef4444', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } })
-    // Add plane marker
-    const el = document.createElement('div')
-    el.innerHTML = `<svg id="plane-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19.5L21.5 12L2.5 4.5V10.5L17.5 12L2.5 13.5V19.5Z"/></svg>`
-    el.style.transform = 'translate(-16px, -16px)'
-    const marker = new mapboxgl.Marker(el).setLngLat([start[0], start[1]]).addTo(map)
-    planeMarkerRef.current = marker
-    // Animation
-    let startTime: number | null = null
-    let duration = 6000 // ms
-    const profile = getFlightProfile(duration)
-    let reqId: number
-    // Make sure setFlightOverlay is in scope here
-    function animate(ts: number) {
-      if (!isAnimating || isPaused) { animationRef.current = null; return }
-      if (!startTime) startTime = ts
-      const t = Math.min((ts - startTime) / duration, 1)
-      const lng = start[0] + (end[0] - start[0]) * t
-      const lat = start[1] + (end[1] - start[1]) * t
-      marker.setLngLat([lng, lat])
-      // Calculate bearing from previous to current position
-      let prevLng = start[0] + (end[0] - start[0]) * Math.max(t - 0.01, 0)
-      let prevLat = start[1] + (end[1] - start[1]) * Math.max(t - 0.01, 0)
-      const bearing = getBearing([prevLng, prevLat], [lng, lat])
-      const planeSvg = el.querySelector('#plane-svg') as SVGElement
-      if (planeSvg) {
-        planeSvg.style.transform = `rotate(${bearing + 90}deg)`
+    const fetchUserFlights = async () => {
+      const sessionRes = await supabase.auth.getSession();
+      const session = sessionRes.data?.session;
+      if (!session?.user) {
+        setFlights([]);
+        return;
       }
-      setAnimationProgress(t)
-      // Use the functional form to ensure correct closure
-      setFlightOverlay(() => interpolateProfile(profile, t))
-      if (t < 1) {
-        reqId = requestAnimationFrame(animate)
-        animationRef.current = reqId
-      } else {
-        setIsAnimating(false)
-        setAnimationProgress(1)
-        setFlightOverlay(() => interpolateProfile(profile, 1))
+      const result = await supabase
+        .from('vidmaflights')
+        .select('*')
+        .eq('owner_id', session.user.id)
+        .order('departure_date', { ascending: true });
+      if (result.error) {
+        setFlights([]);
+        return;
       }
-    }
-    reqId = requestAnimationFrame(animate)
-    animationRef.current = reqId
-    // Cleanup on unmount/flight change
-    return () => {
-      if (map && map.getLayer(pathLayerId)) map.removeLayer(pathLayerId)
-      if (map && map.getSource(pathLayerId)) map.removeSource(pathLayerId)
-      if (map && map.getLayer(startMarkerId)) map.removeLayer(startMarkerId)
-      if (map && map.getSource(startMarkerId)) map.removeSource(startMarkerId)
-      if (map && map.getLayer(endMarkerId)) map.removeLayer(endMarkerId)
-      if (map && map.getSource(endMarkerId)) map.removeSource(endMarkerId)
-      if (planeMarkerRef.current) { planeMarkerRef.current.remove(); planeMarkerRef.current = null }
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-    }
-  }, [selectedFlight])
-
-  // Animation controls
-  const handlePlay = () => { setIsPaused(false); setIsAnimating(true) }
-  const handlePause = () => { setIsPaused(true); setIsAnimating(false) }
-  const handleReplay = () => { setSelectedFlight(null); setTimeout(() => setSelectedFlight(selectedFlight), 100) }
-
-  // After the airport markers/layer are set up, add this effect:
-  useEffect(() => {
-    if (!mapRef.current || !airports || airports.length === 0) return;
-    const map = mapRef.current;
-
-    function handleAirportClick(e: any) {
-      if (!e.features || e.features.length === 0) return;
-      const props = e.features[0].properties;
-      if (!props) return;
-      const airport = airports.find(a => a.code === props.code);
-      if (!airport) return;
-      const html = `
-        <div class="airport-tooltip">
-          <div class="airport-name">${airport.name}</div>
-          <div class="airport-meta">
-            <span class="fi fi-${getCountryCode(airport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
-            <span class="airport-code">${airport.code}</span>
-            <span class="airport-city">${airport.city}</span>
-            <span class="airport-country">${airport.country}</span>
-          </div>
-          <div class="airport-visits">Visits: <b>${airport.visits}</b></div>
-          <div class="airport-routes">
-            <div class="routes-title">Connected Routes:</div>
-            <ul>
-              ${airport.routes.map(route => {
-                const other = airports.find(a => a.code === (route.from === airport.code ? route.to : route.from));
-                return other
-                  ? `<li><span class=\"fi fi-${getCountryCode(other.country)}\"></span> ${airport.code} → ${other.code} (${route.count}x)</li>`
-                  : '';
-              }).join('')}
-            </ul>
-          </div>
-        </div>
-      `;
-      new mapboxgl.Popup({ closeButton: true, className: 'airport-popup', offset: 12 })
-        .setLngLat([airport.lng, airport.lat])
-        .setHTML(html)
-        .addTo(map);
-    }
-
-    map.off('click', 'airports-layer', handleAirportClick);
-    map.on('click', 'airports-layer', handleAirportClick);
-    return () => {
-      map.off('click', 'airports-layer', handleAirportClick);
+      setFlights(result.data || []);
     };
-  }, [airports]);
-
-  // Drag handlers
-  function onPanelMouseDown(e: React.MouseEvent) {
-    if (panelRef.current && e.button === 0) {
-      setDragging(true);
-      setDragOffset({
-        x: e.clientX - panelPos.x,
-        y: e.clientY - panelPos.y,
-      });
-    }
-  }
-  useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
-      if (dragging) {
-        setPanelPos({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
-      }
-    }
-    function onMouseUp() { setDragging(false); }
-    if (dragging) {
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [dragging, dragOffset]);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsAuthenticated(!!session)
-    }
-    checkSession()
-  }, [supabase])
-
-  useEffect(() => {
-    if (isAuthenticated === false) {
-      router.replace("/auth")
-    }
-  }, [isAuthenticated, router])
-
-  if (isAuthenticated === null || !isAuthenticated) {
-    return null // or a spinner
-  }
+    fetchUserFlights();
+  }, [supabase]);
 
   return (
     <div className="container mx-auto p-4 space-y-4">
-      {/* Floating flight selector panel */}
-      <div
-        ref={panelRef}
-        className={`fixed z-50 w-96 max-w-full ${collapsed ? 'h-auto' : 'max-h-[80vh]'} overflow-y-auto flex flex-col gap-4 cursor-grab transition-all duration-300`}
-        style={{ left: panelPos.x, top: panelPos.y, userSelect: dragging ? 'none' : undefined, minWidth: 240 }}
-      >
-        <div
-          className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-lg rounded-t-2xl pb-2 mb-2 flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 shadow-lg cursor-grab active:cursor-grabbing"
-          onMouseDown={onPanelMouseDown}
-        >
-          <Plane className="h-6 w-6 text-flight" />
-          <h2 className="font-bold text-xl tracking-tight select-none flex-1">Replay a Flight</h2>
-          <button
-            className="p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-            onClick={e => { e.stopPropagation(); setCollapsed(c => !c); }}
-            aria-label={collapsed ? 'Expand' : 'Collapse'}
-            tabIndex={0}
-            style={{ outline: 'none' }}
-          >
-            <svg className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-          </button>
-        </div>
-        <div className={`transition-all duration-300 ${collapsed ? 'h-0 opacity-0 pointer-events-none' : 'opacity-100'}`} style={{ overflow: 'hidden' }}>
-          <div className="flex flex-col gap-4">
-            {pagedFlights.length === 0 && <div className="text-muted-foreground text-sm">No flights found.</div>}
-            {pagedFlights.map((flight, idx) => {
-              const dep = flight.departure_iata || (flight.departure_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.departure_airport.slice(0,3)
-              const arr = flight.arrival_iata || (flight.arrival_airport.match(/\(([A-Z]{3})\)/)?.[1]) || flight.arrival_airport.slice(0,3)
-              const airlineLogo = flight.airline && `/${flight.airline.toLowerCase().replace(/\s/g, '')}.png`
-              return (
-                <button
-                  key={flight.id || idx}
-                  className={`group relative w-full flex items-center px-0 py-0 rounded-2xl border-0 shadow-lg transition-all duration-200 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md hover:bg-flight/10 hover:scale-[1.02] focus:outline-none ${selectedFlight === flight ? 'ring-2 ring-flight/60 bg-flight/10' : ''}`}
-                  onClick={() => setSelectedFlight(flight)}
-                  disabled={isAnimating && selectedFlight === flight}
-                  style={{ minHeight: 90 }}
-                >
-                  {/* Vertical accent bar */}
-                  <div className={`h-full w-1.5 rounded-l-2xl ${selectedFlight === flight ? 'bg-flight' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
-                  {/* Airline logo or fallback */}
-                  <div className="flex flex-col items-center justify-center px-4">
-                    {airlineLogo ? (
-                      <img src={airlineLogo} alt={flight.airline} className="h-14 w-14 object-contain rounded-full border border-zinc-200 dark:border-zinc-700 bg-white p-2 opacity-80" />
-                    ) : (
-                      <div className="h-14 w-14 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 opacity-80">
-                        <Plane className="h-7 w-7" />
-                      </div>
-                    )}
-                    <span className="text-xs text-muted-foreground mt-1 font-medium">{flight.airline}</span>
-                  </div>
-                  {/* Main info */}
-                  <div className="flex-1 flex flex-col gap-1 py-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-base bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 tracking-widest flex items-center gap-1">
-                        <span className={`fi fi-${getCountryCode(airportData[dep]?.country || '')}`} style={{ width: '1.25rem', height: '0.9375rem' }} />
-                        {dep}
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-flight" />
-                      <span className="font-mono text-base bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5 tracking-widest flex items-center gap-1">
-                        <span className={`fi fi-${getCountryCode(airportData[arr]?.country || '')}`} style={{ width: '1.25rem', height: '0.9375rem' }} />
-                        {arr}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-semibold">{flight.flight_number}</span>
-                    </div>
-                  </div>
-                  {/* Date badge */}
-                  <div className="flex flex-col items-center justify-center px-4">
-                    <span className="bg-flight/90 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm mb-1 tracking-wide">
-                      {flight.departure_date?.slice(0,10) || '—'}
-                    </span>
-                  </div>
-                  {/* Select indicator */}
-                  {selectedFlight === flight && (
-                    <div className="absolute right-2 top-2 bg-flight/90 text-white rounded-full px-2 py-0.5 text-xs font-semibold shadow">Selected</div>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          {/* Pagination controls */}
-          <div className="flex items-center justify-between mt-2 gap-2 px-2">
-            <button
-              className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold disabled:opacity-50"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >Prev</button>
-            <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-            <button
-              className="px-3 py-1 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold disabled:opacity-50"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >Next</button>
-          </div>
-          {/* Animation controls */}
-          {selectedFlight && (
-            <div className="flex items-center gap-2 mt-2 justify-center">
-              <button onClick={handlePlay} disabled={isAnimating && !isPaused} className="p-2 rounded-full bg-flight/90 text-white disabled:opacity-50 shadow hover:scale-105 transition-transform"><Play className="h-4 w-4" /></button>
-              <button onClick={handlePause} disabled={!isAnimating || isPaused} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 disabled:opacity-50 shadow hover:scale-105 transition-transform"><Pause className="h-4 w-4" /></button>
-              <button onClick={handleReplay} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 shadow hover:scale-105 transition-transform"><RotateCcw className="h-4 w-4" /></button>
-              <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full mx-2 relative overflow-hidden">
-                <div className="bg-flight h-2 rounded-full transition-all" style={{ width: `${Math.round(animationProgress * 100)}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="map">Map View</TabsTrigger>

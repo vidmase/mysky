@@ -289,7 +289,6 @@ export default function FlightsPage() {
   const [flightToDelete, setFlightToDelete] = useState<Flight | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 7
-
   // Ensure consistent initial date
   const [initialDate] = useState(() => new Date())
 
@@ -306,10 +305,6 @@ export default function FlightsPage() {
       router.replace("/auth")
     }
   }, [isAuthenticated, router])
-
-  if (isAuthenticated === null || !isAuthenticated) {
-    return null // or a spinner
-  }
 
   useEffect(() => {
     const fetchFlights = async () => {
@@ -339,6 +334,10 @@ export default function FlightsPage() {
 
     fetchFlights()
   }, [showSuccess, showError])
+
+  if (isAuthenticated === null || !isAuthenticated) {
+    return null // or a spinner
+  }
 
   // Filter flights based on search term and filters
   const filteredFlights = Array.isArray(flights) ? flights.filter((flight: Flight) => {

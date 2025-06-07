@@ -1,4 +1,4 @@
-import { UserFilters } from '@/lib/types/user';
+import { UserFilters } from '../../lib/types/user';
 import { Input } from '../ui/input';
 import {
   Select,
@@ -26,26 +26,26 @@ export function UserFiltersComponent({ filters, onFiltersChange }: UserFiltersPr
         />
       </div>
       <Select
-        value={filters.role || ''}
+        value={filters.role || 'all'}
         onValueChange={(value) =>
-          onFiltersChange({ ...filters, role: value || undefined })
+          onFiltersChange({ ...filters, role: value === 'all' ? undefined : value })
         }
       >
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Filter by role" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All roles</SelectItem>
+          <SelectItem value="all">All roles</SelectItem>
           <SelectItem value="admin">Admin</SelectItem>
           <SelectItem value="user">User</SelectItem>
         </SelectContent>
       </Select>
       <Select
-        value={filters.disabled?.toString() || ''}
+        value={filters.disabled === undefined ? 'all' : filters.disabled.toString()}
         onValueChange={(value) =>
           onFiltersChange({
             ...filters,
-            disabled: value === '' ? undefined : value === 'true',
+            disabled: value === 'all' ? undefined : value === 'true',
           })
         }
       >
@@ -53,7 +53,7 @@ export function UserFiltersComponent({ filters, onFiltersChange }: UserFiltersPr
           <SelectValue placeholder="Filter by status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All status</SelectItem>
+          <SelectItem value="all">All status</SelectItem>
           <SelectItem value="true">Disabled</SelectItem>
           <SelectItem value="false">Active</SelectItem>
         </SelectContent>

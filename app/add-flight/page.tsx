@@ -123,6 +123,38 @@ export default function AddFlightPage() {
   const [arrivalDateOpen, setArrivalDateOpen] = useState(false)
   const today = new Date()
 
+  // Move these hooks to the top
+  const [formData, setFormData] = useState<FormState>({
+    passenger_name: '',
+    reservation_number: '',
+    flight_number: '',
+    departure_airport: '',
+    arrival_airport: '',
+    departure_date: new Date(),
+    departure_time: '',
+    arrival_time: '',
+    total_receipt: '',
+    purchased_date: format(new Date(), 'yyyy-MM-dd'),
+    purchase_time: format(new Date(), 'HH:mm'),
+    airline: null,
+    arrival_iata: null,
+    departure_iata: null,
+    seat: null,
+    notes: null,
+    departure_country: null,
+    arrival_country: null,
+    departure_flag: null,
+    arrival_flag: null,
+    arrival_date: new Date(),
+    return_arrival_time: null,
+    departure_longitude: null,
+    departure_latitude: null,
+    arrival_longitude: null,
+    arrival_latitude: null
+  })
+  const [selectedDepartureAirport, setSelectedDepartureAirport] = useState<Airport>()
+  const [selectedArrivalAirport, setSelectedArrivalAirport] = useState<Airport>()
+
   // Mock airlines for the dropdown
   const airlines = [
     "British Airways",
@@ -210,38 +242,6 @@ export default function AddFlightPage() {
     // Close the popover
     setArrivalDateOpen(false)
   }
-
-  const [formData, setFormData] = useState<FormState>({
-    passenger_name: '',
-    reservation_number: '',
-    flight_number: '',
-    departure_airport: '',
-    arrival_airport: '',
-    departure_date: new Date(),
-    departure_time: '',
-    arrival_time: '',
-    total_receipt: '',
-    purchased_date: format(new Date(), 'yyyy-MM-dd'),
-    purchase_time: format(new Date(), 'HH:mm'),
-    airline: null,
-    arrival_iata: null,
-    departure_iata: null,
-    seat: null,
-    notes: null,
-    departure_country: null,
-    arrival_country: null,
-    departure_flag: null,
-    arrival_flag: null,
-    arrival_date: new Date(),
-    return_arrival_time: null,
-    departure_longitude: null,
-    departure_latitude: null,
-    arrival_longitude: null,
-    arrival_latitude: null
-  })
-
-  const [selectedDepartureAirport, setSelectedDepartureAirport] = useState<Airport>()
-  const [selectedArrivalAirport, setSelectedArrivalAirport] = useState<Airport>()
 
   const handleAirportSelect = (airport: Airport, type: 'departure' | 'arrival') => {
     if (type === 'departure') {

@@ -18,10 +18,18 @@ export default function FlightsList() {
   useEffect(() => {
     const fetchFlights = async () => {
       try {
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setFlights([]);
+          setLoading(false);
+          return;
+        }
         // First check if user is disabled
         const { data: profile } = await supabase
           .from('profiles')
           .select('disabled')
+          .eq('id', session.user.id)
           .single();
 
         if (profile?.disabled) {
@@ -31,10 +39,11 @@ export default function FlightsList() {
           return;
         }
 
-        // Only fetch flights if user is not disabled
+        // Only fetch flights for the current user
         const { data, error } = await supabase
           .from('flights')
           .select('*')
+          .eq('owner_id', session.user.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -75,8 +84,16 @@ export default function FlightsList() {
       )
       .subscribe();
 
+    // Listen for auth state changes to clear flights on logout
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setFlights([]);
+      }
+    });
+
     return () => {
       subscription.unsubscribe();
+      authSub.unsubscribe();
     };
   }, [supabase, router]);
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { UserProfile } from '@/lib/types/user';
-import { userManagementService } from '@/lib/services/userManagement';
+import { UserProfile } from '../../lib/types/user';
+import { userManagementService } from '../../lib/services/userManagement';
 import {
   Card,
   CardContent,
@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../ui/card';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Badge } from '../ui/badge';
 
 interface UserActivityLogProps {
