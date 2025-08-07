@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "npm install --legacy-peer-deps && next build"
+    "vercel-build": "npm install --legacy-peer-deps && npm install typescript @types/react @types/react-dom --save-dev && next build"
   },
   "dependencies": {
     "@deck.gl/core": "^9.1.8",
