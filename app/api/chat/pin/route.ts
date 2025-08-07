@@ -9,8 +9,7 @@ export async function PATCH(request: Request) {
   if (!messageId || typeof pinned !== 'boolean') {
     return NextResponse.json({ error: 'Missing messageId or pinned' }, { status: 400 })
   }
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const supabase = createRouteHandlerClient({ cookies })
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

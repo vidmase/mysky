@@ -57,8 +57,7 @@ export async function GET(request: Request) {
         // Validate query parameters
         const validatedParams = querySchema.parse(queryParams)
 
-        const cookieStore = cookies()
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+        const supabase = createRouteHandlerClient({ cookies })
 
         // Authenticate user
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -129,8 +128,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const cookieStore = cookies()
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+        const supabase = createRouteHandlerClient({ cookies })
 
         // Authenticate user
         const { data: { session }, error: authError } = await supabase.auth.getSession()

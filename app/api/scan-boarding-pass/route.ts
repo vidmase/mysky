@@ -222,6 +222,9 @@ function parseGeminiResponse(text: string): FlightData[] {
                 case 'direct':
                     target.is_direct = value.toLowerCase() === 'yes';
                     break;
+                case 'price':
+                    target.individual_price = value;
+                    break;
             }
         }
     });
@@ -231,6 +234,13 @@ function parseGeminiResponse(text: string): FlightData[] {
     const now = new Date();
     const purchasedDate = now.toISOString().split('T')[0];
     const purchaseTime = now.toTimeString().split(' ')[0].substring(0, 5);
+    
+    // Determine outbound flight price
+    let outboundPrice = total_receipt;
+    if (outbound.individual_price && outbound.individual_price !== 'None') {
+        outboundPrice = outbound.individual_price;
+    }
+    
     const outboundFlight: FlightData = {
         passenger_name: passengers[0]?.name || '',
         reservation_number: booking_reference,
@@ -240,7 +250,7 @@ function parseGeminiResponse(text: string): FlightData[] {
         departure_date: outbound.departure_date || '',
         departure_time: outbound.departure_time || '',
         arrival_time: outbound.arrival_time || '',
-        total_receipt: total_receipt,
+        total_receipt: outboundPrice,
         purchased_date: purchasedDate,
         purchase_time: purchaseTime,
         departure_iata: outbound.departure_iata,
@@ -251,9 +261,16 @@ function parseGeminiResponse(text: string): FlightData[] {
         booking_type: 'OUTBOUND',
         is_return_flight: false,
     };
+    
     // Compose return flight if present
     let flights: FlightData[] = [outboundFlight];
     if (ret.flight_number || ret.departure_airport || ret.arrival_airport) {
+        // Determine return flight price
+        let returnPrice = total_receipt;
+        if (ret.individual_price && ret.individual_price !== 'None') {
+            returnPrice = ret.individual_price;
+        }
+        
         const returnFlight: FlightData = {
             ...outboundFlight,
             flight_number: ret.flight_number || '',
@@ -262,6 +279,7 @@ function parseGeminiResponse(text: string): FlightData[] {
             departure_date: ret.departure_date || '',
             departure_time: ret.departure_time || '',
             arrival_time: ret.arrival_time || '',
+            total_receipt: returnPrice,
             flight_duration: ret.flight_duration,
             is_direct: ret.is_direct,
             booking_type: 'RETURN',
@@ -271,13 +289,49 @@ function parseGeminiResponse(text: string): FlightData[] {
         };
         flights.push(returnFlight);
     }
-    // Split total price if two flights and total_receipt is present
-    if (flights.length === 2 && total_receipt && !isNaN(Number(total_receipt.replace(/[^0-9.]/g, '')))) {
-        const price = parseFloat(total_receipt.replace(/[^0-9.]/g, ''));
-        const currency = total_receipt.replace(/[0-9.\s]/g, '').trim();
-        const splitPrice = (price / 2).toFixed(2);
-        flights[0].total_receipt = `${splitPrice} ${currency}`;
-        flights[1].total_receipt = `${splitPrice} ${currency}`;
+    
+    // Handle price assignment logic
+    const hasIndividualPrices = (outbound.individual_price && outbound.individual_price !== 'None') || 
+                               (ret.individual_price && ret.individual_price !== 'None');
+    
+    if (flights.length === 2 && total_receipt && !hasIndividualPrices) {
+        // Only split total price if no individual prices were found
+        if (!isNaN(Number(total_receipt.replace(/[^0-9.]/g, '')))) {
+            const price = parseFloat(total_receipt.replace(/[^0-9.]/g, ''));
+            const currency = total_receipt.replace(/[0-9.\s]/g, '').trim();
+            const splitPrice = (price / 2).toFixed(2);
+            flights[0].total_receipt = `${splitPrice} ${currency}`;
+            flights[1].total_receipt = `${splitPrice} ${currency}`;
+        }
+    } else if (flights.length === 2 && hasIndividualPrices) {
+        // If we have individual prices, use them
+        if (outbound.individual_price && outbound.individual_price !== 'None') {
+            flights[0].total_receipt = outbound.individual_price;
+        }
+        if (ret.individual_price && ret.individual_price !== 'None') {
+            flights[1].total_receipt = ret.individual_price;
+        }
+        
+        // If only one individual price is available, calculate the other
+        if ((outbound.individual_price && outbound.individual_price !== 'None') && 
+            (!ret.individual_price || ret.individual_price === 'None') && 
+            total_receipt && !isNaN(Number(total_receipt.replace(/[^0-9.]/g, '')))) {
+            
+            const totalPrice = parseFloat(total_receipt.replace(/[^0-9.]/g, ''));
+            const outboundPriceNum = parseFloat(outbound.individual_price.replace(/[^0-9.]/g, ''));
+            const currency = total_receipt.replace(/[0-9.\s]/g, '').trim();
+            const returnPriceNum = totalPrice - outboundPriceNum;
+            flights[1].total_receipt = `${returnPriceNum.toFixed(2)} ${currency}`;
+        } else if ((!outbound.individual_price || outbound.individual_price === 'None') && 
+                   (ret.individual_price && ret.individual_price !== 'None') && 
+                   total_receipt && !isNaN(Number(total_receipt.replace(/[^0-9.]/g, '')))) {
+            
+            const totalPrice = parseFloat(total_receipt.replace(/[^0-9.]/g, ''));
+            const returnPriceNum = parseFloat(ret.individual_price.replace(/[^0-9.]/g, ''));
+            const currency = total_receipt.replace(/[0-9.\s]/g, '').trim();
+            const outboundPriceNum = totalPrice - returnPriceNum;
+            flights[0].total_receipt = `${outboundPriceNum.toFixed(2)} ${currency}`;
+        }
     }
     return flights;
 }
@@ -294,15 +348,40 @@ export async function POST(request: Request) {
             )
         }
 
-        // Convert file to base64
-        const buffer = await file.arrayBuffer()
-        const base64Data = Buffer.from(buffer).toString('base64')
+        // Check if file is PDF or image
+        const isPDF = file.type === 'application/pdf'
+        const isImage = file.type.startsWith('image/')
+        
+        if (!isPDF && !isImage) {
+            return NextResponse.json(
+                { error: 'Unsupported file type. Please upload an image or PDF file.' },
+                { status: 400 }
+            )
+        }
+
+        let base64Data: string
+        let mimeType: string
+
+        if (isImage) {
+            // Convert image file to base64
+            const buffer = await file.arrayBuffer()
+            base64Data = Buffer.from(buffer).toString('base64')
+            mimeType = file.type
+        } else {
+            // For PDF files, convert to image using canvas on the server side
+            // Since we can't use canvas on the server, we'll pass the PDF to the frontend
+            // and convert it there, then send the image back
+            // For now, we'll use a different approach - send PDF directly to Gemini
+            const buffer = await file.arrayBuffer()
+            base64Data = Buffer.from(buffer).toString('base64')
+            mimeType = file.type
+        }
 
         // Initialize Gemini 1.5 Flash model - optimized for OCR and text extraction
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
         // Enhanced prompt for better OCR accuracy
-        const prompt = `Extract text from this boarding pass or flight confirmation image with high precision.
+        const prompt = `Extract text from this boarding pass or flight confirmation ${isPDF ? 'PDF document' : 'image'} with high precision.
 Focus on these key details (mark as "None" if not found):
 
 1. Booking reference number
@@ -313,7 +392,11 @@ Focus on these key details (mark as "None" if not found):
    - Dates in YYYY-MM-DD format
    - Times in 24-hour HH:mm format
    - Duration if shown
-4. Total cost with currency
+   - Individual flight price if shown separately
+4. Pricing information:
+   - Individual outbound flight price (if shown)
+   - Individual return flight price (if shown)
+   - Total cost with currency
 
 Format exactly as:
 Booking reference: [NUMBER]
@@ -331,25 +414,34 @@ Departure time: [HH:mm]
 Arrival time: [HH:mm]
 Duration: [XXh YYm]
 Direct: Yes
+Price: [AMOUNT] (if individual price shown)
 
 Return Flight: (if exists)
-[Same format as Outbound]
+Flight number: [CODE]
+Departure airport: [NAME] ([IATA])
+Arrival airport: [NAME] ([IATA])
+Departure date: [YYYY-MM-DD]
+Departure time: [HH:mm]
+Arrival time: [HH:mm]
+Duration: [XXh YYm]
+Direct: Yes
+Price: [AMOUNT] (if individual price shown)
 
 Total receipt: [AMOUNT]
 
 Return ONLY the extracted data in the exact format shown above. Use "None" for missing fields.
-For unclear text, use OCR best practices to infer the most likely value.`
+For unclear text, use OCR best practices to infer the most likely value.${isPDF ? ' If this is a multi-page PDF, focus on the first page containing the boarding pass information.' : ''}`
 
-        // Create image part with enhanced settings for OCR
-        const imagePart: Part = {
+        // Create file part with enhanced settings for OCR
+        const filePart: Part = {
             inlineData: {
                 data: base64Data,
-                mimeType: file.type
+                mimeType: mimeType
             }
         }
 
         // Generate content with enhanced error handling
-        const result = await model.generateContent([prompt, imagePart])
+        const result = await model.generateContent([prompt, filePart])
         if (!result) {
             throw new Error('No response from Gemini API')
         }
@@ -371,7 +463,8 @@ For unclear text, use OCR best practices to infer the most likely value.`
         // Use extractedFlights directly for response
         return NextResponse.json({
             flights: extractedFlights,
-            raw_response: text
+            raw_response: text,
+            file_type: isPDF ? 'pdf' : 'image'
         })
     } catch (error) {
         console.error('Error processing boarding pass:', error)

@@ -230,8 +230,7 @@ const getCacheKey = (userId: string) => `flight_stats_${userId}_${CACHE_VERSION}
 
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies })
 
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 

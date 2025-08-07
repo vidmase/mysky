@@ -8,8 +8,7 @@ export async function PATCH(
 ) {
   try {
     const { notes } = await request.json()
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+      const supabase = createRouteHandlerClient({ cookies })
 
     // Check if user is authenticated
     const { data: { session }, error: authError } = await supabase.auth.getSession()

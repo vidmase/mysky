@@ -27,6 +27,14 @@ FlightTrack is a modern, feature-rich flight tracking application that helps you
 - Interactive cards with hover effects
 - Real-time updates
 
+### 🔍 Boarding Pass Scanner
+- AI-powered OCR with Google Gemini
+- Support for both image files (JPG, PNG) and PDF documents
+- Automatic extraction of flight details
+- **Enhanced pricing logic**: Shows individual outbound/return prices when available
+- Smart data validation and parsing
+- Seamless integration with flight database
+
 ### 🔄 Smart Sync
 - Automatic data synchronization
 - Offline support

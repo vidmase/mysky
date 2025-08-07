@@ -485,17 +485,17 @@ export default function FlightsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col space-y-6">
+    <div className="container mx-auto px-4 py-4 sm:py-8">
+      <div className="flex flex-col space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center">
-              <Plane className="h-6 w-6 mr-2 text-flight" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center">
+              <Plane className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-flight" />
               Flight History
             </h1>
-            <p className="text-muted-foreground">Browse and search your past flights</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Browse and search your past flights</p>
           </div>
-          <Button asChild className="bg-flight hover:bg-flight/90">
+          <Button asChild className="bg-flight hover:bg-flight/90 h-10 sm:h-9">
             <Link href="/add-flight" className="flex items-center">
               <Plus className="mr-2 h-4 w-4" />
               Add New Flight
@@ -505,15 +505,15 @@ export default function FlightsPage() {
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search flights..."
-              className="pl-8"
+              className="pl-8 h-10 sm:h-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="sm:w-auto w-full">
+          <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="sm:w-auto w-full h-10 sm:h-9">
             <Filter className="mr-2 h-4 w-4" />
             Filters
             <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${showFilters ? "rotate-180" : ""}`} />
@@ -524,7 +524,7 @@ export default function FlightsPage() {
           <CollapsibleContent className="animate-slide-up">
             <Card className="border-t-4 border-t-flight">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center">
                       <Calendar className="h-4 w-4 mr-1 text-flight" />
@@ -753,7 +753,174 @@ export default function FlightsPage() {
           </CollapsibleContent>
         </Collapsible>
 
-        <div className="rounded-md border shadow-sm overflow-hidden">
+        {/* Mobile Card Layout */}
+        <div className="lg:hidden space-y-4">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="flex flex-col items-center">
+                <Plane className="h-8 w-8 mb-2 animate-pulse text-flight" />
+                <p>Loading flights...</p>
+              </div>
+            </div>
+          ) : currentFlights.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="flex flex-col items-center">
+                <Plane className="h-8 w-8 mb-2 text-muted-foreground/50" />
+                <p>No flights found. Try adjusting your search or filters.</p>
+              </div>
+            </div>
+          ) : (
+            currentFlights.map((flight) => (
+              <Card key={flight.id} className="p-4 hover:shadow-md transition-shadow">
+                <div className="space-y-3">
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
+                        {flight.airline ? (
+                          <Image
+                            src={getAirlineLogo(flight.airline)}
+                            alt={`${flight.airline} logo`}
+                            width={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                            height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
+                            className={`object-contain p-0.5 ${flight.airline.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
+                            }}
+                          />
+                        ) : (
+                          <Building className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">{flight.airline}</div>
+                        <Badge
+                          variant="outline"
+                          className="bg-flight/10 text-flight border-flight/20 text-xs"
+                        >
+                          {flight.flight_number}
+                        </Badge>
+                      </div>
+                    </div>
+                    {isUpcoming(flight.departure_date) && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/30 transition-colors text-xs"
+                      >
+                        ✈️ Upcoming
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Route */}
+                  <div className="flex items-center justify-between py-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1 text-sm font-medium">
+                        <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20 text-xs">
+                          {flight.departure_iata || flight.departure_airport.split(' ')[0]}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground truncate max-w-[60px]">
+                          {flight.departure_airport.length > 15 ? flight.departure_airport.substring(0, 15) + '...' : flight.departure_airport}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {formatTimeToHHMM(flight.departure_time)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-center px-4">
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {calculateDuration(flight.departure_time, flight.arrival_time)}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 text-right">
+                      <div className="flex items-center justify-end gap-1 text-sm font-medium">
+                        <span className="text-xs text-muted-foreground truncate max-w-[60px]">
+                          {flight.arrival_airport.length > 15 ? flight.arrival_airport.substring(0, 15) + '...' : flight.arrival_airport}
+                        </span>
+                        <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20 text-xs">
+                          {flight.arrival_iata || flight.arrival_airport.split(' ')[0]}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {formatTimeToHHMM(flight.arrival_time)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flight Details */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div>
+                      <div className="font-medium">
+                        {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">{flight.passenger_name}</div>
+                      {flight.seat && (
+                        <div className="text-xs text-muted-foreground">Seat {flight.seat}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Row */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <div className="flex flex-col">
+                      <Badge variant="outline" className="w-fit bg-muted/30 text-foreground text-xs">
+                        {flight.reservation_number}
+                      </Badge>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {flight.total_receipt}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEdit(flight)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full p-2"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setFlightToDelete(flight)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-flight border-flight/20 hover:bg-flight/10"
+                        onClick={() => router.push(`/flights/${flight.id}`)}
+                      >
+                        View <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden lg:block rounded-md border shadow-sm overflow-hidden">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
@@ -761,17 +928,17 @@ export default function FlightsPage() {
                 <TableHead className="w-[140px]">Passenger</TableHead>
                 <TableHead>Reservation</TableHead>
                 <TableHead>Flight Details</TableHead>
-                <TableHead className="hidden md:table-cell">Departure</TableHead>
-                <TableHead className="hidden md:table-cell">Arrival</TableHead>
-                <TableHead className="hidden md:table-cell w-[80px]">Duration</TableHead>
-                <TableHead className="hidden lg:table-cell">Purchase Info</TableHead>
+                <TableHead>Departure</TableHead>
+                <TableHead>Arrival</TableHead>
+                <TableHead className="w-[80px]">Duration</TableHead>
+                <TableHead>Purchase Info</TableHead>
                 <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <div className="flex flex-col items-center">
                       <Plane className="h-8 w-8 mb-2 animate-pulse text-flight" />
                       <p>Loading flights...</p>
@@ -780,7 +947,7 @@ export default function FlightsPage() {
                 </TableRow>
               ) : currentFlights.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     <div className="flex flex-col items-center">
                       <Plane className="h-8 w-8 mb-2 text-muted-foreground/50" />
                       <p>No flights found. Try adjusting your search or filters.</p>
@@ -809,7 +976,7 @@ export default function FlightsPage() {
                             </Badge>
                           )}
                         </div>
-                        <span className="text-xs text-muted-foreground hidden sm:inline flex items-center">
+                        <span className="text-xs text-muted-foreground flex items-center">
                           <Calendar className="inline h-3 w-3 mr-1" />
                           {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
                         </span>
@@ -886,7 +1053,7 @@ export default function FlightsPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
@@ -900,7 +1067,7 @@ export default function FlightsPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium flex items-center">
                           <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
@@ -917,7 +1084,7 @@ export default function FlightsPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell w-[80px]">
+                    <TableCell className="w-[80px]">
                       <div className="flex items-center">
                         <Clock className="mr-1 h-3 w-3 text-muted-foreground shrink-0" />
                         <span className="text-sm whitespace-nowrap">
@@ -925,7 +1092,7 @@ export default function FlightsPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">
+                    <TableCell>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -993,132 +1160,159 @@ export default function FlightsPage() {
 
         {/* Pagination Controls */}
         {!loading && sortedFlights.length > 0 && (
-          <div className="flex items-center justify-between px-2">
-            <div className="flex-1 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-4 px-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground text-center sm:text-left">
               Showing {startIndex + 1} to {Math.min(endIndex, sortedFlights.length)} of {sortedFlights.length} flights
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => goToPage(1)}
-                disabled={!canGoPrevious}
-              >
-                <span className="sr-only">Go to first page</span>
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={!canGoPrevious}
-              >
-                <span className="sr-only">Go to previous page</span>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-2">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => {
-                    // Show current page, first and last pages, and pages around current
-                    const nearCurrent = Math.abs(page - currentPage) <= 1
-                    const isFirstPage = page === 1
-                    const isLastPage = page === totalPages
-                    return nearCurrent || isFirstPage || isLastPage
-                  })
-                  .map((page, index, array) => (
-                    <Fragment key={page}>
-                      {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="text-muted-foreground">...</span>
-                      )}
-                      <Button
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="icon"
-                        className={`h-8 w-8 ${currentPage === page ? 'bg-flight hover:bg-flight/90' : ''}`}
-                        onClick={() => goToPage(page)}
-                      >
-                        <span className="sr-only">Go to page {page}</span>
-                        {page}
-                      </Button>
-                    </Fragment>
-                  ))}
+            <div className="flex items-center justify-center space-x-2">
+              {/* Mobile-optimized pagination */}
+              <div className="flex items-center space-x-1 sm:hidden">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={!canGoPrevious}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-3 py-1 text-sm font-medium">
+                  {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={!canGoNext}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={!canGoNext}
-              >
-                <span className="sr-only">Go to next page</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => goToPage(totalPages)}
-                disabled={!canGoNext}
-              >
-                <span className="sr-only">Go to last page</span>
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
+              
+              {/* Desktop pagination */}
+              <div className="hidden sm:flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => goToPage(1)}
+                  disabled={!canGoPrevious}
+                >
+                  <span className="sr-only">Go to first page</span>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={!canGoPrevious}
+                >
+                  <span className="sr-only">Go to previous page</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show current page, first and last pages, and pages around current
+                      const nearCurrent = Math.abs(page - currentPage) <= 1
+                      const isFirstPage = page === 1
+                      const isLastPage = page === totalPages
+                      return nearCurrent || isFirstPage || isLastPage
+                    })
+                    .map((page, index, array) => (
+                      <Fragment key={page}>
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="icon"
+                          className={`h-8 w-8 ${currentPage === page ? 'bg-flight hover:bg-flight/90' : ''}`}
+                          onClick={() => goToPage(page)}
+                        >
+                          <span className="sr-only">Go to page {page}</span>
+                          {page}
+                        </Button>
+                      </Fragment>
+                    ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={!canGoNext}
+                >
+                  <span className="sr-only">Go to next page</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => goToPage(totalPages)}
+                  disabled={!canGoNext}
+                >
+                  <span className="sr-only">Go to last page</span>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!flightToDelete} onOpenChange={() => setFlightToDelete(null)}>
-          <AlertDialogContent className="sm:max-w-[425px]">
+          <AlertDialogContent className="mx-4 sm:mx-0 sm:max-w-[425px]">
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-destructive">
                 <Trash2 className="h-5 w-5" />
                 Delete Flight
               </AlertDialogTitle>
-              <AlertDialogDescription className="pt-4">
+              <AlertDialogDescription>
                 Are you sure you want to delete this flight? This action cannot be undone.
-                <div className="mt-4 space-y-4">
-                  {/* Flight Details */}
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Plane className="h-4 w-4 text-flight" />
-                      <span className="font-medium">{flightToDelete?.airline} {flightToDelete?.flight_number}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
-                        {flightToDelete?.departure_airport}
-                        {flightToDelete?.departure_iata && ` (${flightToDelete.departure_iata})`}
-                      </Badge>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
-                        {flightToDelete?.arrival_airport}
-                        {flightToDelete?.arrival_iata && ` (${flightToDelete.arrival_iata})`}
-                        {flightToDelete?.arrival_country && ` (${flightToDelete.arrival_country})`}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {flightToDelete?.departure_date ? format(new Date(flightToDelete.departure_date), "MMMM d, yyyy", { locale: enUS }) : 'No date'}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      {flightToDelete?.departure_time} - {flightToDelete?.arrival_time}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      {flightToDelete?.passenger_name}
-                      {flightToDelete?.seat && ` (Seat ${flightToDelete.seat})`}
-                    </div>
+              </AlertDialogDescription>
+              
+              <div className="mt-4 space-y-4">
+                {/* Flight Details */}
+                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Plane className="h-4 w-4 text-flight" />
+                    <span className="font-medium">{flightToDelete?.airline} {flightToDelete?.flight_number}</span>
                   </div>
-
-                  {/* Warning Message */}
-                  <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
-                    <div className="font-medium">Warning:</div>
-                    <div>This will permanently delete this flight from your history. This action cannot be undone.</div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
+                      {flightToDelete?.departure_airport}
+                      {flightToDelete?.departure_iata && ` (${flightToDelete.departure_iata})`}
+                    </Badge>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
+                      {flightToDelete?.arrival_airport}
+                      {flightToDelete?.arrival_iata && ` (${flightToDelete.arrival_iata})`}
+                      {flightToDelete?.arrival_country && ` (${flightToDelete.arrival_country})`}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {flightToDelete?.departure_date ? format(new Date(flightToDelete.departure_date), "MMMM d, yyyy", { locale: enUS }) : 'No date'}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    {flightToDelete?.departure_time} - {flightToDelete?.arrival_time}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    {flightToDelete?.passenger_name}
+                    {flightToDelete?.seat && ` (Seat ${flightToDelete.seat})`}
                   </div>
                 </div>
-              </AlertDialogDescription>
+
+                {/* Warning Message */}
+                <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                  <div className="font-medium">Warning:</div>
+                  <div>This will permanently delete this flight from your history. This action cannot be undone.</div>
+                </div>
+              </div>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 sm:gap-0">
               <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>

@@ -24,8 +24,7 @@ const flightSchema = z.object({
 
 export async function GET() {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get the current user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()

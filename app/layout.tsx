@@ -39,12 +39,20 @@ export default function RootLayout({
         <Heartbeat>
         <AuthProvider>
           <NotificationProvider>
-            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
-              <div className="flex min-h-screen flex-col">
-                <MainNav />
-                <div className="flex-1">{children}</div>
-              </div>
-            </ThemeProvider>
+            <div suppressHydrationWarning>
+              <ThemeProvider 
+                attribute="class" 
+                defaultTheme="dark" 
+                enableSystem={false} 
+                forcedTheme="dark"
+                disableTransitionOnChange
+              >
+                <div className="flex min-h-screen flex-col">
+                  <MainNav />
+                  <div className="flex-1">{children}</div>
+                </div>
+              </ThemeProvider>
+            </div>
           </NotificationProvider>
         </AuthProvider>
         </Heartbeat>

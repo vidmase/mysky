@@ -40,6 +40,8 @@ interface BoardingPassData {
     return_arrival_time?: string
     purchased_date?: string
     purchase_time?: string
+    booking_type?: 'OUTBOUND' | 'RETURN'
+    is_return_flight?: boolean
     passengers?: Array<{
         name: string
         type?: string
@@ -77,31 +79,40 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         }
     }
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
         if (!selectedFile) return
 
-        // Check file type
-        if (!selectedFile.type.startsWith('image/')) {
-            setError('Please upload an image file')
+        // Check file type - now accepting both images and PDFs
+        const isImage = selectedFile.type.startsWith('image/')
+        const isPDF = selectedFile.type === 'application/pdf'
+        
+        if (!isImage && !isPDF) {
+            setError('Please upload an image file (JPG, PNG) or PDF file')
             return
         }
 
-        // Check file size (max 5MB)
-        if (selectedFile.size > 5 * 1024 * 1024) {
-            setError('File size should be less than 5MB')
+        // Check file size (max 10MB for PDFs, 5MB for images)
+        const maxSize = isPDF ? 10 * 1024 * 1024 : 5 * 1024 * 1024
+        if (selectedFile.size > maxSize) {
+            setError(`File size should be less than ${isPDF ? '10MB' : '5MB'}`)
             return
         }
 
         setFile(selectedFile)
         setError(null)
 
-        // Create preview URL
-        const reader = new FileReader()
-        reader.onloadend = () => {
-            setPreview(reader.result as string)
+        // Create preview URL based on file type
+        if (isImage) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setPreview(reader.result as string)
+            }
+            reader.readAsDataURL(selectedFile)
+        } else if (isPDF) {
+            // For PDFs, show a placeholder since Gemini can process them directly
+            setPreview('pdf-placeholder')
         }
-        reader.readAsDataURL(selectedFile)
     }
 
     const processImage = async () => {
@@ -112,6 +123,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         setError(null)
         setRawResponse(null)
         setParsedData([])
+
+        const isPDF = file.type === 'application/pdf'
 
         try {
             const progressInterval = setInterval(() => {
@@ -127,7 +140,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             })
 
             if (!response.ok) {
-                throw new Error('Failed to process boarding pass')
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to process boarding pass')
             }
 
             const rawData = await response.json()
@@ -144,7 +158,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             clearInterval(progressInterval)
             setProgress(100)
 
-            toast.success('Boarding pass scanned successfully!', {
+            const fileTypeText = isPDF ? 'PDF' : 'image'
+            toast.success(`Boarding pass ${fileTypeText} scanned successfully!`, {
                 description: 'Review the extracted details and click Save to add to your flights.',
             })
 
@@ -483,8 +498,11 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                     )}
                                     {flight.total_receipt && (
                                         <div>
-                                            <p className="text-muted-foreground text-sm">Total Cost</p>
-                                            <p className="font-medium">{flight.total_receipt}</p>
+                                            <p className="text-muted-foreground text-sm">
+                                                {flight.booking_type === 'OUTBOUND' ? 'Outbound Price' : 
+                                                 flight.booking_type === 'RETURN' ? 'Return Price' : 'Flight Cost'}
+                                            </p>
+                                            <p className="font-medium text-green-600">{flight.total_receipt}</p>
                                         </div>
                                     )}
                                 </div>
@@ -517,7 +535,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     onChange={handleFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     disabled={loading}
@@ -525,12 +543,25 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
 
                 {preview ? (
                     <div className="relative w-full h-full min-h-[250px]">
-                        <Image
-                            src={preview}
-                            alt="Boarding pass preview"
-                            fill
-                            className="object-contain rounded-lg"
-                        />
+                        {preview === 'pdf-placeholder' ? (
+                            <div className="flex flex-col items-center justify-center h-full space-y-4 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                                <FileText className="h-16 w-16 text-muted-foreground" />
+                                <div className="text-center">
+                                    <p className="text-lg font-medium">PDF File Selected</p>
+                                    <p className="text-sm text-muted-foreground">{file?.name}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Click "Scan Boarding Pass" to process
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <Image
+                                src={preview}
+                                alt="Boarding pass preview"
+                                fill
+                                className="object-contain rounded-lg"
+                            />
+                        )}
                         <button
                             onClick={resetState}
                             className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background"
@@ -540,13 +571,18 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                     </div>
                 ) : (
                     <div className="text-center space-y-4">
-                        <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
-                            <CameraIcon className="h-10 w-10 text-muted-foreground" />
+                        <div className="flex justify-center gap-4">
+                            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center">
+                                <CameraIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center">
+                                <FileText className="h-8 w-8 text-muted-foreground" />
+                            </div>
                         </div>
                         <div>
                             <p className="text-lg font-medium">Scan Boarding Pass</p>
                             <p className="text-sm text-muted-foreground">
-                                Drag and drop or click to upload
+                                Drag and drop or click to upload an image (JPG, PNG) or PDF file
                             </p>
                         </div>
                     </div>
@@ -566,7 +602,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 <div className="space-y-2">
                     <Progress value={progress} />
                     <p className="text-sm text-muted-foreground text-center">
-                        Processing boarding pass...
+                        Processing boarding pass {file?.type === 'application/pdf' ? 'PDF' : 'image'}...
                     </p>
                 </div>
             )}

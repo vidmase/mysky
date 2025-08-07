@@ -14,9 +14,22 @@ import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
 import "/node_modules/flag-icons/css/flag-icons.min.css"
 import mapboxgl from "mapbox-gl"
-import { Pause, Play, RotateCcw } from "lucide-react"
+import { Pause, Play, RotateCcw, RefreshCcw } from "lucide-react"
 import { Plane } from "lucide-react"
 import { ArrowRight } from "lucide-react"
+import { ChartContainer } from "@/components/ui/chart"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart as ReBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as ReTooltip,
+  ResponsiveContainer,
+  Legend as ReLegend,
+} from "recharts"
 
 // Types
 interface Airport {
@@ -38,8 +51,24 @@ interface Route {
 }
 
 interface Flight {
+  id: number
+  passenger_name: string
+  reservation_number: string
+  flight_number: string
   departure_airport: string
   arrival_airport: string
+  departure_date: string
+  departure_time: string
+  arrival_time: string
+  total_receipt: string
+  purchased_date: string
+  purchase_time: string
+  airline: string | null
+  arrival_country: string | null
+  arrival_iata: string | null
+  departure_iata: string | null
+  seat: string | null
+  notes: string | null
 }
 
 // Airport data with coordinates
@@ -80,7 +109,8 @@ const airportData: Record<string, { name: string; city: string; country: string;
   "ASW": { lat: 23.9644, lng: 32.8198, name: "Aswan International Airport", city: "Aswan", country: "Egypt" },
   "AUE": { lat: 31.0167, lng: 31.1833, name: "Abu Simbel Airport", city: "Abu Simbel", country: "Egypt" },
   "MUH": { lat: 31.3256, lng: 27.2217, name: "Mersa Matruh International Airport", city: "Mersa Matruh", country: "Egypt" },
-  "ALY": { lat: 31.1839, lng: 29.9489, name: "Alexandria International Airport", city: "Alexandria", country: "Egypt" }
+  "ALY": { lat: 31.1839, lng: 29.9489, name: "Alexandria International Airport", city: "Alexandria", country: "Egypt" },
+  "CFU": { lat: 39.6019, lng: 19.9117, name: "Corfu International Airport", city: "Corfu", country: "Greece" }
 }
 
 // Add this helper function near the top of the file, after the types
@@ -102,7 +132,8 @@ const getCountryCode = (country: string): string => {
     "Ireland": "ie",
     "Switzerland": "ch",
     "Cyprus": "cy",
-    "Egypt": "eg"
+    "Egypt": "eg",
+    "Greece": "gr"
   };
 
   const code = countryMap[normalizedCountry];
@@ -221,10 +252,39 @@ const calculateStatistics = (airports: Airport[]): {
   mostFlownRoute: Route;
   countriesVisited: number;
 } => {
-  const totalVisits = airports.reduce((sum, airport) => sum + airport.visits, 0);
-  const totalRoutes = airports.reduce((sum, airport) => sum + airport.routes.length / 2, 0);
-  const totalFlights = airports.reduce((sum, airport) =>
-    sum + airport.routes.reduce((routeSum, route) => routeSum + route.count, 0), 0) / 2;
+  console.log('calculateStatistics called with airports:', airports.length);
+  
+  try {
+    // Early return for empty airports
+    if (airports.length === 0) {
+      console.log('calculateStatistics: No airports, returning empty stats');
+      return {
+        totalVisits: 0,
+        totalRoutes: 0,
+        totalFlights: 0,
+        totalDistance: 0,
+        totalFlightHours: 0,
+        longestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+        shortestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+        mostVisitedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+        mostConnectedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+        mostFlownRoute: { id: '', from: '', to: '', count: 0 },
+        countriesVisited: 0
+      };
+    }
+
+      console.log('calculateStatistics: Starting calculations with', airports.length, 'airports');
+    console.log('Sample airport:', airports[0]);
+    
+    const totalVisits = airports.reduce((sum, airport) => sum + airport.visits, 0);
+    console.log('Total visits calculated:', totalVisits);
+    
+    const totalRoutes = airports.reduce((sum, airport) => sum + airport.routes.length / 2, 0);
+    console.log('Total routes calculated:', totalRoutes);
+    
+    const totalFlights = airports.reduce((sum, airport) =>
+      sum + airport.routes.reduce((routeSum, route) => routeSum + route.count, 0), 0) / 2;
+    console.log('Total flights calculated:', totalFlights);
 
   // Calculate longest and shortest routes
   let longestRoute = {
@@ -346,19 +406,40 @@ const calculateStatistics = (airports: Airport[]): {
     });
   });
 
-  return {
-    totalVisits,
-    totalRoutes,
-    totalFlights,
-    totalDistance,
-    totalFlightHours,
-    longestRoute,
-    shortestRoute,
-    mostVisitedAirport,
-    mostConnectedAirport,
-    mostFlownRoute,
-    countriesVisited
-  };
+    const result = {
+      totalVisits,
+      totalRoutes,
+      totalFlights,
+      totalDistance,
+      totalFlightHours,
+      longestRoute,
+      shortestRoute,
+      mostVisitedAirport,
+      mostConnectedAirport,
+      mostFlownRoute,
+      countriesVisited
+    };
+    
+    console.log('calculateStatistics result:', result);
+    console.log('Total visits:', totalVisits, 'Total routes:', totalRoutes, 'Countries visited:', countriesVisited);
+    return result;
+  } catch (error) {
+    console.error('Error in calculateStatistics:', error);
+    // Return default values on error
+    return {
+      totalVisits: 0,
+      totalRoutes: 0,
+      totalFlights: 0,
+      totalDistance: 0,
+      totalFlightHours: 0,
+      longestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+      shortestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+      mostVisitedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+      mostConnectedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+      mostFlownRoute: { id: '', from: '', to: '', count: 0 },
+      countriesVisited: 0
+    };
+  }
 };
 
 // Add available Mapbox styles
@@ -425,20 +506,95 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("map")
   const [flights, setFlights] = useState<any[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [realtimeStatus, setRealtimeStatus] = useState<string>('disconnected')
+  const [forceUpdateKey, setForceUpdateKey] = useState<number>(0)
 
   // Refs for map elements
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
 
+  // Create a dependency key that changes when airports really change
+  const airportsKey = useMemo(() => {
+    return `${airports.length}-${airports.map(a => `${a.code}:${a.visits}`).join(',').slice(0, 100)}`;
+  }, [airports]);
+
+  // Memoized statistics calculation
+  const stats = useMemo(() => {
+    console.log('Recalculating stats, airports length:', airports.length);
+    console.log('Airports data:', airports.slice(0, 5)); // Show first 5 airports
+    const calculatedStats = calculateStatistics(airports);
+    console.log('Calculated stats result:', calculatedStats);
+    return calculatedStats;
+  }, [airports, airportsKey, forceUpdateKey]);
+
+  // Memoized chart data
+  const chartData = useMemo(() => {
+    console.log('Recalculating chart data, flights length:', flights.length);
+    
+    const countryData = airports.reduce<{ country: string; visits: number }[]>((acc, airport) => {
+      const found = acc.find((a) => a.country === airport.country);
+      if (found) found.visits += airport.visits;
+      else acc.push({ country: airport.country, visits: airport.visits });
+      return acc;
+    }, []);
+
+    const flightsByYear = flights.reduce<{ year: string; count: number }[]>((acc, flight) => {
+      const date = flight.departure_date ? new Date(flight.departure_date) : null;
+      if (!date) return acc;
+      const year = date.getFullYear().toString();
+      const found = acc.find((a) => a.year === year);
+      if (found) found.count++;
+      else acc.push({ year, count: 1 });
+      return acc;
+    }, []).sort((a, b) => a.year.localeCompare(b.year));
+
+    const airlineData = flights.reduce<{ airline: string; count: number }[]>((acc, flight) => {
+      const airline = flight.airline || "Unknown";
+      const found = acc.find((a) => a.airline === airline);
+      if (found) found.count++;
+      else acc.push({ airline, count: 1 });
+      return acc;
+    }, []);
+
+    // Enhanced: sort, group, label, accessible colors
+    // 1. Sort countries by visits descending
+    let sortedCountryData = [...countryData].sort((a, b) => b.visits - a.visits);
+    // 2. Group countries with <3 flights into 'Other'
+    const grouped = sortedCountryData.filter(c => c.visits < 3);
+    let displayCountryData = sortedCountryData.filter(c => c.visits >= 3);
+    if (grouped.length > 0) {
+      const otherTotal = grouped.reduce((sum, c) => sum + c.visits, 0);
+      displayCountryData.push({ country: 'Other', visits: otherTotal });
+    }
+
+    return {
+      countryData: displayCountryData,
+      flightsByYear,
+      airlineData,
+      grouped,
+      totalFlights: displayCountryData.reduce((sum, c) => sum + c.visits, 0)
+    };
+  }, [airports, flights, forceUpdateKey]);
+
   // Process flight data
   const processFlightData = useCallback((flights: Flight[]) => {
+    console.log('processFlightData called with flights:', flights.length);
     const airportMap = new Map<string, Airport>();
     const routeMap = new Map<string, number>();
     const visitedCountries = new Set<string>();
 
-    // Helper function to extract IATA code from airport string
-    const extractIATACode = (airportString: string) => {
+    // Helper function to extract IATA code from airport string or use database IATA
+    const extractIATACode = (airportString: string, flight: Flight, isArrival: boolean = false) => {
+      // First, try to use the IATA codes from the database
+      const iataCode = isArrival ? flight.arrival_iata : flight.departure_iata;
+      if (iataCode && iataCode.length === 3) {
+        return iataCode;
+      }
+      
+      // Fallback: extract from airport string
       const match = airportString.match(/\(([A-Z]{3})\)/);
       if (match) return match[1];
 
@@ -454,59 +610,71 @@ export default function MapPage() {
     };
 
     // Helper function to get normalized route key
-    const getRouteKey = (from: string, to: string) => {
-      const fromCode = extractIATACode(from);
-      const toCode = extractIATACode(to);
+    const getRouteKey = (flight: Flight) => {
+      const fromCode = extractIATACode(flight.departure_airport, flight, false);
+      const toCode = extractIATACode(flight.arrival_airport, flight, true);
       // Sort codes to ensure consistent key regardless of direction
       return [fromCode, toCode].sort().join('-');
     };
 
     // First pass: Create airports and count visits
     flights.forEach((flight) => {
-      const depCode = extractIATACode(flight.departure_airport);
-      const arrCode = extractIATACode(flight.arrival_airport);
+      const depCode = extractIATACode(flight.departure_airport, flight, false);
+      const arrCode = extractIATACode(flight.arrival_airport, flight, true);
 
-      // Process departure airport
-      if (depCode in airportData) {
+      // Process departure airport - include all airports, not just those in hardcoded data
+      if (depCode && depCode.length === 3) {
         if (!airportMap.has(depCode)) {
+          const airportInfo = airportData[depCode];
           airportMap.set(depCode, {
             code: depCode,
-            name: airportData[depCode].name,
-            city: airportData[depCode].city,
-            country: airportData[depCode].country,
-            lat: airportData[depCode].lat,
-            lng: airportData[depCode].lng,
+            name: airportInfo?.name || flight.departure_airport || `Airport ${depCode}`,
+            city: airportInfo?.city || 'Unknown City',
+            country: airportInfo?.country || 'Unknown Country',
+            lat: airportInfo?.lat || 0,
+            lng: airportInfo?.lng || 0,
             visits: 1,
             routes: []
           });
+          
+          // Log when we encounter an airport not in our hardcoded data
+          if (!airportInfo) {
+            console.warn(`Airport ${depCode} not found in hardcoded data, using fallback data`);
+          }
         } else {
           const airport = airportMap.get(depCode)!;
           airport.visits++;
         }
       }
 
-      // Process arrival airport
-      if (arrCode in airportData) {
+      // Process arrival airport - include all airports, not just those in hardcoded data
+      if (arrCode && arrCode.length === 3) {
         if (!airportMap.has(arrCode)) {
+          const airportInfo = airportData[arrCode];
           airportMap.set(arrCode, {
             code: arrCode,
-            name: airportData[arrCode].name,
-            city: airportData[arrCode].city,
-            country: airportData[arrCode].country,
-            lat: airportData[arrCode].lat,
-            lng: airportData[arrCode].lng,
+            name: airportInfo?.name || flight.arrival_airport || `Airport ${arrCode}`,
+            city: airportInfo?.city || 'Unknown City',
+            country: airportInfo?.country || 'Unknown Country',
+            lat: airportInfo?.lat || 0,
+            lng: airportInfo?.lng || 0,
             visits: 1,
             routes: []
           });
+          
+          // Log when we encounter an airport not in our hardcoded data
+          if (!airportInfo) {
+            console.warn(`Airport ${arrCode} not found in hardcoded data, using fallback data`);
+          }
         } else {
           const airport = airportMap.get(arrCode)!;
           airport.visits++;
         }
       }
 
-      // Process route
-      if (depCode in airportData && arrCode in airportData) {
-        const routeKey = getRouteKey(depCode, arrCode);
+      // Process route - include all valid IATA codes
+      if (depCode && arrCode && depCode.length === 3 && arrCode.length === 3) {
+        const routeKey = getRouteKey(flight);
         routeMap.set(routeKey, (routeMap.get(routeKey) || 0) + 1);
       }
     });
@@ -534,6 +702,9 @@ export default function MapPage() {
         .filter(route => route.from === airport.code)
         .sort((a, b) => b.count - a.count);
     });
+
+    console.log('processFlightData result - airports:', airportArray.length, 'routes:', routeArray.length);
+    console.log('Sample airports:', airportArray.slice(0, 3));
 
     return { airports: airportArray, routes: routeArray };
   }, []);
@@ -581,12 +752,14 @@ export default function MapPage() {
       ? routes.filter((route) => route.from === filterAirport || route.to === filterAirport)
       : routes;
 
-    // Create GeoJSON features for all paths
+    // Create GeoJSON features for all paths with valid coordinates
     const features = routesToDraw.flatMap((route) => {
       const fromAirport = airports.find((a) => a.code === route.from);
       const toAirport = airports.find((a) => a.code === route.to);
 
-      if (fromAirport && toAirport) {
+      if (fromAirport && toAirport && 
+          fromAirport.lat !== 0 && fromAirport.lng !== 0 && 
+          toAirport.lat !== 0 && toAirport.lng !== 0) {
         const path = createFlightPath(fromAirport, toAirport, route, map, !!filterAirport);
         return path ? [path] : [];
       }
@@ -603,46 +776,123 @@ export default function MapPage() {
     }
   }, 100), [routes, airports, createFlightPath]);
 
+  // Extract fetchUserFlights so it can be used by both useEffect and manual refresh
+  const fetchUserFlights = useCallback(async (skipLoading = false) => {
+    if (!skipLoading) {
+      setIsRefreshing(true);
+    }
+    console.log('Fetching user flights...');
+    
+    try {
+      const sessionRes = await supabase.auth.getSession();
+      const session = sessionRes.data?.session;
+      if (!session?.user) {
+        console.log('No session found');
+        setFlights([]);
+        setAirports([]);
+        setRoutes([]);
+        return;
+      }
+      
+      console.log('Current user ID:', session.user.id);
+      console.log('Session email:', session.user.email);
+      
+      // Add cache-busting parameter to ensure fresh data
+      const result = await supabase
+        .from('vidmaflights')
+        .select('*')
+        .eq('owner_id', session.user.id)
+        .order('departure_date', { ascending: true });
+        
+      if (result.error) {
+        console.error('Error fetching flights:', result.error);
+        setFlights([]);
+        setAirports([]);
+        setRoutes([]);
+        return;
+      }
+      
+      console.log('Fetched flights count:', result.data?.length);
+      console.log('Flight IDs:', result.data?.map(f => f.id));
+      
+      setFlights(result.data || []);
+      // Also update airports/routes for the map
+      const { airports: processedAirports, routes: processedRoutes } = processFlightData(result.data || []);
+      console.log('Processed airports:', processedAirports.length, 'routes:', processedRoutes.length);
+      
+      // Force state updates by creating new arrays
+      setAirports([...processedAirports]);
+      setRoutes([...processedRoutes]);
+      setLastUpdate(new Date());
+      setForceUpdateKey(prev => prev + 1); // Force re-render
+      setLoading(false);
+    } catch (error) {
+      console.error('Error in fetchUserFlights:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [supabase, processFlightData]);
+
   // Fetch flight data
   useEffect(() => {
-    const fetchFlights = async () => {
+    let channel: any = null;
+    let isSubscribed = true;
+    
+    const setupRealtimeSubscription = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-        if (sessionError) {
-          throw sessionError
-        }
-
-        if (!session?.user) {
-          router.push("/login")
-          return
-        }
-
-        const { data: flights, error: flightsError } = await supabase
-          .from("vidmaflights")
-          .select("departure_airport, arrival_airport")
-          .eq("owner_id", session.user.id)
-
-        if (flightsError) {
-          throw flightsError
-        }
-
-        const { airports: processedAirports, routes: processedRoutes } = processFlightData(flights)
-        setAirports(processedAirports)
-        setRoutes(processedRoutes)
-        setLoading(false)
+        // Initial fetch
+        await fetchUserFlights(true);
+        
+        // Get session for realtime subscription
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user || !isSubscribed) return;
+        
+        console.log('Setting up realtime subscription for user:', session.user.id);
+        
+        // Subscribe to realtime changes
+        channel = supabase.channel(`realtime-flights-${session.user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'vidmaflights',
+              filter: `owner_id=eq.${session.user.id}`
+            },
+            (payload) => {
+              console.log('Real-time database change detected:', {
+                eventType: payload.eventType,
+                table: payload.table,
+                schema: payload.schema,
+                new: payload.new,
+                old: payload.old
+              });
+              
+              // Refetch data on any change
+              if (isSubscribed) {
+                fetchUserFlights(true);
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log('Realtime subscription status:', status);
+            setRealtimeStatus(status);
+          });
       } catch (error) {
-        console.error("Error:", error)
-        toast({
-          title: "Error fetching flights",
-          description: "Please try again later",
-          variant: "destructive",
-        })
+        console.error('Error setting up realtime subscription:', error);
       }
-    }
-
-    fetchFlights()
-  }, [supabase, router, toast, processFlightData])
+    };
+    
+    setupRealtimeSubscription();
+    
+    return () => {
+      isSubscribed = false;
+      if (channel) {
+        console.log('Unsubscribing from realtime channel');
+        channel.unsubscribe();
+      }
+    };
+  }, [fetchUserFlights, supabase]);
 
   // Update the updateFlightPaths function
   const updateFlightPaths = useCallback(() => {
@@ -695,6 +945,93 @@ export default function MapPage() {
       });
     } else {
       console.log('Flight paths source not found!'); // Debug log
+    }
+  }, [airports]);
+
+  // Function to update airport markers (move this up so it's defined before use)
+  const updateAirportMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !airports || airports.length === 0) return;
+
+    // Create GeoJSON features for airports with valid coordinates
+    const airportFeatures = airports
+      .filter(airport => airport.lat !== 0 && airport.lng !== 0) // Only include airports with valid coordinates
+      .map(airport => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [airport.lng, airport.lat]
+        },
+        properties: {
+          id: airport.code,
+          name: airport.name,
+          code: airport.code,
+          visits: airport.visits,
+          lat: airport.lat,
+          lng: airport.lng
+        }
+      }));
+
+    // Add or update the airports source
+    if (!map.getSource('airports')) {
+      map.addSource('airports', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: airportFeatures
+        }
+      });
+    } else {
+      (map.getSource('airports') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: airportFeatures
+      });
+    }
+
+    // Add the airports layer if it doesn't exist
+    if (!map.getLayer('airports-layer')) {
+      map.addLayer({
+        id: 'airports-layer',
+        type: 'circle',
+        source: 'airports',
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['get', 'visits'],
+            1, 6,    // minimum size for 1 visit
+            10, 8,  // medium size for 10 visits
+            50, 10   // maximum size for 50+ visits
+          ],
+          'circle-color': '#0ea5e9', // Light blue color
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff', // White border
+          'circle-opacity': 0.7
+        }
+      });
+
+      // Update the other instance of airport labels layer
+      if (!map.getLayer('airport-labels')) {
+        map.addLayer({
+          id: 'airport-labels',
+          type: 'symbol',
+          source: 'airports',
+          layout: {
+            'text-field': ['get', 'code'],  // Show only airport code
+            'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+            'text-size': 12,
+            'text-offset': [0, 1.5],
+            'text-anchor': 'top',
+            'visibility': 'none'  // Hide labels completely
+          },
+          paint: {
+            'text-color': '#1e293b',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2,
+            'text-opacity': 1
+          }
+        });
+      }
     }
   }, [airports]);
 
@@ -767,11 +1104,77 @@ export default function MapPage() {
         }
       });
 
-      // Update flight paths if we have data
+      // Register hover events for flight paths
+      const removePopups = () => {
+        const popups = document.getElementsByClassName('mapboxgl-popup');
+        while (popups[0]) popups[0].remove();
+      };
+      const handleFlightPathMouseEnter = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        if (!e.features || e.features.length === 0) return;
+        map.getCanvas().style.cursor = 'pointer';
+        removePopups();
+        const feature = e.features[0];
+        const { from, to, count } = feature.properties || {};
+        const fromAirport = airports.find(a => a.code === from);
+        const toAirport = airports.find(a => a.code === to);
+        if (fromAirport && toAirport) {
+          const distance = calculateDistance(fromAirport.lat, fromAirport.lng, toAirport.lat, toAirport.lng);
+          new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            className: 'flight-path-popup',
+            offset: 10
+          })
+            .setLngLat([(fromAirport.lng + toAirport.lng) / 2, (fromAirport.lat + toAirport.lat) / 2])
+            .setHTML(`
+              <div class="flight-tooltip">
+                <div class="flight-route">
+                  <span class="fi fi-${getCountryCode(fromAirport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+                  <span>${fromAirport.code}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline h-4 w-4 mx-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                  <span class="fi fi-${getCountryCode(toAirport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+                  <span>${toAirport.code}</span>
+                </div>
+                <div class="flight-count">Flights: <b>${count}</b></div>
+                <div class="flight-distance">Distance: <b>${distance} km</b></div>
+              </div>
+            `)
+            .addTo(map);
+        }
+      };
+      const handleFlightPathMouseLeave = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        map.getCanvas().style.cursor = '';
+        removePopups();
+      };
+      map.on('mouseenter', 'flight-paths-layer', handleFlightPathMouseEnter);
+      map.on('mouseleave', 'flight-paths-layer', handleFlightPathMouseLeave);
       if (airports && airports.length > 0) {
-        console.log('Airports data available, updating flight paths...'); // Debug log
         updateFlightPaths();
       }
+      // Register click event for airports-layer to show statistics popup
+      map.on('click', 'airports-layer', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties;
+        if (!props) return;
+        const airportCode = props.code;
+        const airport = airports.find(a => a.code === airportCode);
+        if (!airport) return;
+        new mapboxgl.Popup({ closeButton: true, className: 'airport-popup', offset: 12 })
+          .setLngLat([airport.lng, airport.lat])
+          .setHTML(`
+            <div class="airport-tooltip">
+              <div class="airport-name">${airport.name}</div>
+              <div class="airport-meta">
+                <span class="fi fi-${getCountryCode(airport.country)}" style="width:1.25rem;height:0.9375rem;"></span>
+                <span class="airport-code">${airport.code}</span>
+                <span class="airport-city">${airport.city}</span>
+                <span class="airport-country">${airport.country}</span>
+              </div>
+              <div class="airport-visits">Flights from this airport: <b>${airport.visits}</b></div>
+            </div>
+          `)
+          .addTo(map);
+      });
     });
 
     return () => {
@@ -798,109 +1201,6 @@ export default function MapPage() {
       });
     }
   }, [airports, updateFlightPaths]);
-
-  // Function to update airport markers
-  const updateAirportMarkers = useCallback(() => {
-    const map = mapRef.current;
-    if (!map || !airports || airports.length === 0) return;
-
-    // Create GeoJSON features for airports
-    const airportFeatures = airports.map(airport => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [airport.lng, airport.lat]
-      },
-      properties: {
-        id: airport.code,
-        name: airport.name,
-        code: airport.code,
-        visits: airport.visits,
-        lat: airport.lat,
-        lng: airport.lng
-      }
-    }));
-
-    // Add or update the airports source
-    if (!map.getSource('airports')) {
-      map.addSource('airports', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: airportFeatures
-        }
-      });
-    } else {
-      (map.getSource('airports') as mapboxgl.GeoJSONSource).setData({
-        type: 'FeatureCollection',
-        features: airportFeatures
-      });
-    }
-
-    // Add the airports layer if it doesn't exist
-    if (!map.getLayer('airports-layer')) {
-      map.addLayer({
-        id: 'airports-layer',
-        type: 'circle',
-        source: 'airports',
-        paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['get', 'visits'],
-            1, 6,    // minimum size for 1 visit
-            10, 8,  // medium size for 10 visits
-            50, 10   // maximum size for 50+ visits
-          ],
-          'circle-color': '#0ea5e9', // Light blue color
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff', // White border
-          'circle-opacity': 0.7
-        }
-      });
-
-      // Update the other instance of airport labels layer
-      if (!map.getLayer('airport-labels')) {
-        map.addLayer({
-          id: 'airport-labels',
-          type: 'symbol',
-          source: 'airports',
-          layout: {
-            'text-field': ['get', 'code'],  // Show only airport code
-            'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-            'text-size': 12,
-            'text-offset': [0, 1.5],
-            'text-anchor': 'top',
-            'visibility': 'none'  // Hide labels completely
-          },
-          paint: {
-            'text-color': '#1e293b',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2,
-            'text-opacity': 1
-          }
-        });
-      }
-    }
-  }, [airports]);
-
-  // Update markers when airports data changes
-  useEffect(() => {
-    if (!mapRef.current || !airports || airports.length === 0) return;
-
-    const map = mapRef.current;
-
-    if (map.isStyleLoaded()) {
-      console.log('Map style is loaded, updating airport markers immediately');
-      updateAirportMarkers();
-    } else {
-      console.log('Waiting for map style to load...');
-      map.once('load', () => {
-        console.log('Map style loaded, updating airport markers');
-        updateAirportMarkers();
-      });
-    }
-  }, [airports, updateAirportMarkers]);
 
   // Add hover interactions for flight paths
   useEffect(() => {
@@ -949,7 +1249,7 @@ export default function MapPage() {
     };
 
     // Mouse leave handler for flight paths
-    const handleFlightPathMouseLeave = () => {
+    const handleFlightPathMouseLeave = (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
       map.getCanvas().style.cursor = '';
       removePopups();
     };
@@ -1338,45 +1638,22 @@ export default function MapPage() {
     };
   }, [updateAirportMarkers, updateFlightPaths, addVisitedCountriesLayer]);
 
-  // Fetch only the current user's flights on mount
-  useEffect(() => {
-    const fetchUserFlights = async () => {
-      const sessionRes = await supabase.auth.getSession();
-      const session = sessionRes.data?.session;
-      if (!session?.user) {
-        setFlights([]);
-        return;
-      }
-      const result = await supabase
-        .from('vidmaflights')
-        .select('*')
-        .eq('owner_id', session.user.id)
-        .order('departure_date', { ascending: true });
-      if (result.error) {
-        setFlights([]);
-        return;
-      }
-      setFlights(result.data || []);
-    };
-    fetchUserFlights();
-  }, [supabase]);
-
   return (
-    <div className="container mx-auto p-4 space-y-4">
+    <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 space-y-3 sm:space-y-4">
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="map">Map View</TabsTrigger>
-          <TabsTrigger value="list">Airport List</TabsTrigger>
-          <TabsTrigger value="stats">Statistics</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-10 sm:h-9">
+          <TabsTrigger value="map" className="text-xs sm:text-sm">Map View</TabsTrigger>
+          <TabsTrigger value="list" className="text-xs sm:text-sm">Airport List</TabsTrigger>
+          <TabsTrigger value="stats" className="text-xs sm:text-sm">Statistics</TabsTrigger>
         </TabsList>
-        <TabsContent value="map" className="space-y-4">
-          <div className="relative w-full h-[calc(100vh-4rem)]">
-            <div ref={mapContainerRef} className="w-full h-full" />
+        <TabsContent value="map" className="space-y-3 sm:space-y-4">
+          <div className="relative w-full h-[calc(100vh-8rem)] sm:h-[calc(100vh-4rem)]">
+            <div ref={mapContainerRef} className="w-full h-full rounded-lg overflow-hidden" />
           </div>
         </TabsContent>
         <TabsContent value="list">
-          <div className="space-y-4">
-            <div className="grid gap-4">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="grid gap-3 sm:gap-4">
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="p-4 space-y-2">
@@ -1391,7 +1668,7 @@ export default function MapPage() {
                     <Card
                       key={airport.code}
                       className={cn(
-                        "group relative p-6 hover:bg-muted/50 transition-all duration-300 cursor-pointer border-l-4",
+                        "group relative p-4 sm:p-6 hover:bg-muted/50 transition-all duration-300 cursor-pointer border-l-4",
                         selectedAirport === airport.code
                           ? "bg-muted border-l-primary"
                           : "border-l-transparent hover:border-l-primary/50"
@@ -1399,33 +1676,33 @@ export default function MapPage() {
                       onClick={() => setSelectedAirport(selectedAirport === airport.code ? null : airport.code)}
                     >
                       <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className={`fi fi-${getCountryCode(airport.country)}`}
-                                style={{ width: "1.5rem", height: "1.125rem" }}
+                              <span className={`fi fi-${getCountryCode(airport.country)} flex-shrink-0`}
+                                style={{ width: "1.2rem", height: "0.9rem" }}
                                 title={airport.country} />
-                              <h3 className="font-semibold text-lg tracking-tight">
+                              <h3 className="font-semibold text-base sm:text-lg tracking-tight truncate">
                                 {airport.name}
                               </h3>
                             </div>
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground flex-wrap">
                               <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
                                 {airport.code}
                               </span>
                               {airport.country && (
-                                <span className="flex items-center gap-2">
+                                <span className="flex items-center gap-2 truncate">
                                   <span>•</span>
-                                  {airport.country}
+                                  <span className="truncate">{airport.country}</span>
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background/80"
+                              size="sm"
+                              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-background/80 h-8 w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 if (mapRef.current) {
@@ -1435,33 +1712,33 @@ export default function MapPage() {
                             >
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
+                                width="14"
+                                height="14"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                className="h-4 w-4"
+                                className="h-3.5 w-3.5"
                               >
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                                 <circle cx="12" cy="10" r="3" />
                               </svg>
                               <span className="sr-only">Show on map</span>
                             </Button>
-                            <div className="flex items-center gap-1.5 text-sm font-medium">
+                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium">
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
+                                width="14"
+                                height="14"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                className="h-4 w-4 text-muted-foreground"
+                                className="h-3.5 w-3.5 text-muted-foreground"
                               >
                                 <path d="M12 20v-6M6.8 20h10.4" />
                                 <path d="M22 7.5V14l-2 1-4.5-2.5-6.5 2.5-3-1V7.5l3 1 6.5-2.5 4.5 2.5 2-1z" />
@@ -1559,7 +1836,39 @@ export default function MapPage() {
             </div>
           </div>
         </TabsContent>
-        <TabsContent value="stats" className="space-y-6">
+        <TabsContent value="stats" className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold">Flight Statistics</h2>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span>{flights.length} flights • Last updated: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}</span>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                  realtimeStatus === 'SUBSCRIBED' 
+                    ? 'bg-green-100 text-green-800' 
+                    : realtimeStatus === 'CLOSED' 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    realtimeStatus === 'SUBSCRIBED' ? 'bg-green-500' : 
+                    realtimeStatus === 'CLOSED' ? 'bg-red-500' : 'bg-yellow-500'
+                  }`} />
+                  {realtimeStatus === 'SUBSCRIBED' ? 'Live' : 
+                   realtimeStatus === 'CLOSED' ? 'Offline' : 'Connecting'}
+                </span>
+              </div>
+            </div>
+            <Button
+              onClick={() => fetchUserFlights()}
+              disabled={isRefreshing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 w-full sm:w-auto"
+            >
+              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -1571,235 +1880,326 @@ export default function MapPage() {
             </div>
           ) : (
             <>
-              {airports.length > 0 && (() => {
-                const stats = calculateStatistics(airports);
-                return (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                      <Card className="p-6 space-y-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">Total Airports</h3>
-                        <div className="text-2xl font-bold">{airports.length}</div>
-                      </Card>
-                      <Card className="p-6 space-y-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">Total Visits</h3>
-                        <div className="text-2xl font-bold">{stats.totalVisits}</div>
-                      </Card>
-                      <Card className="p-6 space-y-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">Total Routes</h3>
-                        <div className="text-2xl font-bold">{stats.totalRoutes}</div>
-                      </Card>
-                      <Card className="p-6 space-y-2">
-                        <h3 className="text-sm font-medium text-muted-foreground">Countries Visited</h3>
-                        <div className="text-2xl font-bold">{stats.countriesVisited}</div>
-                      </Card>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <Card className="p-6 space-y-4">
-                        <h3 className="text-lg font-semibold">Most Visited Airport</h3>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`fi fi-${getCountryCode(stats.mostVisitedAirport.country)}`}
-                              style={{ width: "1.5rem", height: "1.125rem" }}
-                              title={stats.mostVisitedAirport.country} />
-                            <span className="font-medium">{stats.mostVisitedAirport.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
-                              {stats.mostVisitedAirport.code}
-                            </span>
-                            <span>•</span>
-                            <span>{stats.mostVisitedAirport.visits} visits</span>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">Route Statistics</h3>
-                          <select
-                            className="text-sm bg-muted px-2 py-1 rounded-md border border-input hover:bg-accent hover:text-accent-foreground"
-                            defaultValue="longest-route"
-                            onChange={(e) => {
-                              const elements = document.querySelectorAll('.route-section');
-                              elements.forEach(el => {
-                                if (el instanceof HTMLElement) {
-                                  el.style.display = el.id === e.target.value ? 'block' : 'none';
+              {airports.length > 0 ? (
+                (() => {
+                  console.log('Rendering stats component with:', { airportsLength: airports.length, statsCountries: stats.countriesVisited });
+                  
+                  // 3. Accessible color palette
+                  const chartColors = [
+                    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#6366f1', '#fbbf24', '#ef4444', '#10b981', '#a21caf', '#f472b6'
+                  ];
+                  
+                  return (
+                    <>
+                      <div className="grid gap-4 sm:gap-6 md:gap-8 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                        {/* Pie Chart: Flights by Country (Enhanced) */}
+                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
+                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Country</h3>
+                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                              <Pie
+                                data={chartData.countryData}
+                                dataKey="visits"
+                                nameKey="country"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ name, percent, value }: any) =>
+                                  percent > 0.05 && name !== 'Other'
+                                    ? `${name}: ${(percent * 100).toFixed(1)}%`
+                                    : ''
                                 }
-                              });
-                            }}
-                          >
-                            <option value="longest-route">Longest Route</option>
-                            <option value="shortest-route">Shortest Route</option>
-                          </select>
-                        </div>
-                        <div className="space-y-2">
-                          <div id="longest-route" className="route-section">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(stats.longestRoute.from.country)}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-medium">{stats.longestRoute.from.name}</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
-                                  {stats.longestRoute.from.code}
-                                </span>
+                                isAnimationActive={false}
+                              >
+                                {chartData.countryData.map((entry, idx) => (
+                                  <Cell key={entry.country} fill={chartColors[idx % chartColors.length]} />
+                                ))}
+                              </Pie>
+                              <ReTooltip
+                                formatter={(value: number, name: string, props: any) => {
+                                  const percent = ((value as number) / chartData.totalFlights) * 100;
+                                  return [`${value} flights (${percent.toFixed(1)}%)`, props.payload.country];
+                                }}
+                                contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }}
+                                itemStyle={{ color: '#0f172a' }}
+                                wrapperStyle={{ zIndex: 50 }}
+                                cursor={{ fill: '#e0e7ef', opacity: 0.2 }}
+                              />
+                                <ReLegend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ color: '#0f172a', marginTop: 8 }} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                          {chartData.grouped.length > 0 && (
+                            <div className="mt-3 sm:mt-4 w-full text-xs text-foreground">
+                              <div className="font-semibold mb-1">Other countries:</div>
+                              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                                {chartData.grouped.map((c) => (
+                                  <li key={c.country} className="truncate">
+                                    {c.country}: {c.visits} flight{c.visits > 1 ? 's' : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </Card>
+                        {/* Bar Chart: Flights per Year */}
+                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
+                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Year</h3>
+                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <ReBarChart data={chartData.flightsByYear}>
+                                <XAxis dataKey="year" stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
+                                <YAxis allowDecimals={false} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
+                                <Bar dataKey="count" fill="#0ea5e9" />
+                                <ReTooltip contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }} itemStyle={{ color: '#0f172a' }} wrapperStyle={{ zIndex: 50 }} cursor={{ fill: '#e0e7ef', opacity: 0.2 }} />
+                              </ReBarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </Card>
+                        {/* Bar Chart: Flights per Airline */}
+                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
+                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Airline</h3>
+                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <ReBarChart data={chartData.airlineData} layout="vertical">
+                                <YAxis dataKey="airline" type="category" width={60} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 9 }} />
+                                <XAxis type="number" allowDecimals={false} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
+                                <Bar dataKey="count" fill="#f59e42" />
+                                <ReTooltip contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }} itemStyle={{ color: '#0f172a' }} wrapperStyle={{ zIndex: 50 }} cursor={{ fill: '#e0e7ef', opacity: 0.2 }} />
+                              </ReBarChart>
+                            </ResponsiveContainer>
+                          </ChartContainer>
+                        </Card>
+                      </div>
+                      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
+                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Airports</h3>
+                          <div className="text-xl sm:text-2xl font-bold">{airports.length}</div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">Key: {airportsKey.slice(-20)}</div>
+                        </Card>
+                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
+                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Visits</h3>
+                          <div className="text-xl sm:text-2xl font-bold">{stats.totalVisits}</div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">Calculated: {new Date().toLocaleTimeString()}</div>
+                        </Card>
+                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
+                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Routes</h3>
+                          <div className="text-xl sm:text-2xl font-bold">{stats.totalRoutes}</div>
+                        </Card>
+                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
+                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Countries Visited</h3>
+                          <div className="text-xl sm:text-2xl font-bold">{stats.countriesVisited}</div>
+                        </Card>
+                      </div>
+
+                      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
+                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                          <h3 className="text-base sm:text-lg font-semibold">Most Visited Airport</h3>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`fi fi-${getCountryCode(stats.mostVisitedAirport.country)} flex-shrink-0`}
+                                style={{ width: "1.2rem", height: "0.9rem" }}
+                                title={stats.mostVisitedAirport.country} />
+                              <span className="font-medium text-sm sm:text-base truncate">{stats.mostVisitedAirport.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
+                                {stats.mostVisitedAirport.code}
+                              </span>
+                              <span>•</span>
+                              <span>{stats.mostVisitedAirport.visits} visits</span>
+                            </div>
+                          </div>
+                        </Card>
+
+                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h3 className="text-base sm:text-lg font-semibold">Route Statistics</h3>
+                            <select
+                              className="text-xs sm:text-sm bg-muted px-2 py-1 rounded-md border border-input hover:bg-accent hover:text-accent-foreground w-full sm:w-auto"
+                              defaultValue="longest-route"
+                              onChange={(e) => {
+                                const elements = document.querySelectorAll('.route-section');
+                                elements.forEach(el => {
+                                  if (el instanceof HTMLElement) {
+                                    el.style.display = el.id === e.target.value ? 'block' : 'none';
+                                  }
+                                });
+                              }}
+                            >
+                              <option value="longest-route">Longest Route</option>
+                              <option value="shortest-route">Shortest Route</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <div id="longest-route" className="route-section">
+                              <div className="flex flex-col gap-2 text-sm">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`fi fi-${getCountryCode(stats.longestRoute.from.country)} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.longestRoute.from.name}</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
+                                    {stats.longestRoute.from.code}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 pl-4 sm:pl-6">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-3.5 w-3.5 text-muted-foreground"
+                                  >
+                                    <path d="M5 12h14" />
+                                    <path d="m12 5 7 7-7 7" />
+                                  </svg>
+                                  <span className="text-xs sm:text-sm text-muted-foreground">
+                                    {new Intl.NumberFormat('en-US').format(stats.longestRoute.distance)} km
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`fi fi-${getCountryCode(stats.longestRoute.to.country)} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.longestRoute.to.name}</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
+                                    {stats.longestRoute.to.code}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2 pl-6">
+                            </div>
+                            <div id="shortest-route" className="route-section" style={{ display: 'none' }}>
+                              <div className="flex flex-col gap-2 text-sm">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`fi fi-${getCountryCode(stats.shortestRoute.from.country)} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.shortestRoute.from.name}</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
+                                    {stats.shortestRoute.from.code}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 pl-4 sm:pl-6">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-3.5 w-3.5 text-muted-foreground"
+                                  >
+                                    <path d="M5 12h14" />
+                                    <path d="m12 5 7 7-7 7" />
+                                  </svg>
+                                  <span className="text-xs sm:text-sm text-muted-foreground">
+                                    {new Intl.NumberFormat('en-US').format(stats.shortestRoute.distance)} km
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`fi fi-${getCountryCode(stats.shortestRoute.to.country)} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.shortestRoute.to.name}</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
+                                    {stats.shortestRoute.to.code}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+
+                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                          <h3 className="text-base sm:text-lg font-semibold">Most Flown Route</h3>
+                          {stats.mostFlownRoute && (
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-mono text-xs sm:text-sm">{stats.mostFlownRoute.from}</span>
+                                </div>
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
+                                  width="14"
+                                  height="14"
                                   viewBox="0 0 24 24"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  className="h-4 w-4 text-muted-foreground"
+                                  className="h-3.5 w-3.5"
                                 >
                                   <path d="M5 12h14" />
                                   <path d="m12 5 7 7-7 7" />
                                 </svg>
-                                <span className="text-sm text-muted-foreground">
-                                  {new Intl.NumberFormat('en-US').format(stats.longestRoute.distance)} km
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')} flex-shrink-0`}
+                                    style={{ width: "1rem", height: "0.75rem" }} />
+                                  <span className="font-mono text-xs sm:text-sm">{stats.mostFlownRoute.to}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(stats.longestRoute.to.country)}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-medium">{stats.longestRoute.to.name}</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
-                                  {stats.longestRoute.to.code}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div id="shortest-route" className="route-section" style={{ display: 'none' }}>
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(stats.shortestRoute.from.country)}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-medium">{stats.shortestRoute.from.name}</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
-                                  {stats.shortestRoute.from.code}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 pl-6">
+                              <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
+                                  width="14"
+                                  height="14"
                                   viewBox="0 0 24 24"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  className="h-4 w-4 text-muted-foreground"
+                                  className="h-3.5 w-3.5"
                                 >
-                                  <path d="M5 12h14" />
-                                  <path d="m12 5 7 7-7 7" />
+                                  <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                  <path d="M10 12h2v6" />
+                                  <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
                                 </svg>
-                                <span className="text-sm text-muted-foreground">
-                                  {new Intl.NumberFormat('en-US').format(stats.shortestRoute.distance)} km
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(stats.shortestRoute.to.country)}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-medium">{stats.shortestRoute.to.name}</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded-md">
-                                  {stats.shortestRoute.to.code}
-                                </span>
+                                {stats.mostFlownRoute.count} flights
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      </Card>
+                          )}
+                        </Card>
 
-                      <Card className="p-6 space-y-4">
-                        <h3 className="text-lg font-semibold">Most Flown Route</h3>
-                        {stats.mostFlownRoute && (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-mono">{stats.mostFlownRoute.from}</span>
-                              </div>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-4 w-4"
-                              >
-                                <path d="M5 12h14" />
-                                <path d="m12 5 7 7-7 7" />
-                              </svg>
-                              <div className="flex items-center gap-2">
-                                <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')}`}
-                                  style={{ width: "1.25rem", height: "0.9375rem" }} />
-                                <span className="font-mono">{stats.mostFlownRoute.to}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-4 w-4"
-                              >
-                                <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
-                                <polyline points="14 2 14 8 20 8" />
-                                <path d="M10 12h2v6" />
-                                <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
-                              </svg>
-                              {stats.mostFlownRoute.count} flights
+                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h3 className="text-base sm:text-lg font-semibold">Total Distance Flown</h3>
+                            <div className="text-xl sm:text-2xl font-bold">
+                              {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
                             </div>
                           </div>
-                        )}
-                      </Card>
+                        </Card>
 
-                      <Card className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">Total Distance Flown</h3>
-                          <div className="text-2xl font-bold">
-                            {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
+                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <h3 className="text-base sm:text-lg font-semibold">Total Hours in Air</h3>
+                            <div className="text-xl sm:text-2xl font-bold">
+                              {Math.round(stats.totalFlightHours)} hours
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">Total Hours in Air</h3>
-                          <div className="text-2xl font-bold">
-                            {Math.round(stats.totalFlightHours)} hours
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            Including taxi, takeoff, and landing times
                           </div>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Including taxi, takeoff, and landing times
-                        </div>
-                      </Card>
-                    </div>
-                  </>
-                );
-              })()}
+                        </Card>
+                      </div>
+                    </>
+                  );
+                })()
+              ) : null}
             </>
           )}
         </TabsContent>

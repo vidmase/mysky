@@ -5,8 +5,7 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
     try {
         const { departure, arrival } = await request.json()
-        const cookieStore = cookies()
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+          const supabase = createRouteHandlerClient({ cookies })
 
         // Fetch coordinates for both airports in parallel
         const [departureResult, arrivalResult] = await Promise.all([

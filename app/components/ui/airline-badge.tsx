@@ -1,10 +1,5 @@
 'use client'
 
-interface AirlineBadgeProps {
-    airline: string
-    className?: string
-}
-
 const airlineLogos: Record<string, { logo: string, shortName?: string }> = {
     'Air Baltic': {
         logo: '/airbaltic.png',
@@ -19,12 +14,47 @@ const airlineLogos: Record<string, { logo: string, shortName?: string }> = {
     },
     'easyJet': {
         logo: '/easyjet.png'
+    },
+    'Unknown': {
+        logo: '/placeholder-logo.png',
+        shortName: 'Unknown Airline'
     }
 }
 
-export function AirlineBadge({ airline, className = '' }: AirlineBadgeProps) {
-    const airlineInfo = airlineLogos[airline]
-    const displayName = airlineInfo?.shortName || airline
+// Helper function to detect airline from flight number if airline is Unknown
+const detectAirlineFromFlightNumber = (airline: string, flightNumber?: string): string => {
+    if (airline !== 'Unknown' && airline !== '') return airline;
+    
+    if (!flightNumber) return airline;
+    
+    // Common airline prefixes
+    const airlineMap: Record<string, string> = {
+        'FR': 'Ryanair',
+        'W6': 'Wizz Air',
+        'U2': 'easyJet',
+        'BT': 'Air Baltic',
+        'BA': 'British Airways',
+        'LH': 'Lufthansa',
+        'AF': 'Air France',
+        'KL': 'KLM',
+        'EK': 'Emirates',
+        'QR': 'Qatar Airways'
+    };
+    
+    const prefix = flightNumber.substring(0, 2).toUpperCase();
+    return airlineMap[prefix] || airline;
+};
+
+interface AirlineBadgeProps {
+    airline: string
+    className?: string
+    flightNumber?: string // Add optional flight number prop
+}
+
+export function AirlineBadge({ airline, className = '', flightNumber }: AirlineBadgeProps) {
+    const detectedAirline = detectAirlineFromFlightNumber(airline, flightNumber);
+    const airlineInfo = airlineLogos[detectedAirline]
+    const displayName = airlineInfo?.shortName || detectedAirline
 
     return (
         <div className={`inline-flex items-center gap-2 rounded-lg bg-background/50 px-3 py-1.5 backdrop-blur-sm ring-1 ring-border/5 ${className}`}>

@@ -12,6 +12,7 @@ interface Flight {
     departure_airport: string
     arrival_airport: string
     airline: string
+    flight_number: string
 }
 
 export function RecentActivity() {
@@ -28,7 +29,7 @@ export function RecentActivity() {
                 // Get the next upcoming flight
                 const { data: upcoming, error: upcomingError } = await supabase
                     .from('vidmaflights')
-                    .select('id, departure_date, departure_airport, arrival_airport, airline')
+                    .select('id, departure_date, departure_airport, arrival_airport, airline, flight_number')
                     .gte('departure_date', today)
                     .order('departure_date', { ascending: true })
                     .limit(1)
@@ -41,7 +42,7 @@ export function RecentActivity() {
                 // Get the most recent past flight
                 const { data: recent, error: recentError } = await supabase
                     .from('vidmaflights')
-                    .select('id, departure_date, departure_airport, arrival_airport, airline')
+                    .select('id, departure_date, departure_airport, arrival_airport, airline, flight_number')
                     .lt('departure_date', today)
                     .order('departure_date', { ascending: false })
                     .limit(1)
@@ -126,6 +127,7 @@ export function RecentActivity() {
                         </div>
                         <AirlineBadge
                             airline={flight.airline}
+                            flightNumber={flight.flight_number}
                             className={`${isUpcoming ? 'bg-white/5' : 'bg-white/5'} text-white/80`}
                         />
                     </div>

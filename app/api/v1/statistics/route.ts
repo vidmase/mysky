@@ -241,8 +241,7 @@ function calculateStatistics(
 
 export async function GET(request: Request) {
     try {
-        const cookieStore = cookies()
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+            const supabase = createRouteHandlerClient({ cookies })
 
         // Authenticate user
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
