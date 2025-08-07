@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm install && npm run build",
+  "framework": "nextjs",
+  "installCommand": "npm install --legacy-peer-deps",
+  "functions": {
+    "app/api/**/*.ts": {
+      "runtime": "nodejs20.x"
+    },
+    "pages/api/**/*.ts": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  }
+}
