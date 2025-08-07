@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "npm install --legacy-peer-deps && npm install typescript @types/react @types/react-dom --save-dev && next build"
+    "vercel-build": "npm install --legacy-peer-deps && next build"
   },
   "dependencies": {
     "@deck.gl/core": "^9.1.8",
@@ -83,6 +83,9 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.7.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
     "vaul": "^0.9.6",
     "ws": "^8.18.1",
     "zod": "^3.24.2"
