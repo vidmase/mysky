@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,7 @@ import { PlaneTakeoff, Clock, AlertTriangle } from "lucide-react"
 import { toast } from 'sonner'
 import { formatDistanceToNow, formatDistance } from 'date-fns'
 
-export default function AuthPage() {
+function AuthPageInner() {
   const router = useRouter()
   const supabase = createClientComponentClient()
   const searchParams = useSearchParams()
@@ -342,4 +342,12 @@ export default function AuthPage() {
       </div>
     </div>
   )
-} 
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading...</div>}>
+      <AuthPageInner />
+    </Suspense>
+  )
+}
