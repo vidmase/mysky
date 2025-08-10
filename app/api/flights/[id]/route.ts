@@ -126,6 +126,16 @@ export async function PUT(
       )
     }
 
+    // Best-effort event logging
+    try {
+      await supabase.from('event_logs').insert({
+        user_id: session.user.id,
+        action: 'update_flight',
+        metadata: { id: params.id },
+        page: '/flights',
+      })
+    } catch {}
+
     return NextResponse.json(data, { status: 200 })
   } catch (error) {
     console.error('Error in PUT /api/flights/[id]:', error)

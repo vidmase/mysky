@@ -161,6 +161,21 @@ export async function POST(request: Request) {
             }, { status: 500 })
         }
 
+        // Best-effort event logging for add (v1)
+        try {
+            const { error: logErr } = await supabase.from('event_logs').insert([
+                {
+                    user_id: session.user.id,
+                    action: 'add_flight',
+                    metadata: { ids: [data.id], type: 'v1' },
+                    page: '/flights',
+                },
+            ])
+            if (logErr) console.error('event_logs insert failed (v1 add):', logErr.message)
+        } catch (e) {
+            console.error('event_logs insert threw (v1 add):', e)
+        }
+
         return NextResponse.json<ApiResponse<any>>({
             success: true,
             data

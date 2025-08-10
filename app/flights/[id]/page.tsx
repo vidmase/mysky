@@ -58,28 +58,69 @@ interface Flight {
   notes: string | null
 }
 
-function getAirlineLogo(airline: string | null): string {
-  if (!airline) return ""
-
-  // Special cases for airlines with local logos
-  const airlineName = airline.toLowerCase()
-  if (airlineName === 'ryanair') {
-    return '/ryanair.png'
-  }
-  if (airlineName === 'wizzair') {
-    return '/wizzair.png'
-  }
-  if (airlineName === 'easyjet') {
-    return '/easyjet.png'
+// Robust airline logo resolver supporting codes and names
+function getAirlineLogo(airline: string | null, flightNumber?: string | null): string {
+  // Local overrides for common airlines we ship assets for
+  const localByCode: Record<string, string> = {
+    FR: '/ryanair.png',   // Ryanair
+    W6: '/wizzair.png',   // Wizz Air
+    U2: '/easyjet.png',   // easyJet
+    BT: '/airbaltic.png', // airBaltic
   }
 
-  // Clean airline name for URL
-  const cleanAirlineName = airlineName
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
+  const nameToCode: Record<string, string> = {
+    ryanair: 'FR',
+    'wizz air': 'W6',
+    wizzair: 'W6',
+    easyjet: 'U2',
+    'airbaltic': 'BT',
+    'air baltic': 'BT',
+  }
 
-  // Return logo URL from logo.clearbit.com (fallback to null if no airline)
-  return `https://logo.clearbit.com/${cleanAirlineName}.com`
+  // Try to determine IATA/ICAO code
+  let code: string | null = null
+
+  const norm = (s: string) => s.trim().toLowerCase()
+
+  if (airline) {
+    const a = airline.trim()
+    // If provided value looks like a code (2-3 alphanumerics, often uppercase)
+    if (/^[A-Z0-9]{2,3}$/.test(a) || /^[A-Z0-9]{2,3}$/.test(a.toUpperCase())) {
+      code = a.toUpperCase()
+    } else {
+      const name = norm(a)
+      if (nameToCode[name]) {
+        code = nameToCode[name]
+      }
+    }
+  }
+
+  // If still no code, try to extract from flight number prefix (e.g., FR6821, U2 1234, BT-123)
+  if (!code && flightNumber) {
+    const m = flightNumber.trim().toUpperCase().match(/^([A-Z]{2,3}|[A-Z]\d)\s?-?\d+/)
+    if (m) code = m[1]
+  }
+
+  // Use local asset if we have it
+  if (code && localByCode[code]) {
+    return localByCode[code]
+  }
+
+  // Fallback to public airline logos by IATA code via aviasales CDN
+  if (code) {
+    // 200x50 generally looks crisp in our 28-40px box
+    return `https://pics.avs.io/200/50/${code}.png`
+  }
+
+  // Last resort: if we only have a name, try Clearbit domain heuristic (best-effort)
+  if (airline) {
+    const cleanAirlineName = norm(airline)
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+    return `https://logo.clearbit.com/${cleanAirlineName}.com`
+  }
+
+  return ''
 }
 
 // Import FlightMap dynamically to avoid SSR issues with Leaflet
@@ -430,7 +471,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
                         {flight.airline ? (
                           <Image
-                            src={getAirlineLogo(flight.airline)}
+                            src={getAirlineLogo(flight.airline, flight.flight_number)}
                             alt={`${flight.airline} logo`}
                             width={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
                             height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}

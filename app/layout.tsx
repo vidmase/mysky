@@ -10,6 +10,7 @@ import { MainNav } from "@/components/main-nav"
 import { Heartbeat } from "./components/heartbeat"
 import 'leaflet/dist/leaflet.css'
 import "mapbox-gl/dist/mapbox-gl.css"
+import { ReactQueryProvider } from "./providers"
 
 const inter = Inter({ subsets: ["latin"] })
 const jakarta = Plus_Jakarta_Sans({
@@ -30,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`dark`}>
+    <html lang="en" className={`dark`} suppressHydrationWarning style={{ colorScheme: 'dark' }}>
       <head>
         {/* Add this to ensure proper mobile viewport */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -47,10 +48,12 @@ export default function RootLayout({
                 forcedTheme="dark"
                 disableTransitionOnChange
               >
-                <div className="flex min-h-screen flex-col">
-                  <MainNav />
-                  <div className="flex-1">{children}</div>
-                </div>
+                <ReactQueryProvider>
+                  <div className="flex min-h-screen flex-col">
+                    <MainNav />
+                    <div className="flex-1">{children}</div>
+                  </div>
+                </ReactQueryProvider>
               </ThemeProvider>
             </div>
           </NotificationProvider>

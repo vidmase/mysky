@@ -189,6 +189,22 @@ export async function POST(request: Request) {
         )
       }
 
+      // Best-effort event logging for add (return flight)
+      try {
+        const ids = (flights ?? []).map((f: any) => f.id)
+        const { error: logErr } = await supabase.from('event_logs').insert([
+          {
+            user_id: user.id,
+            action: 'add_flight',
+            metadata: { ids, type: 'return' },
+            page: '/flights',
+          },
+        ])
+        if (logErr) console.error('event_logs insert failed (add return):', logErr.message)
+      } catch (e) {
+        console.error('event_logs insert threw (add return):', e)
+      }
+
       return NextResponse.json(flights)
     } else {
       // For one-way flights, just insert the single flight
@@ -220,6 +236,22 @@ export async function POST(request: Request) {
           { message: 'Failed to add flight', error: error.message },
           { status: 500 }
         )
+      }
+
+      // Best-effort event logging for add (one-way)
+      try {
+        const ids = Array.isArray(flight) ? flight.map((f: any) => f.id) : []
+        const { error: logErr } = await supabase.from('event_logs').insert([
+          {
+            user_id: user.id,
+            action: 'add_flight',
+            metadata: { ids, type: 'one-way' },
+            page: '/flights',
+          },
+        ])
+        if (logErr) console.error('event_logs insert failed (add one-way):', logErr.message)
+      } catch (e) {
+        console.error('event_logs insert threw (add one-way):', e)
       }
 
       return NextResponse.json(flight)

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import type { DebouncedFunc } from "lodash"
-import "/node_modules/flag-icons/css/flag-icons.min.css"
+import "flag-icons/css/flag-icons.min.css"
 import mapboxgl from "mapbox-gl"
 import { Pause, Play, RotateCcw, RefreshCcw } from "lucide-react"
 import { Plane } from "lucide-react"
@@ -1572,6 +1572,9 @@ export default function MapPage() {
       return;
     }
     // Remove previous layers and sources if they exist
+    if (map.getLayer('visited-countries')) {
+      map.removeLayer('visited-countries');
+    }
     if (map.getLayer('visited-countries-boundary')) {
       map.removeLayer('visited-countries-boundary');
     }
@@ -1594,26 +1597,37 @@ export default function MapPage() {
             return feature ? feature.properties['ISO3166-1-Alpha-3'] : null;
           }).filter(Boolean)
         );
-        // Set feature-state for visited countries
-        geojson.features.forEach((feature: any) => {
-          const iso3 = feature.properties['ISO3166-1-Alpha-3'];
-          map.setFeatureState(
-            { source: 'countries', id: feature.id || iso3 },
-            { visited: visitedIsoCodes.has(iso3) }
-          );
+        // Convert visited set to array for use in filter
+        const visitedIsoArray = Array.from(visitedIsoCodes) as string[];
+
+        // Add a fill layer for visited countries
+        map.addLayer({
+          id: 'visited-countries',
+          type: 'fill',
+          source: 'countries',
+          filter: [
+            'in',
+            ['get', 'ISO3166-1-Alpha-3'],
+            ['literal', visitedIsoArray]
+          ],
+          paint: {
+            'fill-color': '#f59e42',
+            'fill-opacity': 0.12
+          }
         });
-        // Add the boundary layer for visited countries using feature-state
+
+        // Add the boundary line layer for visited countries
         map.addLayer({
           id: 'visited-countries-boundary',
           type: 'line',
           source: 'countries',
+          filter: [
+            'in',
+            ['get', 'ISO3166-1-Alpha-3'],
+            ['literal', visitedIsoArray]
+          ],
           paint: {
-            'line-color': [
-              'case',
-              ['boolean', ['feature-state', 'visited'], false],
-              '#f59e42',
-              'rgba(0,0,0,0)'
-            ],
+            'line-color': '#f59e42',
             'line-width': 2,
             'line-opacity': 0.8,
           },
@@ -1621,18 +1635,19 @@ export default function MapPage() {
       });
   }, [airports]);
 
-  // Call this function after style changes and on airports update
+  // Re-add sources/layers when the style changes (e.g. user switches base map)
   useEffect(() => {
-    if (!mapRef.current) return;
     const map = mapRef.current;
+    if (!map) return;
+
     const handleStyleData = () => {
       updateAirportMarkers();
       updateFlightPaths();
       addVisitedCountriesLayer();
     };
+
     map.on('styledata', handleStyleData);
-    // Also call once on mount
-    handleStyleData();
+    handleStyleData(); // initialize immediately
     return () => {
       map.off('styledata', handleStyleData);
     };
