@@ -80,6 +80,7 @@ const airportData: Record<string, { name: string; city: string; country: string;
   "RIX": { lat: 56.9236, lng: 23.9711, name: "Riga International", city: "Riga", country: "Latvia" },
   "LTN": { lat: 51.8747, lng: -0.3683, name: "London Luton", city: "London", country: "United Kingdom" },
   "VNO": { lat: 54.6341, lng: 25.2858, name: "Vilnius International", city: "Vilnius", country: "Lithuania" },
+  "PLQ": { lat: 55.9733, lng: 21.0939, name: "Palanga International", city: "Palanga", country: "Lithuania" },
   "BGY": { lat: 45.6739, lng: 9.7042, name: "Milan Bergamo", city: "Milan", country: "Italy" },
   "CIA": { lat: 41.7994, lng: 12.5949, name: "Rome Ciampino", city: "Rome", country: "Italy" },
   "NYO": { lat: 58.7886, lng: 16.9122, name: "Stockholm Skavsta", city: "Stockholm", country: "Sweden" },
@@ -133,14 +134,23 @@ const getCountryCode = (country: string): string => {
     "Switzerland": "ch",
     "Cyprus": "cy",
     "Egypt": "eg",
-    "Greece": "gr"
+    "Greece": "gr",
+    "Malta": "mt"
   };
 
   const code = countryMap[normalizedCountry];
   if (!code) {
     console.warn(`No country code mapping found for: ${normalizedCountry}`);
+    // Better fallback: try to generate a reasonable country code
+    const fallback = normalizedCountry.toLowerCase()
+      .replace(/[^a-z\s]/g, '') // Remove non-alphabetic chars
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .slice(0, 2);
+    return fallback || 'xx';
   }
-  return code || normalizedCountry.toLowerCase().slice(0, 2);
+  return code;
 };
 
 // Function to get unique visited countries
@@ -953,6 +963,15 @@ export default function MapPage() {
     const map = mapRef.current;
     if (!map || !airports || airports.length === 0) return;
 
+    // Ensure the style is loaded before adding sources/layers
+    if (!map.isStyleLoaded()) {
+      map.once('load', () => {
+        // Re-run once the style has loaded
+        updateAirportMarkers();
+      });
+      return;
+    }
+
     // Create GeoJSON features for airports with valid coordinates
     const airportFeatures = airports
       .filter(airport => airport.lat !== 0 && airport.lng !== 0) // Only include airports with valid coordinates
@@ -1150,6 +1169,8 @@ export default function MapPage() {
       map.on('mouseleave', 'flight-paths-layer', handleFlightPathMouseLeave);
       if (airports && airports.length > 0) {
         updateFlightPaths();
+        // Initialize airport markers once the style is loaded
+        updateAirportMarkers();
       }
       // Register click event for airports-layer to show statistics popup
       map.on('click', 'airports-layer', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
@@ -1632,8 +1653,271 @@ export default function MapPage() {
             'line-opacity': 0.8,
           },
         });
+        // Apply choropleth coloring by visit counts
+        updateVisitedCountriesChoropleth(geojson);
       });
   }, [airports]);
+
+  // Helpers for country choropleth coloring
+  const getCountryVisitCounts = (geojson: any) => {
+    const nameToIso3 = new Map<string, string>(
+      geojson.features.map((f: any) => [f.properties.name, f.properties['ISO3166-1-Alpha-3']])
+    );
+    const counts = new Map<string, number>();
+    for (const a of airports) {
+      const iso3 = nameToIso3.get(a.country);
+      if (!iso3) continue;
+      counts.set(iso3, (counts.get(iso3) ?? 0) + a.visits);
+    }
+    return counts;
+  };
+
+  const colorForCount = (c: number) => {
+    if (c >= 25) return '#b91c1c';
+    if (c >= 15) return '#dc2626';
+    if (c >= 8) return '#ef4444';
+    if (c >= 4) return '#f87171';
+    if (c >= 2) return '#fca5a5';
+    if (c >= 1) return '#fecaca';
+    return '#e5e7eb';
+  };
+
+  const updateVisitedCountriesChoropleth = (geojson: any) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const counts = getCountryVisitCounts(geojson);
+    const stops: (string | number)[] = [];
+    for (const [iso3, c] of counts.entries()) {
+      stops.push(iso3, colorForCount(c));
+    }
+    if (map.getLayer('visited-countries')) {
+      map.setPaintProperty(
+        'visited-countries',
+        'fill-color',
+        ['match', ['get', 'ISO3166-1-Alpha-3'], ...stops, '#e5e7eb']
+      );
+      map.setPaintProperty('visited-countries', 'fill-opacity', 0.55);
+      if (!map.getLayer('visited-countries-boundary')) {
+        map.addLayer({
+          id: 'visited-countries-boundary',
+          type: 'line',
+          source: 'countries',
+          paint: { 'line-color': '#334155', 'line-width': 0.5, 'line-opacity': 0.8 },
+        });
+      }
+    }
+  };
+
+  // Reactively update choropleth when airports change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const src = map.getSource('countries') as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    // Access the current data from the source
+    const data: any = (src as any)._data || (src as any).serialize?.()?.data || (src as any).getData?.() || undefined;
+    if (data) updateVisitedCountriesChoropleth(data);
+  }, [airports]);
+
+  // Airports heatmap source/layer
+  const buildAirportsHeatmap = (apts: Airport[]): GeoJSON.FeatureCollection => ({
+    type: 'FeatureCollection',
+    features: apts
+      .filter(a => Number.isFinite(a.lat) && Number.isFinite(a.lng))
+      .map(a => ({
+        type: 'Feature',
+        properties: { code: a.code, name: a.name, country: a.country, visits: a.visits },
+        geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+      })),
+  } as GeoJSON.FeatureCollection);
+
+  const addAirportsHeatmapLayer = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    if (!map.isStyleLoaded()) {
+      map.once('style.load', addAirportsHeatmapLayer);
+      return;
+    }
+    console.log('[map] (re)adding airports-heatmap layer');
+    if (map.getLayer('airports-heatmap')) map.removeLayer('airports-heatmap');
+    if (map.getLayer('airports-heat-count')) map.removeLayer('airports-heat-count');
+    if (map.getSource('airports-heat')) map.removeSource('airports-heat');
+    if (map.getSource('airports-heat-points')) map.removeSource('airports-heat-points');
+
+    map.addSource('airports-heat', { type: 'geojson', data: buildAirportsHeatmap(airports) });
+
+    // Classic heatmap with green->yellow->red ramp
+    map.addLayer({
+        id: 'airports-heatmap',
+        type: 'heatmap',
+        source: 'airports-heat',
+        maxzoom: 12,
+        paint: {
+          // Weight by visits but keep smooth
+          'heatmap-weight': [
+            'interpolate', ['exponential', 1.2], ['*', ['get', 'visits'], 2],
+            1, 1.0,
+            5, 2.0,
+            10, 3.0,
+            20, 4.0
+          ],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1.2, 6, 2.0, 10, 2.6, 12, 3.0],
+          // Classic green->yellow->red ramp
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0.00, 'rgba(0,0,0,0)',
+            0.20, '#2DC937',
+            0.40, '#99C140',
+            0.60, '#E7B416',
+            0.80, '#DB7B2B',
+            1.00, '#CC3232'
+          ],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 12, 6, 32, 10, 64, 12, 96],
+          'heatmap-opacity': 0.95,
+        },
+      },
+      // Place below circle markers if they exist
+      map.getLayer('airports-layer') ? 'airports-layer' : undefined
+    );
+
+    // Clustered points for numeric labels over hotspots
+    map.addSource('airports-heat-points', {
+      type: 'geojson',
+      data: buildAirportsHeatmap(airports),
+      cluster: true,
+      clusterMaxZoom: 12,
+      clusterRadius: 40,
+      // Sum up visits per cluster
+      clusterProperties: {
+        sum_visits: ['+', ['accumulated'], ['get', 'visits']]
+      }
+    } as any);
+
+    // Symbol labels showing summed visits per cluster (white text with halo)
+    map.addLayer({
+      id: 'airports-heat-count',
+      type: 'symbol',
+      source: 'airports-heat-points',
+      filter: ['has', 'sum_visits'],
+      layout: {
+        'text-field': ['to-string', ['get', 'sum_visits']],
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 0, 10, 6, 12, 12, 16]
+      },
+      paint: {
+        'text-color': '#ffffff',
+        'text-halo-color': 'rgba(0,0,0,0.6)',
+        'text-halo-width': 1.5
+      }
+    });
+  }, [airports]);
+
+  // Apply per-airport color ramp and sizing by visit counts
+  const applyAirportCircleStyling = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer('airports-layer')) return;
+    try {
+      map.setPaintProperty(
+        'airports-layer',
+        'circle-color',
+        [
+          'interpolate', ['linear'], ['get', 'visits'],
+          1, '#3b82f6',   // blue
+          3, '#22c55e',   // green
+          6, '#eab308',   // yellow
+          10, '#f97316',  // orange
+          20, '#ef4444',  // red
+          40, '#a21caf'   // purple
+        ]
+      );
+      map.setPaintProperty(
+        'airports-layer',
+        'circle-radius',
+        ['interpolate', ['linear'], ['get', 'visits'], 1, 6, 5, 9, 10, 12, 20, 16, 40, 20]
+      );
+      map.setPaintProperty('airports-layer', 'circle-stroke-color', '#ffffff');
+      map.setPaintProperty('airports-layer', 'circle-stroke-width', 1.5);
+      // Default zoom-dependent subtle blur for circles (when heatmap is OFF)
+      map.setPaintProperty(
+        'airports-layer',
+        'circle-blur',
+        ['interpolate', ['linear'], ['zoom'],
+          0, 0.35,
+          6, 0.25,
+          10, 0.18,
+          14, 0.10
+        ]
+      );
+    } catch (_) {}
+  }, []);
+
+  // Attach heatmap on style load
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onStyle = () => addAirportsHeatmapLayer();
+    if (map.isStyleLoaded()) onStyle(); else map.once('style.load', onStyle);
+    return () => { try { map.off('style.load', onStyle); } catch (_) {} };
+  }, [addAirportsHeatmapLayer]);
+
+  // Apply airport circle styling once the style is ready
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onStyle = () => applyAirportCircleStyling();
+    if (map.isStyleLoaded()) onStyle(); else map.once('style.load', onStyle);
+    return () => { try { map.off('style.load', onStyle); } catch (_) {} };
+  }, [applyAirportCircleStyling]);
+
+  // Keep heatmap data in sync with airports
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const src = map.getSource('airports-heat') as mapboxgl.GeoJSONSource | undefined;
+    if (src) src.setData(buildAirportsHeatmap(airports));
+  }, [airports]);
+
+  // Toggle visibility of airports heatmap layer
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const layerId = 'airports-heatmap';
+    const countId = 'airports-heat-count';
+    if (!map.getLayer(layerId) || !map.getLayer(countId)) {
+      // Try to add it if missing
+      console.log('[map] heatmap layer missing on toggle; attempting to add');
+      addAirportsHeatmapLayer();
+    }
+    if (map.getLayer(layerId)) {
+      console.log('[map] setting heatmap visibility:', showHeatmap);
+      map.setLayoutProperty(layerId, 'visibility', showHeatmap ? 'visible' : 'none');
+      if (map.getLayer(countId)) {
+        map.setLayoutProperty(countId, 'visibility', showHeatmap ? 'visible' : 'none');
+      }
+      // Keep airport circles visible (color by visits), hide only flight paths for clarity
+      try {
+        if (map.getLayer('airports-layer')) {
+          map.setLayoutProperty('airports-layer', 'visibility', 'visible');
+          map.setPaintProperty('airports-layer', 'circle-opacity', showHeatmap ? 0.7 : 0.7);
+          map.setPaintProperty(
+            'airports-layer',
+            'circle-blur',
+            showHeatmap
+              ? ['interpolate', ['linear'], ['zoom'], 0, 0.8, 6, 0.6, 10, 0.4, 14, 0.25]
+              : ['interpolate', ['linear'], ['zoom'], 0, 0.35, 6, 0.25, 10, 0.18, 14, 0.10]
+          );
+          applyAirportCircleStyling();
+        }
+        if (map.getLayer('flight-paths-layer')) {
+          map.setLayoutProperty('flight-paths-layer', 'visibility', showHeatmap ? 'none' : 'visible');
+        }
+        if (map.getLayer('visited-countries')) {
+          map.setPaintProperty('visited-countries', 'fill-opacity', showHeatmap ? 0.08 : 0.55);
+        }
+      } catch (_) {}
+    }
+  }, [showHeatmap]);
 
   // Re-add sources/layers when the style changes (e.g. user switches base map)
   useEffect(() => {
@@ -1644,6 +1928,13 @@ export default function MapPage() {
       updateAirportMarkers();
       updateFlightPaths();
       addVisitedCountriesLayer();
+      addAirportsHeatmapLayer();
+      applyAirportCircleStyling();
+      // Ensure z-order: heatmap under airports, numeric labels above airports
+      try {
+        if (map.getLayer('airports-heatmap') && map.getLayer('airports-layer')) map.moveLayer('airports-heatmap', 'airports-layer');
+        if (map.getLayer('airports-heat-count')) map.moveLayer('airports-heat-count');
+      } catch (_) {}
     };
 
     map.on('styledata', handleStyleData);
@@ -1651,7 +1942,7 @@ export default function MapPage() {
     return () => {
       map.off('styledata', handleStyleData);
     };
-  }, [updateAirportMarkers, updateFlightPaths, addVisitedCountriesLayer]);
+  }, [updateAirportMarkers, updateFlightPaths, addVisitedCountriesLayer, addAirportsHeatmapLayer]);
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 space-y-3 sm:space-y-4">
@@ -1663,6 +1954,16 @@ export default function MapPage() {
         </TabsList>
         <TabsContent value="map" className="space-y-3 sm:space-y-4">
           <div className="relative w-full h-[calc(100vh-8rem)] sm:h-[calc(100vh-4rem)]">
+            <div className="absolute top-3 right-3 z-50 flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowHeatmap(v => !v)}
+                title="Toggle airport heatmap"
+              >
+                {showHeatmap ? 'Hide Heatmap' : 'Show Heatmap'}
+              </Button>
+            </div>
             <div ref={mapContainerRef} className="w-full h-full rounded-lg overflow-hidden" />
           </div>
         </TabsContent>

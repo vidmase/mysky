@@ -31,6 +31,7 @@ const iataToCountry: { [key: string]: string } = {
   'LBA': 'United Kingdom', // Leeds Bradford
   'LTN': 'United Kingdom', // London Luton
   'SEN': 'United Kingdom', // London Southend
+  'LHR': 'United Kingdom', // London Heathrow
 
   // Spain
   'MAD': 'Spain', // Madrid
@@ -38,10 +39,12 @@ const iataToCountry: { [key: string]: string } = {
   'GRO': 'Spain', // Girona
   'PMI': 'Spain', // Palma de Mallorca
   'TFS': 'Spain', // Tenerife South
+  'BCN': 'Spain', // Barcelona
 
   // Lithuania
   'KUN': 'Lithuania', // Kaunas
   'VNO': 'Lithuania', // Vilnius
+  'PLQ': 'Lithuania', // Palanga
 
   // Latvia
   'RIX': 'Latvia', // Riga
@@ -51,12 +54,46 @@ const iataToCountry: { [key: string]: string } = {
 
   // Switzerland
   'GVA': 'Switzerland', // Geneva
+  'ZRH': 'Switzerland', // Zurich
 
   // Italy
   'NAP': 'Italy', // Naples
+  'FCO': 'Italy', // Rome Fiumicino
 
   // Cyprus
-  'PFO': 'Cyprus' // Paphos
+  'PFO': 'Cyprus', // Paphos
+
+  // Malta
+  'MLA': 'Malta', // Malta International
+
+  // Poland
+  'WAW': 'Poland', // Warsaw
+  'KRK': 'Poland', // Krakow
+
+  // France
+  'CDG': 'France', // Paris Charles de Gaulle
+
+  // Netherlands
+  'AMS': 'Netherlands', // Amsterdam Schiphol
+
+  // Belgium
+  'BRU': 'Belgium', // Brussels
+
+  // Sweden
+  'ARN': 'Sweden', // Stockholm Arlanda
+
+  // Egypt
+  'CAI': 'Egypt', // Cairo
+  'HRG': 'Egypt', // Hurghada
+  'SSH': 'Egypt', // Sharm El Sheikh
+  'LXR': 'Egypt', // Luxor
+  'ASW': 'Egypt', // Aswan
+  'AUE': 'Egypt', // Abu Simbel
+  'MUH': 'Egypt', // Mersa Matruh
+  'ALY': 'Egypt', // Alexandria
+
+  // Greece
+  'CFU': 'Greece' // Corfu
 }
 
 interface FlightStatistics {

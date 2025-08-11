@@ -63,6 +63,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return // Profile already exists
       }
 
+      // Also check by email to avoid unique constraint violations on unique email index
+      if (user.email) {
+        const { data: emailProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', user.email)
+          .single()
+
+        if (emailProfile) {
+          // A profile already exists for this email, skip creating a new one
+          return
+        }
+      }
+
       // Create new profile
       const { error: insertError } = await supabase
         .from('profiles')
@@ -82,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       // Log more details for debugging
-      console.error('Error creating user profile:', error, JSON.stringify(error));
+      console.error('Error creating user profile:', { code: error?.code, message: error?.message, details: error?.details });
 
       // Handle duplicate profile error gracefully (Postgres code 23505 or duplicate message)
       if (error?.code === '23505' || (typeof error?.message === 'string' && error.message.includes('duplicate'))) {

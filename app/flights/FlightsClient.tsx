@@ -9,7 +9,8 @@ import { enUS } from "date-fns/locale"
 import { useNotification } from "@/contexts/notification-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PaginationControls } from "@/app/flights/components/PaginationControls"
@@ -17,6 +18,7 @@ import { FiltersPanel } from "@/app/flights/components/FiltersPanel"
 import { FlightsTable } from "@/app/flights/components/FlightsTable"
 import { DeleteFlightDialog } from "@/app/flights/components/DeleteFlightDialog"
 import { CsvImportDialog } from "@/app/flights/components/CsvImportDialog"
+import { CsvExportDialog } from "@/app/flights/components/CsvExportDialog"
 import { format } from "date-fns"
 import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 
@@ -51,18 +53,28 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const router = useRouter()
   const { showSuccess, showError } = useNotification()
 
-  const { data: flights = [], isFetching, refetch } = useQuery<Flight[]>({
+  const { data: flights = [], isFetching, refetch: originalRefetch } = useQuery<Flight[]>({
     queryKey: ["flights"],
     queryFn: async () => {
       const res = await fetch("/api/flights")
       if (!res.ok) throw new Error("Failed to fetch flights")
       const data = await res.json()
-      // toast only on client refetches
-      showSuccess("Flights updated")
       return data
     },
     initialData: initialFlights,
+    refetchOnWindowFocus: false, // Prevent auto-refetch when switching tabs
+    refetchOnMount: false, // Prevent auto-refetch on component mount
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   })
+
+  // Custom refetch function that shows success toast
+  const refetch = async () => {
+    const result = await originalRefetch()
+    if (result.isSuccess) {
+      showSuccess("Flights updated")
+    }
+    return result
+  }
 
   // Gmail preview and selection dialog state
   type GmailPreviewItem = {
@@ -79,6 +91,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [gmailItems, setGmailItems] = useState<GmailPreviewItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
+  const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
   // Gmail date range (YYYY-MM-DD)
   const todayISO = useMemo(() => new Date().toISOString().slice(0,10), [])
   const defaultStartISO = useMemo(() => {
@@ -431,17 +444,44 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
 
   return (
     <div className="container mx-auto p-4">
-      {/* Import/Export actions */}
-      <div className="flex justify-end gap-2 mb-4">
-        <Button variant="outline" className="gap-2" onClick={() => setIsCsvDialogOpen(true)}>
-          <Upload className="h-4 w-4" /> Import CSV
-        </Button>
-        <Button variant="outline" className="gap-2" onClick={exportCsv}>
-          <Download className="h-4 w-4" /> Export CSV
-        </Button>
-        <Button variant="secondary" className="gap-2" onClick={openImportDialog} disabled={isLoadingPreview}>
-          {isLoadingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Import from Gmail
-        </Button>
+      {/* Header with Tools dropdown */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Flights</h1>
+          <p className="text-muted-foreground">Manage and track your flight history</p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Tools
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsCsvExportDialogOpen(true)} className="gap-2">
+              <Download className="h-4 w-4" />
+              Export CSV
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={openImportDialog} 
+              disabled={isLoadingPreview}
+              className="gap-2"
+            >
+              {isLoadingPreview ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
+              Import from Gmail
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Counts section */}
@@ -485,16 +525,42 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       {/* CSV Import Dialog */}
       <CsvImportDialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen} onImported={async () => { await refetch() }} />
 
+      {/* CSV Export Dialog */}
+      <CsvExportDialog open={isCsvExportDialogOpen} onOpenChange={setIsCsvExportDialogOpen} flights={flights} />
+
       {/* Mobile cards (simplified retained from previous code) */}
       <div className="grid grid-cols-1 gap-4 md:hidden mb-4">
         {currentFlights.map((flight) => (
-          <div key={flight.id} className="rounded-lg border border-border/50 p-4">
+          <div key={flight.id} className="rounded-xl border border-border/40 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200 p-4 hover:border-border/60">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src={getAirlineLogo(flight.airline ?? null)} alt={flight.airline || "Airline"} className="h-6 w-6 rounded-full" />
+                <div className="relative w-6 h-6 rounded-full overflow-hidden flex items-center justify-center bg-muted">
+                  <img 
+                    src={getAirlineLogo(flight.airline ?? null, flight.flight_number)} 
+                    alt={flight.airline || "Airline"} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center fallback-icon hidden">
+                    <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
                 <div>
                   <div className="font-medium">{flight.flight_number}</div>
-                  <div className="text-xs text-muted-foreground">{flight.airline || "Unknown"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {flight.airline || (() => {
+                      if (flight.flight_number) {
+                        const match = flight.flight_number.trim().toUpperCase().match(/^([A-Z]{2,3})/);
+                        return match ? match[1] : flight.flight_number.replace(/\d+$/, '').trim() || 'Unknown';
+                      }
+                      return 'Unknown';
+                    })()}
+                  </div>
                   <div className="text-xs text-muted-foreground truncate" title={flight.passenger_name} aria-label={`Passenger ${flight.passenger_name}`}>
                     {flight.passenger_name}
                   </div>

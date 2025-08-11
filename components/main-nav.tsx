@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard, MessageCircle } from "lucide-react"
+import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard, MessageCircle, Calendar } from "lucide-react"
 import { useState } from "react"
 
 import { cn } from "@/lib/utils"
@@ -46,6 +46,13 @@ export function MainNav() {
       icon: MapPin,
       color: "text-airport",
       bgColor: "bg-airport/10",
+    },
+    {
+      name: "Calendar",
+      href: "/calendar",
+      icon: Calendar,
+      color: "text-blue-400",
+      bgColor: "bg-blue-400/10",
     },
     {
       name: "Stats",
