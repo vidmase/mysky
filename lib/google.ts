@@ -8,10 +8,18 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 export function createOAuth2Client(redirectUri?: string): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const redirect = redirectUri || process.env.GOOGLE_REDIRECT_URI
+  
+  // Determine redirect URI based on environment
+  let redirect = redirectUri
+  if (!redirect) {
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    redirect = `${baseUrl}/api/gmail/callback`
+  }
 
   if (!clientId || !clientSecret || !redirect) {
-    throw new Error('Missing Google OAuth env vars (GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI)')
+    throw new Error('Missing Google OAuth env vars (GOOGLE_CLIENT_ID/SECRET)')
   }
   return new google.auth.OAuth2(clientId, clientSecret, redirect)
 }
