@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+
 import { User } from '@supabase/auth-helpers-nextjs';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
@@ -27,9 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  // Memoize the Supabase client so the effect doesn't re-run due to identity changes
+  const supabase = useMemo(() => createClientComponentClient(), []);
+
+  // Guards to prevent duplicate initialization in React Strict Mode (dev)
+  const initializedRef = useRef(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (initializedRef.current) return; // guard against Strict Mode double-invoke
+    initializedRef.current = true;
+
     const getUser = async () => {
       try {
         // Get user
@@ -37,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userError) throw userError;
 
         setUser(user);
+        currentUserIdRef.current = user?.id ?? null;
 
         if (user) {
           // Get or create profile
@@ -87,9 +97,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const uid = session?.user?.id ?? null;
       if (event === 'SIGNED_IN') {
+        // Avoid refetch if it's the same user id that we already have
+        if (uid && uid === currentUserIdRef.current) return;
+        currentUserIdRef.current = uid;
         getUser();
       } else if (event === 'SIGNED_OUT') {
+        currentUserIdRef.current = null;
         setUser(null);
         setProfile(null);
         router.push('/login');
@@ -102,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [router, supabase]);
 
   const signOut = async () => {
     try {

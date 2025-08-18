@@ -30,6 +30,7 @@ import {
   ResponsiveContainer,
   Legend as ReLegend,
 } from "recharts"
+import { useUnifiedStatistics } from "@/lib/statistics"
 
 // Types
 interface Airport {
@@ -207,15 +208,10 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 // Add this function after the calculateDistance function
 const calculateFlightDuration = (distance: number): number => {
-  // Average speeds for different flight phases (in km/h)
-  const TAXI_TIME = 30 / 60; // 30 minutes total for taxi, takeoff, and landing procedures
-  const AVG_CRUISE_SPEED = 840; // Average cruise speed for commercial flights
-
-  // Calculate cruise time in hours
-  const cruiseTime = distance / AVG_CRUISE_SPEED;
-
-  // Total flight time including taxi, takeoff, and landing
-  return cruiseTime + TAXI_TIME;
+  // Align with backend and /stats: 0.5h taxi + cruise at 840km/h
+  const TAXI_TIME = 0.5;
+  const AVG_CRUISE_SPEED = 840;
+  return distance / AVG_CRUISE_SPEED + TAXI_TIME;
 };
 
 // Update the calculateTotalDistance function
@@ -409,6 +405,7 @@ const calculateStatistics = (airports: Airport[]): {
             toAirport.lat,
             toAirport.lng
           );
+          // Unified duration model
           const flightDuration = calculateFlightDuration(distance);
           totalFlightHours += flightDuration * route.count;
         }
@@ -509,6 +506,9 @@ export default function MapPage() {
   const { toast } = useToast()
   const supabase = createClientComponentClient()
 
+  // Use unified statistics system
+  const { statistics: unifiedStats, loading: statsLoading, error: statsError, refetch: refetchStats } = useUnifiedStatistics()
+
   // State
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
   const [airports, setAirports] = useState<Airport[]>([])
@@ -531,14 +531,75 @@ export default function MapPage() {
     return `${airports.length}-${airports.map(a => `${a.code}:${a.visits}`).join(',').slice(0, 100)}`;
   }, [airports]);
 
-  // Memoized statistics calculation
+  // Map unified statistics to the format expected by the map page
   const stats = useMemo(() => {
-    console.log('Recalculating stats, airports length:', airports.length);
-    console.log('Airports data:', airports.slice(0, 5)); // Show first 5 airports
-    const calculatedStats = calculateStatistics(airports);
-    console.log('Calculated stats result:', calculatedStats);
-    return calculatedStats;
-  }, [airports, airportsKey, forceUpdateKey]);
+    if (!unifiedStats) {
+      return {
+        totalVisits: 0,
+        totalRoutes: 0,
+        totalFlights: 0,
+        totalDistance: 0,
+        totalFlightHours: 0,
+        longestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+        shortestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+        mostVisitedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+        mostConnectedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+        mostFlownRoute: { id: '', from: '', to: '', count: 0 },
+        countriesVisited: 0
+      };
+    }
+
+    // Convert unified statistics to map page format
+    return {
+      totalVisits: unifiedStats.totalVisits || 0,
+      totalRoutes: unifiedStats.totalRoutes || 0,
+      totalFlights: unifiedStats.totalFlights || 0,
+      totalDistance: unifiedStats.totalKilometers || 0,
+      totalFlightHours: unifiedStats.hoursInAir || 0,
+      longestRoute: unifiedStats.longestRoute ? {
+        from: { 
+          code: unifiedStats.longestRoute.from.iata || '', 
+          name: unifiedStats.longestRoute.from.name || '', 
+          city: '', 
+          country: '', 
+          lat: 0, 
+          lng: 0, 
+          visits: 0, 
+          routes: [] 
+        },
+        to: { 
+          code: unifiedStats.longestRoute.to.iata || '', 
+          name: unifiedStats.longestRoute.to.name || '', 
+          city: '', 
+          country: '', 
+          lat: 0, 
+          lng: 0, 
+          visits: 0, 
+          routes: [] 
+        },
+        distance: unifiedStats.longestRoute.distance_km || 0
+      } : { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 },
+      shortestRoute: { from: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, to: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, distance: 0 }, // Not available in unified stats
+      mostVisitedAirport: unifiedStats.mostVisitedAirport ? {
+        code: unifiedStats.mostVisitedAirport.iata || '',
+        name: unifiedStats.mostVisitedAirport.name || '',
+        city: '',
+        country: '',
+        lat: 0,
+        lng: 0,
+        visits: unifiedStats.mostVisitedAirport.visits || 0,
+        routes: []
+      } : { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] },
+      mostConnectedAirport: { code: '', name: '', city: '', country: '', lat: 0, lng: 0, visits: 0, routes: [] }, // Not available in unified stats
+      mostFlownRoute: unifiedStats.mostFlownRoute ? {
+        id: `${unifiedStats.mostFlownRoute.from.iata}-${unifiedStats.mostFlownRoute.to.iata}`,
+        from: unifiedStats.mostFlownRoute.from.iata || '',
+        to: unifiedStats.mostFlownRoute.to.iata || '',
+        count: unifiedStats.mostFlownRoute.count || 0
+      } : { id: '', from: '', to: '', count: 0 },
+      countriesVisited: unifiedStats.totalCountries || 0
+    };
+  }, [unifiedStats]);
 
   // Memoized chart data
   const chartData = useMemo(() => {
@@ -1583,7 +1644,7 @@ export default function MapPage() {
     };
   }, [airports]);
 
-  // Add countries boundary source and layer using new Mapbox API method
+  // Add/update countries layers safely (idempotent)
   const addVisitedCountriesLayer = useCallback(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -1592,24 +1653,19 @@ export default function MapPage() {
       map.once('style.load', addVisitedCountriesLayer);
       return;
     }
-    // Remove previous layers and sources if they exist
-    if (map.getLayer('visited-countries')) {
-      map.removeLayer('visited-countries');
-    }
-    if (map.getLayer('visited-countries-boundary')) {
-      map.removeLayer('visited-countries-boundary');
-    }
-    if (map.getSource('countries')) {
-      map.removeSource('countries');
-    }
-    // Fetch the countries GeoJSON and add as a source
+    // Fetch the countries GeoJSON and add as a source if missing
     fetch('/countries.geojson')
       .then(res => res.json())
       .then((geojson) => {
-        map.addSource('countries', {
-          type: 'geojson',
-          data: geojson,
-        });
+        // Re-check map instance and style; guard against unmount/style reloads
+        const mapInstance = mapRef.current;
+        if (!mapInstance || !mapInstance.getStyle()) return;
+        if (!mapInstance.getSource('countries')) {
+          mapInstance.addSource('countries', {
+            type: 'geojson',
+            data: geojson,
+          });
+        }
         // Get visited country ISO3 codes
         const visitedIsoCodes = new Set(
           airports.map(a => a.country).map(country => {
@@ -1621,38 +1677,55 @@ export default function MapPage() {
         // Convert visited set to array for use in filter
         const visitedIsoArray = Array.from(visitedIsoCodes) as string[];
 
-        // Add a fill layer for visited countries
-        map.addLayer({
-          id: 'visited-countries',
-          type: 'fill',
+        // Add or update fill layer for visited countries
+        if (!map.getLayer('visited-countries')) {
+        mapInstance.addLayer({
+            id: 'visited-countries',
+            type: 'fill',
           source: 'countries',
-          filter: [
+            filter: [
+              'in',
+              ['get', 'ISO3166-1-Alpha-3'],
+              ['literal', visitedIsoArray]
+            ],
+            paint: {
+              'fill-color': '#f59e42',
+              'fill-opacity': 0.12
+            }
+          });
+        } else {
+          map.setFilter('visited-countries', [
             'in',
             ['get', 'ISO3166-1-Alpha-3'],
             ['literal', visitedIsoArray]
-          ],
-          paint: {
-            'fill-color': '#f59e42',
-            'fill-opacity': 0.12
-          }
-        });
+          ]);
+          map.setPaintProperty('visited-countries', 'fill-opacity', 0.12);
+        }
 
-        // Add the boundary line layer for visited countries
-        map.addLayer({
-          id: 'visited-countries-boundary',
-          type: 'line',
-          source: 'countries',
-          filter: [
+        // Add or update boundary line layer for visited countries
+        if (!mapInstance.getLayer('visited-countries-boundary')) {
+          mapInstance.addLayer({
+            id: 'visited-countries-boundary',
+            type: 'line',
+            source: 'countries',
+            filter: [
+              'in',
+              ['get', 'ISO3166-1-Alpha-3'],
+              ['literal', visitedIsoArray]
+            ],
+            paint: {
+              'line-color': '#f59e42',
+              'line-width': 2,
+              'line-opacity': 0.8,
+            },
+          });
+        } else {
+          mapInstance.setFilter('visited-countries-boundary', [
             'in',
             ['get', 'ISO3166-1-Alpha-3'],
             ['literal', visitedIsoArray]
-          ],
-          paint: {
-            'line-color': '#f59e42',
-            'line-width': 2,
-            'line-opacity': 0.8,
-          },
-        });
+          ]);
+        }
         // Apply choropleth coloring by visit counts
         updateVisitedCountriesChoropleth(geojson);
       });
@@ -1660,16 +1733,26 @@ export default function MapPage() {
 
   // Helpers for country choropleth coloring
   const getCountryVisitCounts = (geojson: any) => {
-    const nameToIso3 = new Map<string, string>(
-      geojson.features.map((f: any) => [f.properties.name, f.properties['ISO3166-1-Alpha-3']])
-    );
-    const counts = new Map<string, number>();
-    for (const a of airports) {
-      const iso3 = nameToIso3.get(a.country);
-      if (!iso3) continue;
-      counts.set(iso3, (counts.get(iso3) ?? 0) + a.visits);
+    try {
+      if (!geojson || !Array.isArray(geojson.features)) return new Map<string, number>();
+      const nameToIso3 = new Map<string, string>();
+      for (const f of geojson.features) {
+        const props = (f && f.properties) ? f.properties : {};
+        const name = props?.name as string | undefined;
+        const iso = props?.['ISO3166-1-Alpha-3'] as string | undefined;
+        if (name && iso) nameToIso3.set(name, iso);
+      }
+      const counts = new Map<string, number>();
+      for (const a of airports) {
+        const iso3 = nameToIso3.get(a.country);
+        if (!iso3) continue;
+        counts.set(iso3, (counts.get(iso3) ?? 0) + a.visits);
+      }
+      return counts;
+    } catch (e) {
+      console.error('getCountryVisitCounts error:', e);
+      return new Map<string, number>();
     }
-    return counts;
   };
 
   const colorForCount = (c: number) => {
@@ -1683,28 +1766,37 @@ export default function MapPage() {
   };
 
   const updateVisitedCountriesChoropleth = (geojson: any) => {
-    const map = mapRef.current;
-    if (!map) return;
-    const counts = getCountryVisitCounts(geojson);
-    const stops: (string | number)[] = [];
-    for (const [iso3, c] of counts.entries()) {
-      stops.push(iso3, colorForCount(c));
-    }
-    if (map.getLayer('visited-countries')) {
-      map.setPaintProperty(
-        'visited-countries',
-        'fill-color',
-        ['match', ['get', 'ISO3166-1-Alpha-3'], ...stops, '#e5e7eb']
-      );
-      map.setPaintProperty('visited-countries', 'fill-opacity', 0.55);
-      if (!map.getLayer('visited-countries-boundary')) {
-        map.addLayer({
-          id: 'visited-countries-boundary',
-          type: 'line',
-          source: 'countries',
-          paint: { 'line-color': '#334155', 'line-width': 0.5, 'line-opacity': 0.8 },
-        });
+    try {
+      const map = mapRef.current;
+      if (!map) return;
+      const counts = getCountryVisitCounts(geojson);
+      const stops: (string | number)[] = [];
+      for (const [iso3, c] of counts.entries()) {
+        stops.push(iso3, colorForCount(c));
       }
+      if (map.getLayer('visited-countries')) {
+        if (stops.length >= 2) {
+          map.setPaintProperty(
+            'visited-countries',
+            'fill-color',
+            ['match', ['get', 'ISO3166-1-Alpha-3'], ...stops, '#e5e7eb']
+          );
+        } else {
+          // Fallback when there are no stops yet
+          map.setPaintProperty('visited-countries', 'fill-color', '#e5e7eb');
+        }
+        map.setPaintProperty('visited-countries', 'fill-opacity', 0.55);
+        if (!map.getLayer('visited-countries-boundary')) {
+          map.addLayer({
+            id: 'visited-countries-boundary',
+            type: 'line',
+            source: 'countries',
+            paint: { 'line-color': '#334155', 'line-width': 0.5, 'line-opacity': 0.8 },
+          });
+        }
+      }
+    } catch (e) {
+      console.error('updateVisitedCountriesChoropleth error:', e);
     }
   };
 
@@ -1947,10 +2039,9 @@ export default function MapPage() {
   return (
     <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 space-y-3 sm:space-y-4">
       <Tabs defaultValue="map" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 h-10 sm:h-9">
+        <TabsList className="grid w-full grid-cols-2 h-10 sm:h-9">
           <TabsTrigger value="map" className="text-xs sm:text-sm">Map View</TabsTrigger>
           <TabsTrigger value="list" className="text-xs sm:text-sm">Airport List</TabsTrigger>
-          <TabsTrigger value="stats" className="text-xs sm:text-sm">Statistics</TabsTrigger>
         </TabsList>
         <TabsContent value="map" className="space-y-3 sm:space-y-4">
           <div className="relative w-full h-[calc(100vh-8rem)] sm:h-[calc(100vh-4rem)]">
@@ -2151,373 +2242,6 @@ export default function MapPage() {
               )}
             </div>
           </div>
-        </TabsContent>
-        <TabsContent value="stats" className="space-y-4 sm:space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold">Flight Statistics</h2>
-              <div className="text-xs sm:text-sm text-muted-foreground mt-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                <span>{flights.length} flights • Last updated: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Never'}</span>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
-                  realtimeStatus === 'SUBSCRIBED' 
-                    ? 'bg-green-100 text-green-800' 
-                    : realtimeStatus === 'CLOSED' 
-                    ? 'bg-red-100 text-red-800' 
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    realtimeStatus === 'SUBSCRIBED' ? 'bg-green-500' : 
-                    realtimeStatus === 'CLOSED' ? 'bg-red-500' : 'bg-yellow-500'
-                  }`} />
-                  {realtimeStatus === 'SUBSCRIBED' ? 'Live' : 
-                   realtimeStatus === 'CLOSED' ? 'Offline' : 'Connecting'}
-                </span>
-              </div>
-            </div>
-            <Button
-              onClick={() => fetchUserFlights()}
-              disabled={isRefreshing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2 w-full sm:w-auto"
-            >
-              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
-          {loading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Card key={i} className="p-4">
-                  <Skeleton className="h-8 w-[100px] mb-4" />
-                  <Skeleton className="h-6 w-[60px]" />
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <>
-              {airports.length > 0 ? (
-                (() => {
-                  console.log('Rendering stats component with:', { airportsLength: airports.length, statsCountries: stats.countriesVisited });
-                  
-                  // 3. Accessible color palette
-                  const chartColors = [
-                    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#6366f1', '#fbbf24', '#ef4444', '#10b981', '#a21caf', '#f472b6'
-                  ];
-                  
-                  return (
-                    <>
-                      <div className="grid gap-4 sm:gap-6 md:gap-8 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                        {/* Pie Chart: Flights by Country (Enhanced) */}
-                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
-                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Country</h3>
-                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                              <Pie
-                                data={chartData.countryData}
-                                dataKey="visits"
-                                nameKey="country"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={({ name, percent, value }: any) =>
-                                  percent > 0.05 && name !== 'Other'
-                                    ? `${name}: ${(percent * 100).toFixed(1)}%`
-                                    : ''
-                                }
-                                isAnimationActive={false}
-                              >
-                                {chartData.countryData.map((entry, idx) => (
-                                  <Cell key={entry.country} fill={chartColors[idx % chartColors.length]} />
-                                ))}
-                              </Pie>
-                              <ReTooltip
-                                formatter={(value: number, name: string, props: any) => {
-                                  const percent = ((value as number) / chartData.totalFlights) * 100;
-                                  return [`${value} flights (${percent.toFixed(1)}%)`, props.payload.country];
-                                }}
-                                contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }}
-                                itemStyle={{ color: '#0f172a' }}
-                                wrapperStyle={{ zIndex: 50 }}
-                                cursor={{ fill: '#e0e7ef', opacity: 0.2 }}
-                              />
-                                <ReLegend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ color: '#0f172a', marginTop: 8 }} />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                          {chartData.grouped.length > 0 && (
-                            <div className="mt-3 sm:mt-4 w-full text-xs text-foreground">
-                              <div className="font-semibold mb-1">Other countries:</div>
-                              <ul className="list-disc list-inside space-y-0.5 text-xs">
-                                {chartData.grouped.map((c) => (
-                                  <li key={c.country} className="truncate">
-                                    {c.country}: {c.visits} flight{c.visits > 1 ? 's' : ''}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </Card>
-                        {/* Bar Chart: Flights per Year */}
-                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
-                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Year</h3>
-                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <ReBarChart data={chartData.flightsByYear}>
-                                <XAxis dataKey="year" stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
-                                <YAxis allowDecimals={false} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
-                                <Bar dataKey="count" fill="#0ea5e9" />
-                                <ReTooltip contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }} itemStyle={{ color: '#0f172a' }} wrapperStyle={{ zIndex: 50 }} cursor={{ fill: '#e0e7ef', opacity: 0.2 }} />
-                              </ReBarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </Card>
-                        {/* Bar Chart: Flights per Airline */}
-                        <Card className="p-3 sm:p-4 flex flex-col items-center bg-white dark:bg-slate-900">
-                          <h3 className="text-sm sm:text-base font-semibold mb-2 text-foreground">Flights by Airline</h3>
-                          <ChartContainer config={{}} className="w-full h-48 sm:h-56 md:h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <ReBarChart data={chartData.airlineData} layout="vertical">
-                                <YAxis dataKey="airline" type="category" width={60} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 9 }} />
-                                <XAxis type="number" allowDecimals={false} stroke="#0f172a" tick={{ fill: '#0f172a', fontSize: 10 }} />
-                                <Bar dataKey="count" fill="#f59e42" />
-                                <ReTooltip contentStyle={{ color: '#0f172a', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }} itemStyle={{ color: '#0f172a' }} wrapperStyle={{ zIndex: 50 }} cursor={{ fill: '#e0e7ef', opacity: 0.2 }} />
-                              </ReBarChart>
-                            </ResponsiveContainer>
-                          </ChartContainer>
-                        </Card>
-                      </div>
-                      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
-                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Airports</h3>
-                          <div className="text-xl sm:text-2xl font-bold">{airports.length}</div>
-                          <div className="text-xs text-muted-foreground hidden sm:block">Key: {airportsKey.slice(-20)}</div>
-                        </Card>
-                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
-                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Visits</h3>
-                          <div className="text-xl sm:text-2xl font-bold">{stats.totalVisits}</div>
-                          <div className="text-xs text-muted-foreground hidden sm:block">Calculated: {new Date().toLocaleTimeString()}</div>
-                        </Card>
-                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
-                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total Routes</h3>
-                          <div className="text-xl sm:text-2xl font-bold">{stats.totalRoutes}</div>
-                        </Card>
-                        <Card className="p-4 sm:p-6 space-y-1 sm:space-y-2">
-                          <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Countries Visited</h3>
-                          <div className="text-xl sm:text-2xl font-bold">{stats.countriesVisited}</div>
-                        </Card>
-                      </div>
-
-                      <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-2">
-                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                          <h3 className="text-base sm:text-lg font-semibold">Most Visited Airport</h3>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`fi fi-${getCountryCode(stats.mostVisitedAirport.country)} flex-shrink-0`}
-                                style={{ width: "1.2rem", height: "0.9rem" }}
-                                title={stats.mostVisitedAirport.country} />
-                              <span className="font-medium text-sm sm:text-base truncate">{stats.mostVisitedAirport.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                              <span className="font-mono bg-muted px-1.5 py-0.5 rounded-md">
-                                {stats.mostVisitedAirport.code}
-                              </span>
-                              <span>•</span>
-                              <span>{stats.mostVisitedAirport.visits} visits</span>
-                            </div>
-                          </div>
-                        </Card>
-
-                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <h3 className="text-base sm:text-lg font-semibold">Route Statistics</h3>
-                            <select
-                              className="text-xs sm:text-sm bg-muted px-2 py-1 rounded-md border border-input hover:bg-accent hover:text-accent-foreground w-full sm:w-auto"
-                              defaultValue="longest-route"
-                              onChange={(e) => {
-                                const elements = document.querySelectorAll('.route-section');
-                                elements.forEach(el => {
-                                  if (el instanceof HTMLElement) {
-                                    el.style.display = el.id === e.target.value ? 'block' : 'none';
-                                  }
-                                });
-                              }}
-                            >
-                              <option value="longest-route">Longest Route</option>
-                              <option value="shortest-route">Shortest Route</option>
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <div id="longest-route" className="route-section">
-                              <div className="flex flex-col gap-2 text-sm">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`fi fi-${getCountryCode(stats.longestRoute.from.country)} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.longestRoute.from.name}</span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
-                                    {stats.longestRoute.from.code}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 pl-4 sm:pl-6">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="h-3.5 w-3.5 text-muted-foreground"
-                                  >
-                                    <path d="M5 12h14" />
-                                    <path d="m12 5 7 7-7 7" />
-                                  </svg>
-                                  <span className="text-xs sm:text-sm text-muted-foreground">
-                                    {new Intl.NumberFormat('en-US').format(stats.longestRoute.distance)} km
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`fi fi-${getCountryCode(stats.longestRoute.to.country)} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.longestRoute.to.name}</span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
-                                    {stats.longestRoute.to.code}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div id="shortest-route" className="route-section" style={{ display: 'none' }}>
-                              <div className="flex flex-col gap-2 text-sm">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`fi fi-${getCountryCode(stats.shortestRoute.from.country)} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.shortestRoute.from.name}</span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
-                                    {stats.shortestRoute.from.code}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 pl-4 sm:pl-6">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="h-3.5 w-3.5 text-muted-foreground"
-                                  >
-                                    <path d="M5 12h14" />
-                                    <path d="m12 5 7 7-7 7" />
-                                  </svg>
-                                  <span className="text-xs sm:text-sm text-muted-foreground">
-                                    {new Intl.NumberFormat('en-US').format(stats.shortestRoute.distance)} km
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`fi fi-${getCountryCode(stats.shortestRoute.to.country)} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-medium text-xs sm:text-sm truncate min-w-0">{stats.shortestRoute.to.name}</span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
-                                    {stats.shortestRoute.to.code}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-
-                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                          <h3 className="text-base sm:text-lg font-semibold">Most Flown Route</h3>
-                          {stats.mostFlownRoute && (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                                <div className="flex items-center gap-2">
-                                  <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.from)?.country || '')} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-mono text-xs sm:text-sm">{stats.mostFlownRoute.from}</span>
-                                </div>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="h-3.5 w-3.5"
-                                >
-                                  <path d="M5 12h14" />
-                                  <path d="m12 5 7 7-7 7" />
-                                </svg>
-                                <div className="flex items-center gap-2">
-                                  <span className={`fi fi-${getCountryCode(airports.find(a => a.code === stats.mostFlownRoute.to)?.country || '')} flex-shrink-0`}
-                                    style={{ width: "1rem", height: "0.75rem" }} />
-                                  <span className="font-mono text-xs sm:text-sm">{stats.mostFlownRoute.to}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 text-muted-foreground text-xs sm:text-sm">
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="h-3.5 w-3.5"
-                                >
-                                  <path d="M16 22h2c.5 0 1-.2 1.4-.6.4-.4.6-.9.6-1.4V7.5L14.5 2H6c-.5 0-1 .2-1.4.6C4.2 3 4 3.5 4 4v3" />
-                                  <polyline points="14 2 14 8 20 8" />
-                                  <path d="M10 12h2v6" />
-                                  <path d="M12 12c-3.3 0-6 2.7-6 6s2.7 6 6 6c2.2 0 4.1-1.2 5.2-3" />
-                                </svg>
-                                {stats.mostFlownRoute.count} flights
-                              </div>
-                            </div>
-                          )}
-                        </Card>
-
-                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <h3 className="text-base sm:text-lg font-semibold">Total Distance Flown</h3>
-                            <div className="text-xl sm:text-2xl font-bold">
-                              {new Intl.NumberFormat('en-US').format(stats.totalDistance)} km
-                            </div>
-                          </div>
-                        </Card>
-
-                        <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <h3 className="text-base sm:text-lg font-semibold">Total Hours in Air</h3>
-                            <div className="text-xl sm:text-2xl font-bold">
-                              {Math.round(stats.totalFlightHours)} hours
-                            </div>
-                          </div>
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            Including taxi, takeoff, and landing times
-                          </div>
-                        </Card>
-                      </div>
-                    </>
-                  );
-                })()
-              ) : null}
-            </>
-          )}
         </TabsContent>
       </Tabs>
 

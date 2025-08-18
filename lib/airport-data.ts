@@ -11,7 +11,8 @@ export const airportData: Record<string, AirportInfo> = {
     "PFO": { name: "Paphos International", city: "Paphos", country: "Cyprus" },
     "ZRH": { name: "Zurich Airport", city: "Zurich", country: "Switzerland" },
     "VNO": { name: "Vilnius International", city: "Vilnius", country: "Lithuania" },
-    "PLQ": { name: "Palanga International", city: "Palanga", country: "Italy" },
+    // Lithuania
+    "PLQ": { name: "Palanga International", city: "Palanga", country: "Lithuania" },
     "BCN": { name: "Barcelona–El Prat", city: "Barcelona", country: "Spain" },
     "MAD": { name: "Adolfo Suárez Madrid–Barajas", city: "Madrid", country: "Spain" },
     "MLA": { name: "Malta International", city: "Valletta", country: "Malta" },
@@ -24,5 +25,11 @@ export const airportData: Record<string, AirportInfo> = {
     "WAW": { name: "Warsaw Chopin", city: "Warsaw", country: "Poland" },
     "KRK": { name: "John Paul II International", city: "Kraków", country: "Poland" },
     "RIX": { name: "Riga International", city: "Riga", country: "Latvia" },
-    "GVA": { name: "Geneva Airport", city: "Geneva", country: "Switzerland" }
+    "GVA": { name: "Geneva Airport", city: "Geneva", country: "Switzerland" },
+
+    // Egypt (fallback)
+    "HRG": { name: "Hurghada International", city: "Hurghada", country: "Egypt" },
+
+    // Greece (fallback)
+    "CFU": { name: "Corfu International Ioannis Kapodistrias", city: "Corfu", country: "Greece" }
 }; 

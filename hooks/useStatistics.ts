@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/app/lib/supabase/client'
 
 export type Statistics = {
   totalFlights: number
@@ -14,6 +14,7 @@ export type Statistics = {
 }
 
 export function useStatistics() {
+  const supabase = createClient()
   const [statistics, setStatistics] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

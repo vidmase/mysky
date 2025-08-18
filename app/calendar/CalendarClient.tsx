@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Calendar, dateFnsLocalizer, View, Views } from 'react-big-calendar'
-import { format, parse, startOfWeek, getDay } from 'date-fns'
+import { format, parse, startOfWeek, getDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
 import { enUS } from 'date-fns/locale'
 import { Flight } from '@/app/flights/FlightsClient'
 import { CalendarFlightEvent } from '@/types/calendar'
@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CalendarIcon, PlaneIcon, MapPinIcon, ClockIcon } from 'lucide-react'
 import { CalendarEvent } from './components/CalendarEvent'
 import { FlightEventModal } from './components/FlightEventModal'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './calendar.css'
 
@@ -70,6 +71,72 @@ export function CalendarClient({ initialFlights }: CalendarClientProps) {
   // Handle date navigation
   const handleNavigate = (date: Date) => {
     setCurrentDate(date)
+  }
+
+  // Custom month day header with popover details
+  type MonthDateHeaderProps = { label: string; date: Date }
+  const MonthDateHeader = ({ date }: MonthDateHeaderProps) => {
+    const dayEvents = useMemo(() => {
+      return calendarEvents.filter((evt) =>
+        isWithinInterval(date, { start: startOfDay(evt.start), end: endOfDay(evt.end) })
+      )
+    }, [calendarEvents, date])
+
+    const flightsCount = dayEvents.length
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            tabIndex={0}
+            aria-label={`Day ${format(date, 'do')}${flightsCount ? `, ${flightsCount} flights` : ''}`}
+            className="rbc-button-link flex items-center gap-1 text-foreground hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-sm"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+              }
+            }}
+          >
+            <span className="font-medium">{format(date, 'dd')}</span>
+            {flightsCount > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] leading-none px-1.5 py-0.5">
+                {flightsCount}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" side="top" className="w-80 p-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">{format(date, 'EEEE, MMM d')}</div>
+              {flightsCount > 0 && (
+                <Badge variant="secondary" className="text-[10px]">{flightsCount} flight{flightsCount > 1 ? 's' : ''}</Badge>
+              )}
+            </div>
+
+            {flightsCount === 0 ? (
+              <div className="text-xs text-muted-foreground">No flights on this day.</div>
+            ) : (
+              <ul className="space-y-2">
+                {dayEvents.map((evt) => (
+                  <li key={`${evt.title}-${evt.start.toString()}`} className="rounded-md border border-border/60 p-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <PlaneIcon className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-semibold">{evt.flightNumber}</span>
+                      <span className="text-muted-foreground">{evt.route}</span>
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      {format(evt.start, 'HH:mm')} – {format(evt.end, 'HH:mm')}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
   }
 
   return (
@@ -174,6 +241,7 @@ export function CalendarClient({ initialFlights }: CalendarClientProps) {
               onSelectEvent={handleSelectEvent}
               components={{
                 event: EventComponent,
+                month: { dateHeader: MonthDateHeader },
               }}
               eventPropGetter={(event: CalendarFlightEvent) => ({
                 style: {
@@ -184,6 +252,14 @@ export function CalendarClient({ initialFlights }: CalendarClientProps) {
                   borderRadius: '4px',
                 }
               })}
+              dayPropGetter={(date) => {
+                const hasFlights = calendarEvents.some((evt) =>
+                  isWithinInterval(date, { start: startOfDay(evt.start), end: endOfDay(evt.end) })
+                )
+                return {
+                  className: `${hasFlights ? 'bg-muted/10 hover:bg-muted/20' : ''} transition-colors`,
+                }
+              }}
               className="rbc-calendar"
             />
           </div>

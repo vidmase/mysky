@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { User } from '@supabase/auth-helpers-nextjs'
 import { useNotification } from './notification-context'
@@ -24,10 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const supabase = createClientComponentClient()
+  const supabase = useMemo(() => createClientComponentClient(), [])
   const { showSuccess, showError } = useNotification()
   const initialLoadRef = useRef(true)
   const lastNotificationRef = useRef<string | null>(null)
+  const initializedRef = useRef(false)
+  const prevUserIdRef = useRef<string | null>(null)
   const router = useRouter()
 
   const showNotification = (message: string, type: 'success' | 'error') => {
@@ -112,11 +114,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
     const getUser = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser()
         if (error) throw error
         setUser(user)
+        prevUserIdRef.current = user?.id ?? null
         if (user) {
           await createUserProfile(user)
         }
@@ -133,24 +138,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Set up auth state listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const newUser = session?.user ?? null
-      
-      // Only update user and show notification if there's an actual change
-      if (user?.id !== newUser?.id) {
-        setUser(newUser)
-        setLoading(false)
+      const newId = newUser?.id ?? null
+      const prevId = prevUserIdRef.current
+      if (newId === prevId) return
+      prevUserIdRef.current = newId
 
-        if (!initialLoadRef.current) {
-          if (newUser) {
-            await createUserProfile(newUser)
-            showNotification('Successfully signed in', 'success')
-          } else if (user) {
-            showNotification('Successfully signed out', 'success')
-            router.push('/')
-          }
+      setUser(newUser)
+      setLoading(false)
+
+      if (!initialLoadRef.current) {
+        if (newUser) {
+          await createUserProfile(newUser)
+          showNotification('Successfully signed in', 'success')
+        } else if (prevId) {
+          showNotification('Successfully signed out', 'success')
+          router.push('/')
         }
       }
     })
@@ -160,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth, showSuccess, showError, router, user])
+  }, [supabase.auth, showSuccess, showError, router])
 
   const signOut = async () => {
     try {

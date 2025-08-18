@@ -16,8 +16,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { getUserStats } from "../../../lib/services/stats"
-import { createClient } from "@/utils/supabase/client"
+import { getUserStats } from "@/src/lib/services/stats"
+import { createClient } from "@/app/lib/supabase/client"
 import { useEffect, useState } from "react"
 
 export default function StatsPage() {

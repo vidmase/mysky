@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/app/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MapPin } from 'lucide-react'
 
@@ -11,6 +11,7 @@ type AirportStats = {
 }
 
 export function MostVisitedAirport() {
+  const supabase = createClient()
   const [mostVisitedAirport, setMostVisitedAirport] = useState<AirportStats | null>(null)
   const [loading, setLoading] = useState(false)  // Start with false to prevent initial flash
   const [error, setError] = useState<string | null>(null)

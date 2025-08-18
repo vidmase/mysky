@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft, X, Loader2, Check, Mail } from "lucide-react"
+import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft, X, Loader2, Check } from "lucide-react"
 import { format, isBefore } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
@@ -287,33 +287,7 @@ export default function AddFlightPage() {
     }))
   }
 
-  // Import from Gmail: fetch latest booking email and parse
-  const handleImportFromGmail = async () => {
-    try {
-      const res = await fetch('/api/gmail/messages')
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.authUrl) {
-          // Redirect user to Google consent
-          window.location.href = data.authUrl as string
-          return
-        }
-      }
-      if (!res.ok) {
-        console.error('Gmail fetch failed')
-        return
-      }
-      const data = await res.json()
-      if (data?.parsed) {
-        // Use existing boarding pass extraction handler to fill the form
-        handleExtractedData(data.parsed)
-      } else {
-        console.warn('No booking email parsed:', data?.reason)
-      }
-    } catch (err) {
-      console.error('Gmail import error', err)
-    }
-  }
+  // Gmail import button removed (available under Flights → Tools)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -592,11 +566,7 @@ export default function AddFlightPage() {
                         <Plane className="h-5 w-5 mr-2" />
                         Flight Details
                       </h3>
-                      <div className="flex justify-end mb-2">
-                        <Button type="button" variant="secondary" onClick={handleImportFromGmail} className="gap-2">
-                          <Mail className="h-4 w-4" /> Import from Gmail
-                        </Button>
-                      </div>
+                      {/* Gmail import button intentionally removed; use Flights → Tools instead */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <Label htmlFor="flightNumber" className="flex items-center">
