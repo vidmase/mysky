@@ -8,8 +8,8 @@ const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 export function createOAuth2Client(): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const redirect = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/api/gmail/callback`
+  const redirect = process.env.APP_URL
+    ? `${process.env.APP_URL}/api/gmail/callback`
     : process.env.GOOGLE_REDIRECT_URI
 
   if (!clientId || !clientSecret || !redirect) {
