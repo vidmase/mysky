@@ -18,6 +18,9 @@ export function createOAuth2Client(redirectUri?: string): OAuth2Client {
     redirect = `${baseUrl}/api/gmail/callback`
   }
 
+  // Log the redirect URI for debugging (remove in production)
+  console.log('Google OAuth Redirect URI:', redirect)
+
   if (!clientId || !clientSecret || !redirect) {
     throw new Error('Missing Google OAuth env vars (GOOGLE_CLIENT_ID/SECRET)')
   }
@@ -26,11 +29,16 @@ export function createOAuth2Client(redirectUri?: string): OAuth2Client {
 
 export function getAuthUrl(): string {
   const oAuth2Client = createOAuth2Client()
-  return oAuth2Client.generateAuthUrl({
+  const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: GMAIL_SCOPES,
     prompt: 'consent', // ensure refresh_token the first time
   })
+  
+  // Log the auth URL for debugging (remove in production)
+  console.log('Google OAuth Auth URL:', authUrl)
+  
+  return authUrl
 }
 
 export async function getSupabaseUser() {
