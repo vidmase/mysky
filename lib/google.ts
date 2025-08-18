@@ -12,14 +12,23 @@ export function createOAuth2Client(redirectUri?: string): OAuth2Client {
   // Determine redirect URI based on environment
   let redirect = redirectUri
   if (!redirect) {
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    redirect = `${baseUrl}/api/gmail/callback`
+    // First try to use the explicit redirect URI from environment
+    if (process.env.GOOGLE_REDIRECT_URI) {
+      redirect = process.env.GOOGLE_REDIRECT_URI
+    } else {
+      // Fallback to dynamic calculation
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      redirect = `${baseUrl}/api/gmail/callback`
+    }
   }
 
   // Log the redirect URI for debugging (remove in production)
   console.log('Google OAuth Redirect URI:', redirect)
+  console.log('Environment VERCEL_URL:', process.env.VERCEL_URL)
+  console.log('Environment NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
+  console.log('Environment GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI)
 
   if (!clientId || !clientSecret || !redirect) {
     throw new Error('Missing Google OAuth env vars (GOOGLE_CLIENT_ID/SECRET)')
@@ -45,7 +54,7 @@ export async function getSupabaseUser() {
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
   const { data, error } = await supabase.auth.getUser()
-  if (error || !data?.user) return { supabase, user: null as const }
+  if (error || !data?.user) return { supabase, user: null }
   return { supabase, user: data.user }
 }
 
