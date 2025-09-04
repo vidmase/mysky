@@ -62,8 +62,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const forceLLM = /^(1|true)$/i.test(searchParams.get('forceLLM') || '')
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies })
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
@@ -94,6 +93,21 @@ export async function GET(req: Request) {
       query += ` before:${formatForGmail(edPlus)}`
     }
 
+    // Add fallback search to catch more Ryanair emails
+    let fallbackQuery = `(from:itinerary@ryanair.com OR from:ryanair.com OR subject:"Ryanair" OR subject:"Travel Itinerary")`
+    if (start) {
+      const sd = new Date(start + 'T00:00:00Z')
+      const sdMinus = new Date(sd)
+      sdMinus.setUTCDate(sdMinus.getUTCDate() - 1)
+      fallbackQuery += ` after:${formatForGmail(sdMinus)}`
+    }
+    if (end) {
+      const ed = new Date(end + 'T00:00:00Z')
+      const edPlus = new Date(ed)
+      edPlus.setUTCDate(edPlus.getUTCDate() + 1)
+      fallbackQuery += ` before:${formatForGmail(edPlus)}`
+    }
+
     const { data: existingFlights } = await supabase
       .from('vidmaflights')
       .select('reservation_number, flight_number, departure_date')
@@ -105,19 +119,75 @@ export async function GET(req: Request) {
 
     // 1) Collect all matching message IDs across pages (up to a higher cap)
     let pageToken: string | undefined = undefined
-    const maxToProcess = 200
+    const maxToProcess = 1000 // Increased to 1000 for more comprehensive search
     const allIds: string[] = []
-    while (allIds.length < maxToProcess) {
-      const listResp: any = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50, pageToken })
-      const ids = (listResp.data.messages as Array<{ id?: string | null }> | undefined)?.map((m) => m.id as string).filter(Boolean) as string[] || []
-      pageToken = (listResp.data.nextPageToken as string | undefined) || undefined
-      if (!ids.length) break
-      for (const id of ids) {
-        if (allIds.length >= maxToProcess) break
-        allIds.push(id)
+    let totalFetched = 0
+    
+    console.log(`=== Gmail Search Session ===`)
+    console.log(`Date range: ${start || 'no start'} to ${end || 'no end'}`)
+    console.log(`Max messages to process: ${maxToProcess}`)
+    
+    // Use a single, comprehensive search query for consistency
+    const comprehensiveQuery = `(from:itinerary@ryanair.com OR from:ryanair.com OR subject:"Ryanair" OR subject:"Travel Itinerary")`
+    const searchQueries = [comprehensiveQuery]
+    
+    const seenIds = new Set<string>()
+    
+    for (const searchQuery of searchQueries) {
+      if (allIds.length >= maxToProcess) break
+      
+      // Apply date filter consistently to the search query
+      let finalQuery = searchQuery
+      if (start || end) {
+        const dateFilter = `${start ? `after:${formatForGmail(new Date(start + 'T00:00:00Z'))}` : ''} ${end ? `before:${formatForGmail(new Date(end + 'T23:59:59Z'))}` : ''}`.trim()
+        finalQuery = `${searchQuery} ${dateFilter}`
       }
-      if (!pageToken) break
+      
+      console.log(`Trying search query: ${finalQuery}`)
+      pageToken = undefined
+      
+      while (allIds.length < maxToProcess) {
+        const listResp: any = await gmail.users.messages.list({ 
+          userId: 'me', 
+          q: finalQuery, 
+          maxResults: 100, // Increased from 50 to 100
+          pageToken 
+        })
+        
+        const ids = (listResp.data.messages as Array<{ id?: string | null }> | undefined)?.map((m) => m.id as string).filter(Boolean) as string[] || []
+        pageToken = (listResp.data.nextPageToken as string | undefined) || undefined
+        
+        console.log(`Fetched ${ids.length} messages (page ${Math.floor(totalFetched / 100) + 1}), total so far: ${allIds.length}`)
+        
+        if (!ids.length) break
+        
+        let newIds = 0
+        for (const id of ids) {
+          if (allIds.length >= maxToProcess) break
+          if (!seenIds.has(id)) {
+            allIds.push(id)
+            seenIds.add(id)
+            newIds++
+          }
+        }
+        
+        totalFetched += ids.length
+        console.log(`Added ${newIds} new unique messages, total unique: ${allIds.length}`)
+        
+        if (!pageToken) {
+          console.log(`No more pages available for this query. Total messages found: ${totalFetched}, unique messages: ${allIds.length}`)
+          break
+        }
+        
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
     }
+    
+    console.log(`=== Search Complete ===`)
+    console.log(`Final message count to process: ${allIds.length}`)
+    console.log(`Total messages fetched: ${totalFetched}`)
+    console.log(`Unique messages after deduplication: ${allIds.length}`)
 
     // 2) Fetch and parse messages with limited concurrency and deterministic fallback
     const previews: any[] = []
@@ -177,14 +247,19 @@ export async function GET(req: Request) {
         if (chosen.departure_iata && !chosen.departure_airport) chosen.departure_airport = chosen.departure_iata
         if (chosen.arrival_iata && !chosen.arrival_airport) chosen.arrival_airport = chosen.arrival_iata
 
-        // If purchase timestamp missing, use received header
+        // If purchase timestamp missing, use received header - BUT NEVER override departure_date
         if (dateHeader) {
           const d = new Date(dateHeader)
           if (!isNaN(d.getTime())) {
             if (!chosen.purchased_date) chosen.purchased_date = d.toISOString().slice(0,10)
             if (!chosen.purchase_time) chosen.purchase_time = d.toISOString().slice(11,16)
+            // CRITICAL: Never set departure_date to email received date here
+            // departure_date should only come from actual flight parsing
           }
         }
+
+        // DEBUG: Log what we have before enrichment
+        console.log(`BEFORE enrichment - Flight ${chosen.flight_number}: departure_date=${chosen.departure_date}, purchased_date=${chosen.purchased_date}`)
 
         // Compute duration if both times exist but duration missing
         if (!chosen.flight_duration && chosen.departure_time && chosen.arrival_time) {
@@ -260,37 +335,139 @@ export async function GET(req: Request) {
             const m = find(/\b(PNR|Booking|Reservation)\s*(Code|Number)?\s*[:#-]?\s*([A-Z0-9]{5,8})\b/i)
             if (m) p.reservation_number = m[3]
           }
-          // Dates
+          // Dates - CRITICAL: Only extract if departure_date is missing
           if (!p.departure_date) {
-            const m1 = find(/\b([A-Za-z]{3,9}\s+\d{1,2},\s*20\d{2})\b/) // Jul 31, 2025
-            const m2 = find(/\b(20\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01]))\b/) // 2025-07-31 or 2025/07/31
-            const m3 = find(/\b(\d{1,2}\s+[A-Za-z]{3,9}\s+20\d{2})\b/) // 31 Jul 2025
-            const m4 = find(/\b(\d{1,2}[\/.](0[1-9]|1[0-2])[\/.](20\d{2}))\b/) // 31/07/2025 or 31.07.2025
-            const m5 = find(/\b(\d{1,2}\s+[A-Za-z]{3,9})\b/) // 31 Jul (no year)
-            const m6 = find(/\b([A-Za-z]{3,9}\s+\d{1,2})\b/) // Jul 31 (no year)
-            const raw = m1?.[1] || m2?.[1] || m3?.[1] || m4?.[1] || m5?.[1] || m6?.[1]
-            if (raw) {
-              let d = new Date(raw)
-              // If yearless, infer from received header
-              if (isNaN(d.getTime()) && (m5 || m6)) {
-                const rec = dateHeader ? new Date(dateHeader) : new Date()
-                const baseYear = !isNaN(rec.getTime()) ? rec.getUTCFullYear() : new Date().getUTCFullYear()
-                // Try with current year
-                const try1 = new Date(`${raw} ${baseYear}`)
-                if (!isNaN(try1.getTime())) {
-                  d = try1
-                  // If inferred date is > 6 months ahead of received date, assume it was last year
-                  if (!isNaN(rec.getTime())) {
-                    const diffMs = try1.getTime() - rec.getTime()
-                    const sixMonthsMs = 1000*60*60*24*30*6
-                    if (diffMs > sixMonthsMs) {
-                      const try2 = new Date(`${raw} ${baseYear - 1}`)
-                      if (!isNaN(try2.getTime())) d = try2
-                    }
-                  }
+            console.log(`ENRICHMENT: No departure_date found, attempting to extract from text`)
+            const monthMap: Record<string, number> = {
+              jan: 0, january: 0,
+              feb: 1, february: 1,
+              mar: 2, march: 2,
+              apr: 3, april: 3,
+              may: 4,
+              jun: 5, june: 5,
+              jul: 6, july: 6,
+              aug: 7, august: 7,
+              sep: 8, sept: 8, september: 8,
+              oct: 9, october: 9,
+              nov: 10, november: 10,
+              dec: 11, december: 11,
+            }
+
+            const lines = (subj + '\n' + text).split(/\n+/).map(s => s.trim())
+
+            const parseDaynameFormat = (s: string): Date | null => {
+              // Thu, 31 Jul 2025 or Mon 31 July 2025
+              const m = s.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+(\d{1,2})\s+([A-Za-z]{3,9})\s+(20\d{2})\b/i)
+              if (!m) return null
+              const day = parseInt(m[1], 10)
+              const mon = monthMap[m[2].toLowerCase()]
+              const year = parseInt(m[3], 10)
+              if (mon == null) return null
+              const d = new Date(Date.UTC(year, mon, day))
+              return isNaN(d.getTime()) ? null : d
+            }
+
+            const parseEuropeanDmyText = (s: string): Date | null => {
+              // 31 Jul 2025
+              const m = s.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(20\d{2})\b/)
+              if (!m) return null
+              const day = parseInt(m[1],10)
+              const mon = monthMap[m[2].toLowerCase()]
+              const year = parseInt(m[3],10)
+              if (mon == null) return null
+              const d = new Date(Date.UTC(year, mon, day))
+              return isNaN(d.getTime()) ? null : d
+            }
+
+            const parseYmd = (s: string): Date | null => {
+              const m = s.match(/\b(20\d{2})[-\/](0[1-9]|1[0-2])[-\/](0[1-9]|[12]\d|3[01])\b/)
+              if (!m) return null
+              const d = new Date(Date.UTC(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)))
+              return isNaN(d.getTime()) ? null : d
+            }
+
+            const parseDmy = (s: string): Date | null => {
+              // 31/07/2025 or 31.07.2025
+              const m = s.match(/\b(\d{1,2})[\/.](0[1-9]|1[0-2])[\/.](20\d{2})\b/)
+              if (!m) return null
+              const d = new Date(Date.UTC(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)))
+              return isNaN(d.getTime()) ? null : d
+            }
+
+            const tryParseLoose = (s: string): Date | null => {
+              // Jul 31, 2025 OR Jul 31 OR 31 Jul
+              const withYearComma = s.match(/\b([A-Za-z]{3,9})\s+(\d{1,2}),\s*(20\d{2})\b/)
+              if (withYearComma) {
+                const mon = monthMap[withYearComma[1].toLowerCase()]
+                const day = parseInt(withYearComma[2],10)
+                const year = parseInt(withYearComma[3],10)
+                if (mon != null) {
+                  const d = new Date(Date.UTC(year, mon, day))
+                  return isNaN(d.getTime()) ? null : d
                 }
               }
-              if (!isNaN(d.getTime())) p.departure_date = d.toISOString().slice(0,10)
+              const dayMonYear = parseEuropeanDmyText(s)
+              if (dayMonYear) return dayMonYear
+              const monDay = s.match(/\b([A-Za-z]{3,9})\s+(\d{1,2})\b/)
+              const dayMon = s.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\b/)
+              const rec = dateHeader ? new Date(dateHeader) : new Date()
+              const baseYear = !isNaN(rec.getTime()) ? rec.getUTCFullYear() : new Date().getUTCFullYear()
+              if (monDay) {
+                const mon = monthMap[monDay[1].toLowerCase()]
+                const day = parseInt(monDay[2],10)
+                if (mon != null) {
+                  let d = new Date(Date.UTC(baseYear, mon, day))
+                  if (!isNaN(rec.getTime())) {
+                    const diffMs = d.getTime() - rec.getTime()
+                    const sixMonthsMs = 1000*60*60*24*30*6
+                    if (diffMs > sixMonthsMs) d = new Date(Date.UTC(baseYear - 1, mon, day))
+                  }
+                  return d
+                }
+              }
+              if (dayMon) {
+                const day = parseInt(dayMon[1],10)
+                const mon = monthMap[dayMon[2].toLowerCase()]
+                if (mon != null) {
+                  let d = new Date(Date.UTC(baseYear, mon, day))
+                  if (!isNaN(rec.getTime())) {
+                    const diffMs = d.getTime() - rec.getTime()
+                    const sixMonthsMs = 1000*60*60*24*30*6
+                    if (diffMs > sixMonthsMs) d = new Date(Date.UTC(baseYear - 1, mon, day))
+                  }
+                  return d
+                }
+              }
+              return null
+            }
+
+            // Strategy 1: Prefer a date near explicit keywords or near a flight number line
+            const keywordRes = [/depart/i, /outbound/i, /flight\s+[A-Z]{2}\s?\d{3,5}/i, /FR\s?\d{3,5}/i]
+            const parseAroundIndex = (idx: number): Date | null => {
+              for (let j = Math.max(0, idx - 2); j <= Math.min(lines.length - 1, idx + 3); j++) {
+                const s = lines[j]
+                const d = parseDaynameFormat(s) || parseYmd(s) || parseDmy(s) || tryParseLoose(s)
+                if (d) return d
+              }
+              return null
+            }
+            let extracted: Date | null = null
+            for (let i = 0; i < lines.length && !extracted; i++) {
+              if (keywordRes.some(r => r.test(lines[i]))) {
+                extracted = parseAroundIndex(i)
+              }
+            }
+            // Strategy 2: Fallback - scan entire text for known formats
+            if (!extracted) {
+              for (const s of lines) {
+                const d = parseDaynameFormat(s) || parseYmd(s) || parseDmy(s) || tryParseLoose(s)
+                if (d) { extracted = d; break }
+              }
+            }
+
+            if (extracted && !isNaN(extracted.getTime())) {
+              p.departure_date = extracted.toISOString().slice(0,10)
+              console.log(`ENRICHMENT: Extracted departure_date: ${p.departure_date} from nearby context`)
             }
           }
           // Times
@@ -325,22 +502,29 @@ export async function GET(req: Request) {
           }
         }
         enrichParsed(chosen, subject, combined)
+        
+        // DEBUG: Log what we have after enrichment
+        console.log(`AFTER enrichment - Flight ${chosen.flight_number}: departure_date=${chosen.departure_date}, purchased_date=${chosen.purchased_date}`)
 
         // Validate/sanitize critical fields expected by UI
         const sanitize = (p: any) => {
+          console.log(`BEFORE sanitize - Flight ${p.flight_number}: departure_date=${p.departure_date}, purchased_date=${p.purchased_date}`)
           // Reservation must look like PNR (5-8 alnum). Otherwise blank so UI shows '—'
           if (p.reservation_number && !/^[A-Z0-9]{5,8}$/i.test(String(p.reservation_number).trim())) {
             p.reservation_number = ''
           }
           // Normalize flight number (e.g., FR6882)
           if (p.flight_number) {
-            const m = String(p.flight_number).match(/[A-Z]{2}\s?\d{2,4}/i)
+            const m = String(p.flight_number).match(/[A-Z]{2}\s?\d{2,5}/i)
             p.flight_number = m ? m[0].replace(/\s+/g,'').toUpperCase() : String(p.flight_number).toUpperCase()
           }
           // Dates to ISO (YYYY-MM-DD)
           if (p.departure_date) {
             const d = new Date(p.departure_date)
-            if (!isNaN(d.getTime())) p.departure_date = d.toISOString().slice(0,10)
+            if (!isNaN(d.getTime())) {
+              p.departure_date = d.toISOString().slice(0,10)
+              console.log(`SANITIZE: Normalized departure_date to ${p.departure_date}`)
+            }
           }
           // Times HH:mm
           const fixTime = (t: string) => {
@@ -358,11 +542,8 @@ export async function GET(req: Request) {
           }
           if (p.departure_time) p.departure_time = fixTime(p.departure_time)
           if (p.arrival_time) p.arrival_time = fixTime(p.arrival_time)
-          // Last-resort fallback for missing flight date: use received date for preview
-          if (!p.departure_date && dateHeader) {
-            const d = new Date(dateHeader)
-            if (!isNaN(d.getTime())) p.departure_date = d.toISOString().slice(0,10)
-          }
+          // Do NOT set departure_date from email received date. If parsing didn't find a
+          // flight date, leave it empty so the UI shows '—' instead of a wrong date.
           // If arrival earlier than departure and arrival_date missing, assume next day
           if (p.departure_date && p.departure_time && p.arrival_time && !p.arrival_date) {
             const dm = p.departure_time.match(/^(\d{2}):(\d{2})$/)
@@ -381,10 +562,13 @@ export async function GET(req: Request) {
           }
           return p
         }
-        // Debug: Log the parsed times to see what's being extracted
-        console.log(`Flight ${chosen.flight_number || 'Unknown'}: dep_time=${chosen.departure_time}, arr_time=${chosen.arrival_time}`)
+        // Debug: Log the parsed data to see what's being extracted
+        console.log(`Flight ${chosen.flight_number || 'Unknown'}: dep_date=${chosen.departure_date}, dep_time=${chosen.departure_time}, arr_time=${chosen.arrival_time}`)
         
         sanitize(chosen)
+        
+        // DEBUG: Log final result before returning
+        console.log(`FINAL RESULT - Flight ${chosen.flight_number}: departure_date=${chosen.departure_date}, purchased_date=${chosen.purchased_date}`)
 
         const depISO = chosen.departure_date ? new Date(chosen.departure_date).toISOString().slice(0,10) : ''
         const key = `${(chosen.flight_number || '').trim()}|${(chosen.reservation_number || '').trim()}|${depISO}`
@@ -407,7 +591,60 @@ export async function GET(req: Request) {
     // 3) Sort newest first for consistent UI
     previews.sort((a, b) => new Date(b.received_at || 0).getTime() - new Date(a.received_at || 0).getTime())
 
-    return NextResponse.json({ items: previews })
+    // 4) Filter by date range if specified - use departure date only for travel date filtering
+    let filteredPreviews = previews
+    if (start || end) {
+      filteredPreviews = previews.filter(item => {
+        // Only use departure date for filtering - this is the actual travel date
+        const departureDate = item.parsed?.departure_date
+        if (!departureDate) return false
+        
+        const departureDateObj = new Date(departureDate)
+        if (isNaN(departureDateObj.getTime())) return false
+        
+        const departureDateISO = departureDateObj.toISOString().slice(0, 10)
+        
+        // Check start date
+        if (start && departureDateISO < start) return false
+        
+        // Check end date
+        if (end && departureDateISO > end) return false
+        
+        return true
+      })
+      
+      console.log(`=== Date Range Filtering by Departure Date ===`)
+      console.log(`Travel date range: ${start || 'unlimited'} to ${end || 'unlimited'}`)
+      console.log(`Total emails before filtering: ${previews.length}`)
+      console.log(`Emails with flights in date range: ${filteredPreviews.length}`)
+      console.log(`Filtered out: ${previews.length - filteredPreviews.length} emails`)
+      
+      // Log some examples of filtered emails for debugging
+      const filteredOut = previews.filter(item => {
+        const departureDate = item.parsed?.departure_date
+        if (!departureDate) return true
+        const departureDateObj = new Date(departureDate)
+        if (isNaN(departureDateObj.getTime())) return true
+        const departureDateISO = departureDateObj.toISOString().slice(0, 10)
+        if (start && departureDateISO < start) return true
+        if (end && departureDateISO > end) return true
+        return false
+      })
+      
+      if (filteredOut.length > 0) {
+        console.log(`Sample filtered out emails:`)
+        filteredOut.slice(0, 3).forEach(item => {
+          const departureDate = item.parsed?.departure_date
+          console.log(`  - ${item.subject} (departure date: ${departureDate || 'not found'})`)
+        })
+      }
+    }
+
+    console.log(`=== Final Result ===`)
+    console.log(`Returning ${filteredPreviews.length} emails to frontend`)
+    console.log(`====================`)
+    
+    return NextResponse.json({ items: filteredPreviews })
   } catch (e: any) {
     const message = e?.message || 'Unknown error'
     if (message.includes('invalid_grant') || message.includes('unauthorized_client')) {

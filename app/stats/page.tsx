@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +18,9 @@ import {
   Tooltip,
   CartesianGrid,
   LabelList,
+  LineChart,
+  Line,
+  Sector,
 } from "recharts"
 
 type Flight = {
@@ -43,6 +46,10 @@ export default function StatsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [stats, setStats] = useState<any | null>(null)
+  const [nowTick, setNowTick] = useState(0) // forces re-render each second for "time ago"
+  const [activeCountryIdx, setActiveCountryIdx] = useState<number | null>(null)
+  const [hoverYearIdx, setHoverYearIdx] = useState<number | null>(null)
+  const [hoverAirlineIdx, setHoverAirlineIdx] = useState<number | null>(null)
 
   const fetchFlights = async () => {
     setIsRefreshing(true)
@@ -68,6 +75,12 @@ export default function StatsPage() {
 
   useEffect(() => {
     void fetchFlights()
+  }, [])
+
+  // live ticker to update "last updated" text
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((v) => v + 1), 1000)
+    return () => clearInterval(t)
   }, [])
 
   const chartData = useMemo(() => {
@@ -131,6 +144,33 @@ export default function StatsPage() {
     "#bcbd22",
     "#17becf",
   ]
+
+  // simple animated counter without external deps
+  const useCountUp = (value: number | undefined, duration = 8000) => {
+    const [display, setDisplay] = useState<number>(0)
+    const [isMounted, setIsMounted] = useState(false)
+    const startRef = useRef<number | null>(null)
+    const fromRef = useRef<number>(0)
+    const target = typeof value === "number" ? value : 0
+
+    useEffect(() => {
+      fromRef.current = display
+      startRef.current = null
+      let raf = 0
+      const step = (ts: number) => {
+        if (startRef.current === null) startRef.current = ts
+        const p = Math.min(1, (ts - startRef.current) / duration)
+        const eased = 1 - Math.pow(1 - p, 3) // easeOutCubic
+        setDisplay(fromRef.current + (target - fromRef.current) * eased)
+        if (p < 1) raf = requestAnimationFrame(step)
+      }
+      raf = requestAnimationFrame(step)
+      return () => cancelAnimationFrame(raf)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [target])
+
+    return Math.round(display)
+  }
 
   // Fallback calculation on the client when API stats are unavailable
   const fallbackStats = useMemo(() => {
@@ -224,41 +264,68 @@ export default function StatsPage() {
   const formatNumber = (value?: number) =>
     typeof value === 'number' ? value.toLocaleString() : '—'
 
+  const timeAgo = (d?: Date | null) => {
+    if (!d) return "—"
+    const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
+    if (sec < 60) return `${sec}s ago`
+    const m = Math.floor(sec / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    return `${h}h ago`
+  }
+
+  // counts for animated counters
+  const airportsCount = useCountUp(viewStats?.totalAirports)
+  const visitsCount = useCountUp(viewStats?.totalVisits)
+  const routesCount = useCountUp(viewStats?.totalRoutes)
+  const countriesCount = useCountUp(viewStats?.totalCountries)
+  const hoursCount = useCountUp(viewStats?.hoursInAir)
+  const kmCount = useCountUp(viewStats?.totalKilometers)
+
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold">Flight Statistics</h2>
-          <div className="text-sm text-muted-foreground mt-1">
-            <span>{flights.length} flights</span>
-            {lastUpdate && <span> • Last updated: {lastUpdate.toLocaleTimeString()}</span>}
+    <div className="container mx-auto px-4 py-8 space-y-6">
+      {/* Hero header */}
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-indigo-600/15 via-sky-500/10 to-purple-600/10 dark:from-indigo-400/10 dark:via-sky-300/10 dark:to-fuchsia-400/10 p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Flight Statistics
+            </h2>
+            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+              <span>{flights.length} flights</span>
+              <span>•</span>
+              <span>Last updated {timeAgo(lastUpdate)}</span>
+            </div>
           </div>
+          <Button onClick={fetchFlights} variant="outline" size="sm" className="gap-2 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </div>
-        <Button onClick={fetchFlights} variant="outline" size="sm" className="gap-2">
-          <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        {/* subtle animated orbs */}
+        <div className="pointer-events-none absolute -top-12 -right-12 h-36 w-36 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-sky-500/20 blur-3xl" />
       </div>
 
       {/* KPI summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Total Airports</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(viewStats?.totalAirports)}</div>
+        <Card className="p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Airports</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums">{formatNumber(airportsCount)}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Total Visits</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(viewStats?.totalVisits)}</div>
+        <Card className="p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Visits</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums">{formatNumber(visitsCount)}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Total Routes</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(viewStats?.totalRoutes)}</div>
+        <Card className="p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Routes</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums">{formatNumber(routesCount)}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Countries Visited</div>
-          <div className="mt-1 text-2xl font-semibold">{formatNumber(viewStats?.totalCountries)}</div>
+        <Card className="p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Countries Visited</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums">{formatNumber(countriesCount)}</div>
         </Card>
-          </div>
+      </div>
 
       {/* Detail cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -318,7 +385,7 @@ export default function StatsPage() {
             <CardTitle className="text-lg">Total Hours in Air</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="text-3xl font-bold">{formatNumber(viewStats?.hoursInAir)} hours</div>
+            <div className="text-3xl font-bold tabular-nums">{formatNumber(hoursCount)} hours</div>
             <div className="text-xs text-muted-foreground">Including taxi, takeoff, and landing times</div>
           </CardContent>
         </Card>
@@ -328,20 +395,41 @@ export default function StatsPage() {
             <CardTitle className="text-lg">Total Distance Flown</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="text-3xl font-bold">{formatNumber(viewStats?.totalKilometers)} km</div>
+            <div className="text-3xl font-bold tabular-nums">{formatNumber(kmCount)} km</div>
               </CardContent>
             </Card>
           </div>
 
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        <Card className="p-4 flex flex-col items-center">
+        <Card className="p-4 flex flex-col items-center animate-fade-in">
           <h3 className="text-base font-semibold mb-2">Flights by Country</h3>
           <ChartContainer config={{}} className="w-full h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={chartData.countryData} dataKey="visits" nameKey="country" outerRadius={90} innerRadius={40} paddingAngle={2}>
+                <Pie
+                  data={chartData.countryData}
+                  dataKey="visits"
+                  nameKey="country"
+                  outerRadius={90}
+                  innerRadius={40}
+                  paddingAngle={2}
+                  isAnimationActive
+                  animationBegin={150}
+                  animationDuration={800}
+                  animationEasing="ease-out"
+                  activeIndex={activeCountryIdx == null ? undefined : activeCountryIdx}
+                  activeShape={(props: any) => (
+                    <Sector {...props} outerRadius={(props.outerRadius as number) + 6} />
+                  )}
+                  onMouseLeave={() => setActiveCountryIdx(null)}
+                >
                   {chartData.countryData.map((_, idx) => (
-                    <Cell key={`c-${idx}`} fill={colors[idx % colors.length]} />
+                    <Cell
+                      key={`c-${idx}`}
+                      fill={colors[idx % colors.length]}
+                      fillOpacity={activeCountryIdx == null || activeCountryIdx === idx ? 1 : 0.6}
+                      onMouseEnter={() => setActiveCountryIdx(idx)}
+                    />
                   ))}
                   <LabelList dataKey="country" position="outside" className="text-xs" />
                 </Pie>
@@ -354,7 +442,7 @@ export default function StatsPage() {
           )}
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 animate-fade-in">
           <h3 className="text-base font-semibold mb-2">Flights by Year</h3>
           <ChartContainer config={{}} className="w-full h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -363,13 +451,31 @@ export default function StatsPage() {
                 <XAxis dataKey="year" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#1f77b4" radius={[4,4,0,0]} />
+                <Bar
+                  dataKey="count"
+                  fill="#1f77b4"
+                  radius={[4,4,0,0]}
+                  isAnimationActive
+                  animationBegin={150}
+                  animationDuration={700}
+                >
+                  {chartData.flightsByYear.map((_, idx) => (
+                    <Cell
+                      key={`y-${idx}`}
+                      fill="#1f77b4"
+                      fillOpacity={hoverYearIdx == null || hoverYearIdx === idx ? 1 : 0.6}
+                      className="bar-spring"
+                      onMouseEnter={() => setHoverYearIdx(idx)}
+                      onMouseLeave={() => setHoverYearIdx(null)}
+                    />
+                  ))}
+                </Bar>
               </ReBarChart>
             </ResponsiveContainer>
           </ChartContainer>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 animate-fade-in">
           <h3 className="text-base font-semibold mb-2">Flights by Airline</h3>
           <ChartContainer config={{}} className="w-full h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -378,12 +484,51 @@ export default function StatsPage() {
                 <XAxis type="number" allowDecimals={false} />
                 <YAxis type="category" dataKey="airline" width={80} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#ff7f0e" radius={[0,4,4,0]} />
+                <Bar
+                  dataKey="count"
+                  fill="#ff7f0e"
+                  radius={[0,4,4,0]}
+                  isAnimationActive
+                  animationBegin={150}
+                  animationDuration={700}
+                >
+                  {chartData.airlineData.map((_, idx) => (
+                    <Cell
+                      key={`a-${idx}`}
+                      fill="#ff7f0e"
+                      fillOpacity={hoverAirlineIdx == null || hoverAirlineIdx === idx ? 1 : 0.6}
+                      className="bar-spring"
+                      onMouseEnter={() => setHoverAirlineIdx(idx)}
+                      onMouseLeave={() => setHoverAirlineIdx(null)}
+                    />
+                  ))}
+                </Bar>
               </ReBarChart>
             </ResponsiveContainer>
           </ChartContainer>
         </Card>
       </div>
+
+      {/* Trend sparkline */}
+      {chartData.flightsByYear.length > 1 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-base font-semibold">Long-term Trend</h3>
+            <span className="text-xs text-muted-foreground">Flights per year</span>
+          </div>
+          <ChartContainer config={{}} className="w-full h-28">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData.flightsByYear}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="year" hide />
+                <YAxis hide />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#6366F1" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </Card>
+      )}
     </div>
   )
 }

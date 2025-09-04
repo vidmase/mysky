@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     let requestedIds: string[] | undefined
     let start: string | undefined
     let end: string | undefined
+    let purchasedDate: string | undefined // YYYY-MM-DD to filter by email received date (purchase date)
     try {
       const json = await req.json().catch(() => null)
       if (json && Array.isArray(json.ids)) {
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
       }
       if (json && typeof json.start === 'string') start = json.start
       if (json && typeof json.end === 'string') end = json.end
+      if (json && typeof json.purchasedDate === 'string') purchasedDate = json.purchasedDate
     } catch {}
 
     // Build Gmail query by received date window when ids not provided
@@ -66,13 +68,19 @@ export async function POST(req: Request) {
       const day = String(d.getUTCDate()).padStart(2, '0')
       return `${y}/${m}/${day}`
     }
-    if (start) {
+    // If a specific purchasedDate is provided, narrow to that day (ignores start/end)
+    if (purchasedDate) {
+      const d = new Date(purchasedDate + 'T00:00:00Z')
+      const before = new Date(d); before.setUTCDate(before.getUTCDate() + 1)
+      const after = new Date(d); after.setUTCDate(after.getUTCDate() - 1)
+      query += ` after:${formatForGmail(after)} before:${formatForGmail(before)}`
+    } else if (start) {
       const sd = new Date(start + 'T00:00:00Z')
       const sdMinus = new Date(sd)
       sdMinus.setUTCDate(sdMinus.getUTCDate() - 1)
       query += ` after:${formatForGmail(sdMinus)}`
     }
-    if (end) {
+    if (!purchasedDate && end) {
       const ed = new Date(end + 'T00:00:00Z')
       const edPlus = new Date(ed)
       edPlus.setUTCDate(edPlus.getUTCDate() + 1)
@@ -102,9 +110,10 @@ export async function POST(req: Request) {
           const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
           const headers = (msg.data.payload?.headers as Array<{ name?: string | null; value?: string | null }> | undefined) || []
           const subject = (headers.find((h) => (h.name ?? '').toLowerCase() === 'subject')?.value as string | undefined) || ''
+          const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
           const bodyText = extractPlainText(msg.data.payload)
           const combined = `${subject}\n\n${bodyText}`
-          const flights = await extractFlightsFromTextLLM(combined)
+          const flights = await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
           const parsed = flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]
           if (!parsed) {
             errors.push({ id, reason: 'parse_failed' })
@@ -166,9 +175,10 @@ export async function POST(req: Request) {
             const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
             const headers = (msg.data.payload?.headers as Array<{ name?: string | null; value?: string | null }> | undefined) || []
             const subject = (headers.find((h) => (h.name ?? '').toLowerCase() === 'subject')?.value as string | undefined) || ''
+            const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
             const bodyText = extractPlainText(msg.data.payload)
             const combined = `${subject}\n\n${bodyText}`
-            const flights = await extractFlightsFromTextLLM(combined)
+            const flights = await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
             const parsed = flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]
             if (!parsed) {
               errors.push({ id, reason: 'parse_failed' })

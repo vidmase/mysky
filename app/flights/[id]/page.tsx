@@ -35,6 +35,8 @@ import { toast } from "sonner"
 import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { DateTime } from 'luxon'
+import { calculateDuration as sharedCalculateDuration, formatTimeToHHMM } from '@/app/flights/lib/flight-utils'
+
 
 
 interface Flight {
@@ -47,6 +49,7 @@ interface Flight {
   departure_date: string
   departure_time: string
   arrival_time: string
+  arrival_date?: string | null
   total_receipt: string
   purchased_date: string
   purchase_time: string
@@ -56,6 +59,7 @@ interface Flight {
   departure_iata: string | null
   seat: string | null
   notes: string | null
+  aircraft_registration?: string | null
 }
 
 // Robust airline logo resolver supporting codes and names
@@ -279,11 +283,24 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [flight, setFlight] = useState<Flight | null>(null)
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [actualTimes, setActualTimes] = useState<{
+    depActual: string | null
+    arrActual: string | null
+    depScheduled: string | null
+    arrScheduled: string | null
+    depDelayMinutes: number | null
+    arrDelayMinutes: number | null
+    status: string | null
+    aircraftRegistration: string | null
+  } | null>(null)
   const [isEditingNotes, setIsEditingNotes] = useState(false)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { id } = React.use(params)
+
+  // Aircraft photo feature removed: no registration editor state
 
   useEffect(() => {
     const fetchFlightData = async () => {
@@ -306,6 +323,62 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
     fetchFlightData()
   }, [id])
+
+  // Fetch real-time/historical actual times by flight number and date
+  useEffect(() => {
+    const loadStatus = async () => {
+      if (!flight?.flight_number || !flight?.departure_date) return
+      setStatusLoading(true)
+      try {
+        const baseDate = flight.departure_date.slice(0, 10)
+        const roles: Array<'Departure'|'Arrival'|'Both'> = ['Departure', 'Arrival', 'Both']
+        const offsets = [0, -1, 1] // try same day, previous day, next day
+
+        let chosen: any | null = null
+
+        for (const off of offsets) {
+          const dt = DateTime.fromISO(baseDate).plus({ days: off }).toISODate()!
+          for (const role of roles) {
+            const url = `/api/flight-status?flightNumber=${encodeURIComponent(flight.flight_number)}&date=${encodeURIComponent(dt)}&dateLocalRole=${role}`
+            const res = await fetch(url)
+            if (!res.ok) continue
+            const json = await res.json()
+            const flightsArr: any[] = json?.flights || []
+            if (!flightsArr.length) continue
+            // Prefer match by IATA pair, otherwise take the first
+            const m = flightsArr.find((f: any) => (
+              (f?.departure?.airport?.iata && flight.departure_iata && f.departure.airport.iata === flight.departure_iata) ||
+              (f?.arrival?.airport?.iata && flight.arrival_iata && f.arrival.airport.iata === flight.arrival_iata)
+            )) || flightsArr[0]
+            if (m) {
+              chosen = m
+              // If this attempt includes a registration, stop early
+              if (m?.aircraft?.reg || m?.aircraft?.registration) break
+            }
+          }
+          if (chosen?.aircraft?.reg || chosen?.aircraft?.registration) break
+        }
+
+        if (chosen) {
+          setActualTimes({
+            depActual: chosen?.departure?.actualTimeLocal ?? chosen?.departure?.estimatedTimeLocal ?? null,
+            arrActual: chosen?.arrival?.actualTimeLocal ?? chosen?.arrival?.estimatedTimeLocal ?? null,
+            depScheduled: chosen?.departure?.scheduledTimeLocal ?? null,
+            arrScheduled: chosen?.arrival?.scheduledTimeLocal ?? null,
+            depDelayMinutes: chosen?.departure?.delayMinutes ?? null,
+            arrDelayMinutes: chosen?.arrival?.delayMinutes ?? null,
+            status: chosen?.status ?? null,
+            aircraftRegistration: chosen?.aircraft?.reg ?? chosen?.aircraft?.registration ?? null,
+          })
+        }
+      } catch {
+        // ignore
+      } finally {
+        setStatusLoading(false)
+      }
+    }
+    loadStatus()
+  }, [flight?.flight_number, flight?.departure_date, flight?.departure_iata, flight?.arrival_iata])
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -391,38 +464,56 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
     }
   }
 
-  const calculateDuration = () => {
-    try {
-      if (
-        !flight ||
-        !flight.departure_date ||
-        !flight.departure_time ||
-        !flight.arrival_time ||
-        !flight.departure_iata ||
-        !flight.arrival_iata
-      ) {
-        return "Duration N/A"
+  const renderDuration = () => {
+    if (!flight) return 'Duration N/A'
+    const result = sharedCalculateDuration(
+      flight.departure_time,
+      flight.arrival_time,
+      {
+        departureDate: flight.departure_date,
+        arrivalDate: flight.arrival_date ?? undefined,
+        departureIata: flight.departure_iata,
+        arrivalIata: flight.arrival_iata,
+        departureAirportName: flight.departure_airport,
+        arrivalAirportName: flight.arrival_airport,
       }
-      const depTz = airportTimeZones[flight.departure_iata];
-      const arrTz = airportTimeZones[flight.arrival_iata];
-      if (!depTz || !arrTz) return "Duration N/A";
-      const [depYear, depMonth, depDay] = flight.departure_date.split("-").map(Number);
-      const [depHour, depMin] = flight.departure_time.split(":").map(Number);
-      const [arrHour, arrMin] = flight.arrival_time.split(":").map(Number);
-      const dep = DateTime.fromObject({ year: depYear, month: depMonth, day: depDay, hour: depHour, minute: depMin }, { zone: depTz });
-      let arr = DateTime.fromObject({ year: depYear, month: depMonth, day: depDay, hour: arrHour, minute: arrMin }, { zone: arrTz });
-      if (arr < dep) arr = arr.plus({ days: 1 });
-      const diff = arr.toUTC().diff(dep.toUTC(), ["hours", "minutes"]);
-      const hours = Math.floor(diff.hours);
-      const minutes = Math.round(diff.minutes);
-      return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
-    } catch (error) {
-      return "Duration N/A"
-    }
+    )
+    return result || 'Duration N/A'
+  }
+
+  // Show delay/early vs scheduled in minutes
+  const renderDelta = (scheduledTime: string, actualLocal?: string | null, iata?: string | null) => {
+    if (!actualLocal) return null
+    try {
+      const tz = iata ? airportTimeZones[iata] : undefined
+      if (!tz || !flight) return null
+      const date = flight.departure_date?.slice(0,10) || ''
+      const sched = DateTime.fromISO(`${date}T${formatTime(scheduledTime)}`, { zone: tz })
+      const actual = DateTime.fromISO(actualLocal, { zone: tz })
+      if (!sched.isValid || !actual.isValid) return null
+      const diffMin = Math.round(actual.diff(sched, 'minutes').minutes)
+      if (diffMin === 0) return <span className="text-xs text-muted-foreground">On time</span>
+      const sign = diffMin > 0 ? '+' : ''
+      const cls = diffMin > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+      return <span className={`text-xs font-medium ${cls}`}>{sign}{diffMin}m {diffMin>0?'late':'early'}</span>
+    } catch { return null }
+  }
+
+  // Format provider's actual local timestamp (ISO with zone) to HH:mm in airport's IANA tz
+  const formatActualLocal = (actualLocal?: string | null, iata?: string | null) => {
+    if (!actualLocal || !iata) return null
+    const tz = airportTimeZones[iata]
+    if (!tz) return null
+    const dt = DateTime.fromISO(actualLocal, { zone: tz })
+    return dt.isValid ? dt.toFormat('HH:mm') : null
   }
 
   // Get airline color (fallback to default)
   const airlineColor = flight.airline ? airlineColors[flight.airline.replace(/\s+/g, '').toLowerCase()] || '#38bdf8' : '#38bdf8';
+
+  // Aircraft photo feature removed: no registration inference
+
+  // Aircraft photo feature removed: no registration logic or handlers
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -567,7 +658,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                   <div className="absolute right-0 top-1/2 w-4 h-4 bg-airport rounded-full border-2 border-white shadow" style={{ transform: 'translateY(-50%)' }} />
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground font-medium text-center">
-                  {calculateDuration()}
+                  {renderDuration()}
                 </div>
               </div>
 
@@ -638,6 +729,8 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
           </TabsList>
 
           <TabsContent value="details" className="space-y-6">
+            {/* Aircraft photo feature removed */}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="border-t-4 border-t-flight shadow-md">
                 <CardHeader>
@@ -666,7 +759,16 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       <Clock className="h-4 w-4 text-flight" />
                     </div>
                     <div>
-                      <div className="font-medium">{formatTime(flight.departure_time)}</div>
+                      <div className="font-medium">{formatTime(flight.departure_time)} <span className="text-xs text-muted-foreground ml-2">Scheduled</span></div>
+                      {actualTimes?.depActual && (
+                        <div className="text-sm">
+                          <span className="font-medium">Actual:</span> {formatActualLocal(actualTimes.depActual, flight.departure_iata) || '—'}
+                          <span className="ml-2">{renderDelta(flight.departure_time, actualTimes.depActual, flight.departure_iata)}</span>
+                        </div>
+                      )}
+                      {!actualTimes?.depActual && statusLoading && (
+                        <div className="text-xs text-muted-foreground">Fetching live status…</div>
+                      )}
                       <div className="text-sm text-muted-foreground">Local time</div>
                     </div>
                   </div>
@@ -709,7 +811,16 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       <Clock className="h-4 w-4 text-airport" />
                     </div>
                     <div>
-                      <div className="font-medium">{formatTime(flight.arrival_time)}</div>
+                      <div className="font-medium">{formatTime(flight.arrival_time)} <span className="text-xs text-muted-foreground ml-2">Scheduled</span></div>
+                      {actualTimes?.arrActual && (
+                        <div className="text-sm">
+                          <span className="font-medium">Actual:</span> {formatActualLocal(actualTimes.arrActual, flight.arrival_iata) || '—'}
+                          <span className="ml-2">{renderDelta(flight.arrival_time, actualTimes.arrActual, flight.arrival_iata)}</span>
+                        </div>
+                      )}
+                      {!actualTimes?.arrActual && statusLoading && (
+                        <div className="text-xs text-muted-foreground">Fetching live status…</div>
+                      )}
                       <div className="text-sm text-muted-foreground">Local time</div>
                     </div>
                   </div>

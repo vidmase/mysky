@@ -2,7 +2,8 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { FlightsClient, type Flight, type FlightsCounts } from './FlightsClient'
+import { FlightsClient, type FlightsCounts } from './FlightsClient'
+import type { Flight } from '@/types/flight'
 
 // Define the Flight type based on the table schema
 // Types re-exported from FlightsClient

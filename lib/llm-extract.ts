@@ -145,7 +145,7 @@ export function parseGeminiResponse(text: string): FlightData[] {
 }
 
 export async function extractFlightsFromTextLLM(emailText: string, hints?: { subject?: string; receivedAt?: string }): Promise<FlightData[]> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { temperature: 0 } })
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro', generationConfig: { temperature: 0 } })
 
   // 1) Normalize noisy email text a bit for better extraction
   const normalize = (t: string) =>
@@ -158,6 +158,8 @@ export async function extractFlightsFromTextLLM(emailText: string, hints?: { sub
 
   const text = normalize(emailText || '')
   if (!text) return []
+  // If no API key, skip LLM paths entirely
+  const hasGeminiKey = !!(process.env.GEMINI_API_KEY && String(process.env.GEMINI_API_KEY).trim())
 
   // 2) Prefer structured JSON response with schema
   const generationConfig: any = {
@@ -211,55 +213,103 @@ export async function extractFlightsFromTextLLM(emailText: string, hints?: { sub
 
   const instruction = [
     {
-      text:
-        'Extract ALL flight segments found in this airline itinerary/confirmation email. Output a JSON array of flight objects strictly matching the provided schema. Use ISO date format YYYY-MM-DD and 24h HH:mm times. Do not invent values. If a field is unknown, use empty string or omit optional fields. Include both outbound and return when present. If multiple passengers exist, still emit per-segment flight records (you may include passengers array).',
+      text: `Task: Extract ALL flight segments from the airline itinerary/confirmation email and return a JSON array strictly matching the provided schema.
+
+Absolute rules:
+- Dates must be ISO: YYYY-MM-DD. Times must be 24h HH:mm.
+- Do NOT infer travel dates from the email's received/sent timestamp.
+- If a value is not explicitly present, set it to an empty string (or omit optional fields). Never hallucinate.
+- Include all segments: outbound and return when present.
+
+Ryanair-specific guidance (high priority):
+- Look for "Outbound" and "Return" sections. Dates often appear near these headings or near an FR flight number.
+- Flight numbers use the pattern FR123, FR1234, or FR12345 (allow optional space: "FR 1234"). Normalize to no space, uppercase.
+- Booking reference/PNR is 5–8 alphanumeric characters (e.g., ABCDEF). It may appear as "Booking reference", "Reservation", or "PNR".
+- IATA codes (3 letters) appear alongside airport names; capture both: departure_iata/arrival_iata and departure_airport/arrival_airport.
+- Passenger list may appear as a table or bullet list under "Passengers".
+- Times are usually local; extract the literal HH:mm text without converting timezones.
+
+General extraction checklist:
+1) passenger_name from Passenger/Name fields (use the main traveler if a list exists).
+2) reservation_number from Booking/Reservation/PNR patterns.
+3) flight_number near each segment line (prefer FR… when Ryanair is detected).
+4) departure_iata, arrival_iata and full airport names.
+5) departure_date (TRAVEL DATE) most likely found near segment headers or flight details. Accept formats: "Jul 31, 2025", "31 Jul 2025", "31/07/2025", "2025-07-31".
+6) departure_time and arrival_time near "Depart"/"Arrive"/"From"/"To" labels or on the same line as the segment.
+7) total_receipt from total/price/amount if shown.
+8) purchased_date/purchase_time from explicit booking/confirmation timestamps, not from email headers.
+
+Output strictly as JSON matching the schema (array of objects). If both outbound and return exist, include two objects and set booking_type to OUTBOUND/RETURN.
+
+EMAIL CONTEXT: ${hints?.subject ? `Subject: ${hints.subject}` : ''} ${hints?.receivedAt ? `Received: ${hints.receivedAt}` : ''}
+
+Mini example (Ryanair-like):
+Text snippet: "Outbound Fri, 31 Jul 2025 FR6882 Riga (RIX) 06:30 → London Stansted (STN) 07:35  Return Tue, 05 Aug 2025 FR6881 STN 20:45 → RIX 00:15"
+Expected JSON (abbrev): [{"flight_number":"FR6882","departure_iata":"RIX","arrival_iata":"STN","departure_date":"2025-07-31","departure_time":"06:30","arrival_time":"07:35","booking_type":"OUTBOUND"},{"flight_number":"FR6881","departure_iata":"STN","arrival_iata":"RIX","departure_date":"2025-08-05","departure_time":"20:45","arrival_time":"00:15","booking_type":"RETURN"}]`,
     },
     { text },
   ] as const
 
-  try {
-    const result = await model.generateContent({ contents: instruction as any, generationConfig })
-    const res = await result.response
-    const jsonText = res.text()
-    if (jsonText) {
-      const parsed = JSON.parse(jsonText) as any[]
-      const mapped: FlightData[] = (Array.isArray(parsed) ? parsed : [])
-        .map((o) => ({
-          passenger_name: String(o.passenger_name || ''),
-          reservation_number: String(o.reservation_number || ''),
-          flight_number: String(o.flight_number || ''),
-          departure_airport: String(o.departure_airport || ''),
-          arrival_airport: String(o.arrival_airport || ''),
-          departure_date: String(o.departure_date || ''),
-          departure_time: String(o.departure_time || ''),
-          arrival_time: String(o.arrival_time || ''),
-          total_receipt: String(o.total_receipt || ''),
-          purchased_date: String(o.purchased_date || ''),
-          purchase_time: String(o.purchase_time || ''),
-          airline: o.airline ? String(o.airline) : undefined,
-          arrival_iata: o.arrival_iata ? String(o.arrival_iata) : undefined,
-          departure_iata: o.departure_iata ? String(o.departure_iata) : undefined,
-          seat: o.seat ? String(o.seat) : undefined,
-          notes: o.notes ? String(o.notes) : undefined,
-          arrival_date: o.arrival_date ? String(o.arrival_date) : undefined,
-          flight_duration: o.flight_duration ? String(o.flight_duration) : undefined,
-          is_direct: typeof o.is_direct === 'boolean' ? o.is_direct : undefined,
-          is_return_flight: typeof o.is_return_flight === 'boolean' ? o.is_return_flight : undefined,
-          booking_type: o.booking_type as any,
-          return_flight_number: o.return_flight_number ? String(o.return_flight_number) : undefined,
-          return_departure_date: o.return_departure_date ? String(o.return_departure_date) : undefined,
-          return_departure_time: o.return_departure_time ? String(o.return_departure_time) : undefined,
-          return_flight_duration: o.return_flight_duration ? String(o.return_flight_duration) : undefined,
-        }))
-        .filter((f) => f.flight_number || f.departure_date)
-      if (mapped.length) return mapped
+  // Helper: sleep
+  const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+
+  // Attempt structured JSON extraction with retries
+  if (hasGeminiKey) {
+    const maxAttempts = 3
+    let lastError: unknown = null
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const result = await model.generateContent({ contents: instruction as any, generationConfig })
+        const res = await result.response
+        const jsonText = res.text()
+        if (jsonText) {
+          const parsed = JSON.parse(jsonText) as any[]
+          const mapped: FlightData[] = (Array.isArray(parsed) ? parsed : [])
+            .map((o) => ({
+              passenger_name: String(o.passenger_name || ''),
+              reservation_number: String(o.reservation_number || ''),
+              flight_number: String(o.flight_number || ''),
+              departure_airport: String(o.departure_airport || ''),
+              arrival_airport: String(o.arrival_airport || ''),
+              departure_date: String(o.departure_date || ''),
+              departure_time: String(o.departure_time || ''),
+              arrival_time: String(o.arrival_time || ''),
+              total_receipt: String(o.total_receipt || ''),
+              purchased_date: String(o.purchased_date || ''),
+              purchase_time: String(o.purchase_time || ''),
+              airline: o.airline ? String(o.airline) : undefined,
+              arrival_iata: o.arrival_iata ? String(o.arrival_iata) : undefined,
+              departure_iata: o.departure_iata ? String(o.departure_iata) : undefined,
+              seat: o.seat ? String(o.seat) : undefined,
+              notes: o.notes ? String(o.notes) : undefined,
+              arrival_date: o.arrival_date ? String(o.arrival_date) : undefined,
+              flight_duration: o.flight_duration ? String(o.flight_duration) : undefined,
+              is_direct: typeof o.is_direct === 'boolean' ? o.is_direct : undefined,
+              is_return_flight: typeof o.is_return_flight === 'boolean' ? o.is_return_flight : undefined,
+              booking_type: o.booking_type as any,
+              return_flight_number: o.return_flight_number ? String(o.return_flight_number) : undefined,
+              return_departure_date: o.return_departure_date ? String(o.return_departure_date) : undefined,
+              return_departure_time: o.return_departure_time ? String(o.return_departure_time) : undefined,
+              return_flight_duration: o.return_flight_duration ? String(o.return_flight_duration) : undefined,
+            }))
+            .filter((f) => f.flight_number || f.departure_date)
+          if (mapped.length) return mapped
+        }
+        // If no usable JSON, treat as failure to trigger retry/fallback
+        lastError = new Error('Empty or unusable JSON from LLM')
+        console.warn(`[llm-extract] Attempt ${attempt}/${maxAttempts}: no usable JSON returned`)
+      } catch (e) {
+        lastError = e
+        console.warn(`[llm-extract] Attempt ${attempt}/${maxAttempts} failed: ${e instanceof Error ? e.message : String(e)}`)
+      }
+      if (attempt < maxAttempts) await sleep(400 * attempt) // simple backoff
     }
-  } catch (e) {
-    // swallow and try fallbacks
+    // continue to fallbacks after retries
   }
 
   // 3) Fallback to legacy text format + parser
   try {
+    if (!hasGeminiKey) throw new Error('No GEMINI_API_KEY; skip legacy LLM prompt')
     const legacyPrompt = `Extract flight details from the following airline itinerary/confirmation email text.
 Follow this exact textual template (use "None" for missing fields). Include return if present:
 
@@ -299,7 +349,7 @@ Total receipt: [AMOUNT]`
       const parsed = parseGeminiResponse(legacy)
       if (parsed.length) return parsed
     }
-  } catch {}
+  } catch { }
 
   // 4) Heuristic regex extraction as last resort
   const heur = extractWithRegex(text)

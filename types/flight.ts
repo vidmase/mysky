@@ -1,5 +1,5 @@
 export type Flight = {
-  id: string
+  id: number
   owner_id: string
   passenger_name: string
   reservation_number: string
@@ -12,10 +12,38 @@ export type Flight = {
   total_receipt: string
   purchased_date: string
   purchase_time: string
-  airline?: string
-  arrival_country?: string
-  arrival_iata?: string
-  departure_iata?: string
-  seat?: string
-  notes?: string
-} 
+  airline: string | null
+  arrival_country: string | null
+  arrival_iata: string | null
+  departure_iata: string | null
+  seat: string | null
+  notes: string | null
+  arrival_date: string | null
+  flight_duration: string | null
+  is_direct: boolean | null
+  is_return_flight: boolean | null
+  booking_type: 'OUTBOUND' | 'RETURN' | null
+  return_flight_number: string | null
+  return_departure_date: string | null
+  return_departure_time: string | null
+  return_flight_duration: string | null
+  return_is_direct: boolean | null
+}
+
+export type Airport = {
+  code: string;
+  name: string;
+  city: string;
+  country: string;
+  lat: number;
+  lng: number;
+  visits: number;
+  routes: Route[];
+}
+
+export type Route = {
+  id: string;
+  from: string;
+  to: string;
+  count: number;
+}

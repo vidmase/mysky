@@ -8,6 +8,7 @@ export interface FlightData {
   departure_airport: string
   arrival_airport: string
   departure_date: string
+  arrival_date?: string | null
   departure_time: string
   arrival_time: string
   total_receipt: string

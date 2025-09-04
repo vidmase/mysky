@@ -22,6 +22,7 @@ export async function batchFetchFlightData(
         departure_airport,
         arrival_airport,
         departure_date,
+        arrival_date,
         departure_time,
         arrival_time,
         total_receipt,

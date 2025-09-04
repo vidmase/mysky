@@ -4,10 +4,11 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
+    const { id } = await params
 
     // Check if user is authenticated
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -21,7 +22,7 @@ export async function GET(
     const { data: flight, error } = await supabase
       .from('vidmaflights')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('owner_id', session.user.id)
       .single()
 
@@ -46,10 +47,11 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
+    const { id } = await params
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
@@ -113,7 +115,7 @@ export async function PUT(
         seat,
         notes
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('owner_id', session.user.id)
       .select()
       .single()
@@ -131,7 +133,7 @@ export async function PUT(
       await supabase.from('event_logs').insert({
         user_id: session.user.id,
         action: 'update_flight',
-        metadata: { id: params.id },
+        metadata: { id },
         page: '/flights',
       })
     } catch {}
@@ -148,10 +150,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
+    const { id } = await params
 
     // Check if user is authenticated
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -166,7 +169,7 @@ export async function DELETE(
     const { data: flight, error: fetchError } = await supabase
       .from('vidmaflights')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('owner_id', session.user.id)
       .single()
 
@@ -182,7 +185,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('vidmaflights')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('owner_id', session.user.id)
 
     if (deleteError) {

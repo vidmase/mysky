@@ -10,6 +10,8 @@ import {
   CalculationOptions,
   DEFAULT_CALCULATION_OPTIONS
 } from './types'
+import { DateTime } from 'luxon'
+import { AIRPORT_TIMEZONES } from '../airport-timezones'
 
 // IATA code to country mapping (centralized)
 const IATA_TO_COUNTRY: { [key: string]: string } = {
@@ -96,20 +98,63 @@ const IATA_TO_COUNTRY: { [key: string]: string } = {
 }
 
 /**
- * Calculate flight duration in hours, handling overnight flights
+ * Calculate naive duration in minutes from HH:MM strings (same-day/overnight only)
  */
-export function calculateFlightDuration(departureTime: string, arrivalTime: string): number {
+function calculateNaiveDurationMinutes(departureTime: string, arrivalTime: string): number {
   const [depHours, depMinutes] = departureTime.split(':').map(Number)
   const [arrHours, arrMinutes] = arrivalTime.split(':').map(Number)
-
   let durationMinutes = (arrHours * 60 + arrMinutes) - (depHours * 60 + depMinutes)
+  if (durationMinutes < 0) durationMinutes += 24 * 60
+  return durationMinutes
+}
 
-  // Handle overnight flights
-  if (durationMinutes < 0) {
-    durationMinutes += 24 * 60 // Add 24 hours
+/**
+ * Calculate timezone-aware duration in minutes using IATA timezones and dates.
+ * Falls back to naive minutes when data insufficient.
+ */
+function calculateTZDurationMinutes(f: FlightData): number | undefined {
+  try {
+    const depIata = f.departure_iata?.toUpperCase() || undefined
+    const arrIata = f.arrival_iata?.toUpperCase() || undefined
+    const depTz = depIata ? AIRPORT_TIMEZONES[depIata] : undefined
+    const arrTz = arrIata ? AIRPORT_TIMEZONES[arrIata] : undefined
+    if (!depTz || !arrTz || !f.departure_date || !f.departure_time || !f.arrival_time) {
+      return undefined
+    }
+    const depDateParsed = DateTime.fromISO(String(f.departure_date))
+    const depYear = depDateParsed.isValid ? depDateParsed.year : Number(String(f.departure_date).slice(0, 4))
+    const depMonth = depDateParsed.isValid ? depDateParsed.month : Number(String(f.departure_date).slice(5, 7))
+    const depDay = depDateParsed.isValid ? depDateParsed.day : Number(String(f.departure_date).slice(8, 10))
+    const [depHour, depMin] = f.departure_time.split(':').map(Number)
+    const [arrHour, arrMin] = f.arrival_time.split(':').map(Number)
+
+    const dep = DateTime.fromObject(
+      { year: depYear, month: depMonth, day: depDay, hour: depHour, minute: depMin },
+      { zone: depTz }
+    )
+    let arr: DateTime
+    const arrDateStr = f.arrival_date ?? undefined
+    if (arrDateStr) {
+      const arrDateParsed = DateTime.fromISO(String(arrDateStr))
+      const aYear = arrDateParsed.isValid ? arrDateParsed.year : Number(String(arrDateStr).slice(0, 4))
+      const aMonth = arrDateParsed.isValid ? arrDateParsed.month : Number(String(arrDateStr).slice(5, 7))
+      const aDay = arrDateParsed.isValid ? arrDateParsed.day : Number(String(arrDateStr).slice(8, 10))
+      arr = DateTime.fromObject(
+        { year: aYear, month: aMonth, day: aDay, hour: arrHour, minute: arrMin },
+        { zone: arrTz }
+      )
+    } else {
+      arr = DateTime.fromObject(
+        { year: depYear, month: depMonth, day: depDay, hour: arrHour, minute: arrMin },
+        { zone: arrTz }
+      )
+      if (arr < dep) arr = arr.plus({ days: 1 })
+    }
+    const minutes = Math.max(0, Math.round(arr.toUTC().diff(dep.toUTC()).as('minutes')))
+    return minutes
+  } catch {
+    return undefined
   }
-
-  return durationMinutes / 60 // Convert to hours
 }
 
 /**
@@ -169,7 +214,8 @@ export function calculateUnifiedStatistics(
   const monthCounts = new Map<string, number>()
   
   let totalKilometers = 0
-  let totalHours = 0
+  let totalMinutesActual = 0
+  let flightsWithActualTimes = 0
   let flightsWithDistance = 0
 
   // Process each flight
@@ -241,14 +287,23 @@ export function calculateUnifiedStatistics(
       monthCounts.set(monthKey, (monthCounts.get(monthKey) || 0) + 1)
     }
 
-    // Track flight duration if times are available
+    // Track flight duration: prefer timezone-aware minutes
     if (flight.departure_time && flight.arrival_time) {
-      totalHours += calculateFlightDuration(flight.departure_time, flight.arrival_time)
+      const tzMinutes = calculateTZDurationMinutes(flight)
+      if (typeof tzMinutes === 'number') {
+        totalMinutesActual += tzMinutes
+        flightsWithActualTimes++
+      } else {
+        // fallback to naive minutes if tz not available
+        totalMinutesActual += calculateNaiveDurationMinutes(flight.departure_time, flight.arrival_time)
+        flightsWithActualTimes++
+      }
     }
   }
 
-  // Use actual flight hours if available, otherwise calculate derived hours
-  const actualHours = Math.round(totalHours * 10) / 10
+  // Use actual flight hours (including taxi time per flight) if available, else derived
+  const taxiPerFlight = options.taxiTimeHours || 0
+  const actualHours = Math.round(((totalMinutesActual / 60) + flightsWithActualTimes * taxiPerFlight) * 10) / 10
   const derivedHours = Math.round(
     ((totalKilometers / (options.cruiseSpeedKmh || 840)) + 
      (flightsWithDistance * (options.taxiTimeHours || 0.5))) * 10

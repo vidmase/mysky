@@ -53,7 +53,7 @@ export default function Home() {
             <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm mb-4">
               <PlaneTakeoff className="h-8 w-8" />
             </div>
-            <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">Welcome to FlightTrack</h1>
+            <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight opacity-70">My All FlightsTrack</h1>
             <p className="text-xl text-white/90 max-w-2xl mx-auto">
               Track your flights, visualize your travels, and gain insights into your journey.
             </p>

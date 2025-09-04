@@ -16,6 +16,7 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CameraIcon } from "lucide-react"
 import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
 
 interface BoardingPassData {
     passenger_name: string
@@ -64,6 +65,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
     const [parsedData, setParsedData] = useState<Partial<BoardingPassData>[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const supabase = createClientComponentClient()
+    const router = useRouter()
 
     const resetState = () => {
         setFile(null)
@@ -209,36 +211,64 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 return;
             }
 
-            // Prepare the data object with type checking
+            // Prepare the data object with type checking and proper nulls/numbers
+            const parsedTotal = (() => {
+                if (typeof flightData.total_receipt === 'number') return flightData.total_receipt
+                if (typeof flightData.total_receipt === 'string') {
+                    // Remove currency symbols and whitespace, keep digits, dot, comma
+                    const cleaned = flightData.total_receipt.replace(/[^0-9,.-]/g, '').replace(/,/g, '.')
+                    const n = parseFloat(cleaned)
+                    return Number.isFinite(n) ? n : null
+                }
+                return null
+            })()
+
+            // Normalize date to yyyy-MM-dd if provided in y-M-d format
+            const padDate = (d?: string) => {
+                if (!d) return ''
+                const parts = d.split('-')
+                if (parts.length !== 3) return d
+                const [y, m, day] = parts
+                if (y.length === 4) {
+                    const mm = m.padStart(2, '0')
+                    const dd = day.padStart(2, '0')
+                    return `${y}-${mm}-${dd}`
+                }
+                return d
+            }
+
+            const normalizedDepartureDate = padDate(flightData.departure_date)
+            const normalizedArrivalDate = padDate(flightData.arrival_date || flightData.departure_date)
+
             const flightDataToSave = {
-                passenger_name: flightData.passenger_name || '',
-                reservation_number: flightData.reservation_number || '',
-                flight_number: flightData.flight_number || '',
+                passenger_name: flightData.passenger_name ?? null,
+                reservation_number: flightData.reservation_number ?? null,
+                flight_number: flightData.flight_number ?? null,
                 departure_airport: flightData.departure_airport || '',
                 arrival_airport: flightData.arrival_airport || '',
-                departure_date: flightData.departure_date || '',
+                departure_date: normalizedDepartureDate || '',
                 departure_time: flightData.departure_time || '',
                 arrival_time: flightData.arrival_time || '',
-                total_receipt: flightData.total_receipt || '0',
-                airline: flightData.airline || 'Unknown',
-                seat: flightData.seat || '',
-                departure_iata: flightData.departure_iata || '',
-                arrival_iata: flightData.arrival_iata || '',
-                departure_country: flightData.departure_country || '',
-                arrival_country: flightData.arrival_country || '',
-                departure_flag: flightData.departure_flag || '',
-                arrival_flag: flightData.arrival_flag || '',
-                arrival_date: flightData.arrival_date || flightData.departure_date || '',
-                return_arrival_time: flightData.return_arrival_time || '',
+                total_receipt: parsedTotal,
+                airline: flightData.airline ?? null,
+                seat: flightData.seat ?? null,
+                departure_iata: flightData.departure_iata ?? null,
+                arrival_iata: flightData.arrival_iata ?? null,
+                departure_country: flightData.departure_country ?? null,
+                arrival_country: flightData.arrival_country ?? null,
+                departure_flag: flightData.departure_flag ?? null,
+                arrival_flag: flightData.arrival_flag ?? null,
+                arrival_date: normalizedArrivalDate || '',
+                return_arrival_time: flightData.return_arrival_time ?? null,
                 purchased_date: flightData.purchased_date || format(new Date(), 'yyyy-MM-dd'),
                 purchase_time: flightData.purchase_time || format(new Date(), 'HH:mm'),
                 owner_id: user.id,
-                notes: flightData.passengers
+                notes: flightData.passengers && flightData.passengers.length > 0
                     ? `Additional passengers: ${flightData.passengers
-                        .filter(p => p.name !== flightData.passenger_name)
-                        .map(p => `${p.name} (${p.type}, Age: ${p.age || 'N/A'})`)
+                        .filter(p => p.name && p.name !== flightData.passenger_name)
+                        .map(p => `${p.name}${p.type ? ` (${p.type}` : ''}${p.age ? `, Age: ${p.age}` : ''}${p.type ? ')' : ''}`)
                         .join('; ')}`
-                    : ''
+                    : null
             };
 
             // Log the data being sent
@@ -298,6 +328,11 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                     return current;
                 });
             }, 100);
+
+            // Navigate to flights to show the newly added record
+            try {
+                router.push('/flights?source=scanner')
+            } catch {}
 
         } catch (err) {
             console.error('Save operation failed:', {

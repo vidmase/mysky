@@ -40,10 +40,14 @@ function AuthPageInner() {
   // Function to format remaining time
   const formatRemainingTime = (endDate: string | null) => {
     if (!endDate) return null
-    const end = new Date(endDate)
-    const now = new Date()
-    if (end <= now) return null
-    return formatDistance(now, end, { addSuffix: true })
+    try {
+      const end = new Date(endDate)
+      const now = new Date()
+      if (end <= now) return null
+      return formatDistanceToNow(end, { addSuffix: true })
+    } catch {
+      return null
+    }
   }
 
   // Effect to check deactivation status and set up timer
@@ -173,7 +177,9 @@ function AuthPageInner() {
         password: signInPassword,
       })
 
-      if (signInError) throw signInError
+      if (signInError) {
+        throw signInError
+      }
 
       if (authData.user) {
         // After successful sign in, check if user is disabled
@@ -195,7 +201,9 @@ function AuthPageInner() {
         router.push('/flights')
       }
     } catch (error) {
-      setSignInError(error instanceof Error ? error.message : 'Invalid email or password')
+      const errorMessage = error instanceof Error ? error.message : 'Invalid email or password'
+      setSignInError(errorMessage)
+      
       if (error instanceof Error && error.message.includes('disabled')) {
         router.push('/auth?disabled=1')
       }
@@ -247,33 +255,39 @@ function AuthPageInner() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="sign-in-email">Email</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="sign-in-email"
+                      id="email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="Enter your email"
                       value={signInEmail}
                       onChange={(e) => setSignInEmail(e.target.value)}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sign-in-password">Password</Label>
+                    <Label htmlFor="password">Password</Label>
                     <Input
-                      id="sign-in-password"
+                      id="password"
                       type="password"
+                      placeholder="Enter your password"
                       value={signInPassword}
                       onChange={(e) => setSignInPassword(e.target.value)}
                       required
                     />
                   </div>
+                  
                   {signInError && (
-                    <p className="text-sm text-red-500">{signInError}</p>
+                    <div className="text-sm text-red-600">{signInError}</div>
                   )}
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full bg-flight hover:bg-flight/90" disabled={signInLoading}>
-                    {signInLoading ? 'Signing in...' : 'Sign In'}
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={signInLoading}
+                  >
+                    {signInLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </CardFooter>
               </form>

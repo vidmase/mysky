@@ -251,7 +251,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                   <SelectContent>
                     <SelectItem value="all">All airlines</SelectItem>
                     {airlines.map((a) => (
-                      <SelectItem key={a} value={a}>
+                      <SelectItem key={`airline-${a.toLowerCase()}`} value={a}>
                         {a}
                       </SelectItem>
                     ))}

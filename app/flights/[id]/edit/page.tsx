@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { use } from "react"
+import { calculateDuration } from "@/app/flights/lib/flight-utils"
 
 // Add formatTime helper function after the imports
 const formatTime = (timeStr: string) => {
@@ -215,7 +216,15 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
                   Duration
                 </div>
                 <div className="font-medium">
-                  {calculateDuration(flight.departure_time, flight.arrival_time)}
+                  {calculateDuration(
+                    flight.departure_time,
+                    flight.arrival_time,
+                    {
+                      departureDate: flight.departure_date,
+                      departureIata: flight.departure_iata,
+                      arrivalIata: flight.arrival_iata,
+                    }
+                  )}
                 </div>
               </div>
 
@@ -285,32 +294,3 @@ export default function EditFlightPage({ params }: { params: Promise<{ id: strin
     </div>
   )
 }
-
-// Helper function to calculate duration
-function calculateDuration(departureTime: string, arrivalTime: string): string {
-  try {
-    if (!departureTime || !arrivalTime) return ''
-
-    const getMinutes = (time: string) => {
-      const [hours, minutes] = time.split(':').map(Number)
-      return hours * 60 + minutes
-    }
-
-    let depMinutes = getMinutes(departureTime)
-    let arrMinutes = getMinutes(arrivalTime)
-
-    // Handle overnight flights
-    if (arrMinutes < depMinutes) {
-      arrMinutes += 24 * 60 // Add 24 hours
-    }
-
-    const durationMinutes = arrMinutes - depMinutes
-    const hours = Math.floor(durationMinutes / 60)
-    const minutes = durationMinutes % 60
-
-    return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`
-  } catch (error) {
-    console.error('Error calculating duration:', error)
-    return ''
-  }
-} 

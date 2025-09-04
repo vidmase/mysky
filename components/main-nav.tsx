@@ -62,6 +62,13 @@ export function MainNav() {
       bgColor: "bg-stats/10",
     },
     {
+      name: "Delays",
+      href: "/delays/BRS",
+      icon: BarChart3,
+      color: "text-stats",
+      bgColor: "bg-stats/10",
+    },
+    {
       name: "Chat",
       href: "/chat",
       icon: MessageCircle,

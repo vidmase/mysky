@@ -44,6 +44,7 @@ export default function ChatPage() {
   const [searchDate, setSearchDate] = useState('')
   const [searchRole, setSearchRole] = useState<'all' | 'user' | 'assistant'>('all')
   const [toast, setToast] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabase = createClientComponentClient()
@@ -82,6 +83,7 @@ export default function ChatPage() {
       const { data: { session } } = await supabase.auth.getSession()
       setIsAuthenticated(!!session)
       setIsCheckingAuth(false)
+      setUserId(session?.user?.id ?? null)
       
       if (!session) {
         router.push('/auth')
@@ -94,6 +96,7 @@ export default function ChatPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session)
+      setUserId(session?.user?.id ?? null)
       if (!session) {
         router.push('/auth')
       } else if (event === 'SIGNED_IN') {
@@ -103,6 +106,43 @@ export default function ChatPage() {
 
     return () => subscription.unsubscribe()
   }, [supabase, router])
+
+  // Realtime: listen for newly inserted assistant messages and append them
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel('chat_messages_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${userId}` },
+        (payload: any) => {
+          const msg = payload?.new
+          if (!msg) return
+          // Only append assistant messages to avoid duplicating the locally-added user message
+          if (msg.role !== 'assistant') return
+          setMessages(prev => {
+            // Skip if this message already exists
+            if (prev.some(m => m.id === msg.id)) return prev
+            return [
+              ...prev,
+              {
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.created_at,
+                isStreaming: false,
+                pinned: msg.pinned || false,
+              } as ChatMessage,
+            ]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, userId])
 
   const clearChatHistory = async () => {
     try {
@@ -151,19 +191,9 @@ export default function ChatPage() {
       }
 
       const data = await response.json()
-
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: data.response || (data.error ?? 'Sorry, I could not answer that.'),
-          timestamp: new Date().toISOString(),
-          isStreaming: false
-        }
-      ])
-                
-                if (data.stats) {
-                  setUserStats(data.stats)
+      // Do not append assistant message here; realtime subscription will deliver it upon DB insert
+      if (data.stats) {
+        setUserStats(data.stats)
       }
     } catch (error) {
       setMessages(prev => [

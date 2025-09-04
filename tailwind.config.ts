@@ -100,7 +100,20 @@ const config = {
         "pulse-subtle": {
           "0%, 100%": { opacity: "1", transform: "scale(1)" },
           "50%": { opacity: "0.95", transform: "scale(1.03)" }
-        }
+        },
+        shimmer: {
+          "0%, 90%, 100%": {
+            "background-position": "calc(-100% - var(--shimmer-width)) 0",
+          },
+          "30%, 60%": {
+            "background-position": "calc(100% + var(--shimmer-width)) 0",
+          },
+        },
+        "border-beam": {
+          "100%": {
+            "offset-distance": "100%",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -111,9 +124,17 @@ const config = {
         dash: "dash 1s linear infinite",
         "fade-in": "fade-in 0.5s ease-out",
         "fade-out": "fade-out 0.5s ease-out",
-        "pulse-subtle": "pulse-subtle 2s ease-in-out infinite"
+        "pulse-subtle": "pulse-subtle 2s ease-in-out infinite",
+        shimmer: "shimmer 3s ease-in-out infinite",
+        "border-beam": "border-beam 3s ease-in-out infinite alternate",
+      },
+      backgroundImage: {
+        'gradient-aurora': "radial-gradient(100% 100% at 50% 50%, #2E3159 0%, #000000 100%)",
       },
       fontFamily: {
+        // Default app fonts mapped to Geist variables from app/layout.tsx
+        sans: ['var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Apple Color Emoji', 'Segoe UI Emoji'],
+        mono: ['var(--font-geist-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New'],
         jakarta: ['var(--font-jakarta)', 'sans-serif'],
       },
     },
