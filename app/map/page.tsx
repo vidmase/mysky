@@ -6,7 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { createClient } from '../lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { haversineDistance, getGreatCirclePoints } from '@/lib/utils';
+import { getGreatCirclePoints } from '@/lib/utils';
 import { NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN as MAPBOX_ACCESS_TOKEN } from '@/lib/env';
 
 // --- TYPE DEFINITIONS ---
@@ -40,13 +40,11 @@ interface FlightPathFeature extends GeoJSON.Feature<GeoJSON.LineString> {
   };
 }
 
-// --- CONSTANTS ---
-// Mapbox token sourced via centralized env helper
-
 // --- COMPONENT ---
 export default function MapPage() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapboxMap | null>(null);
+  const animationRef = useRef<number>(0);
   const [loading, setLoading] = useState(true);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [airports, setAirports] = useState<Airport[]>([]);
@@ -141,108 +139,162 @@ export default function MapPage() {
   // --- MAP INITIALIZATION ---
   useEffect(() => {
     if (!mapContainer.current || !MAPBOX_ACCESS_TOKEN) return;
-    if (map.current) return; // already initialized
+    if (map.current) return;
 
     const containerEl = mapContainer.current as any;
-
-    // Defensive: if a previous map instance is attached to this container (Fast Refresh/StrictMode), remove it
     try {
       if (containerEl && containerEl._map && typeof containerEl._map.remove === 'function') {
         containerEl._map.remove();
       }
-    } catch (_) {
-      // ignore
-    }
-
-    // Also clear any leftover DOM children
+    } catch (_) {}
     try {
       while (mapContainer.current.firstChild) {
         mapContainer.current.removeChild(mapContainer.current.firstChild);
       }
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) {}
 
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     const createMap = () => new MapboxMap({
       container: mapContainer.current as HTMLElement,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [4, 34],
+      center: [20, 30],
       zoom: 1.5,
+      projection: { name: 'globe' }
     });
 
     try {
       map.current = createMap();
-      map.current.on('load', () => {
-        // Add sources and layers here
+      
+      map.current.on('style.load', () => {
+        map.current?.setFog({
+          color: 'rgb(186, 210, 235)',
+          'high-color': 'rgb(36, 92, 223)',
+          'horizon-blend': 0.02,
+          'space-color': 'rgb(11, 11, 25)',
+          'star-intensity': 0.6
+        });
       });
+
     } catch (err) {
-      const message = (err as Error)?.message || '';
-      if (message.includes('Map container is already initialized') && mapContainer.current) {
-        // Clear and retry once
-        mapContainer.current.innerHTML = '';
-        map.current = createMap();
-      } else {
-        console.error('Map init error:', err);
-      }
+      console.error('Map init error:', err);
     }
 
-    // Cleanup
     return () => {
       try { map.current?.remove(); } catch (_) {}
       map.current = null;
-      if (mapContainer.current) {
-        try { mapContainer.current.innerHTML = ''; } catch (_) {}
-      }
     };
-  }, []); // run once
+  }, []);
 
-  // --- MAP LAYERS AND SOURCES ---
+  // --- MAP LAYERS AND ANIMATION ---
   useEffect(() => {
     const currentMap = map.current;
-    if (!currentMap || !currentMap.isStyleLoaded()) return;
+    if (!currentMap) return;
 
-    const sourceId = 'flight-paths';
-    const layerId = 'flight-paths-layer';
+    const updateLayers = () => {
+        if (!currentMap.isStyleLoaded()) {
+            currentMap.once('style.load', updateLayers);
+            return;
+        }
+        
+        const sourceId = 'flight-paths';
+        const bgLayerId = 'flight-paths-bg';
+        const animLayerId = 'flight-paths-anim';
 
-    const source = currentMap.getSource(sourceId) as mapboxgl.GeoJSONSource;
+        if (currentMap.getLayer('flight-paths-layer')) {
+            currentMap.removeLayer('flight-paths-layer');
+        }
 
-    const geojson: GeoJSON.FeatureCollection<GeoJSON.LineString, FlightPathFeature['properties']> = {
-      type: 'FeatureCollection',
-      features: flightPathFeatures,
+        const geojson: GeoJSON.FeatureCollection<GeoJSON.LineString, FlightPathFeature['properties']> = {
+          type: 'FeatureCollection',
+          features: flightPathFeatures,
+        };
+
+        const source = currentMap.getSource(sourceId) as mapboxgl.GeoJSONSource;
+
+        if (source) {
+          source.setData(geojson);
+        } else {
+          currentMap.addSource(sourceId, { type: 'geojson', data: geojson });
+        }
+
+        // Static Background Layer
+        if (!currentMap.getLayer(bgLayerId)) {
+             currentMap.addLayer({
+                id: bgLayerId,
+                type: 'line',
+                source: sourceId,
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#ffffff',
+                    'line-opacity': 0.1,
+                    'line-width': 1
+                }
+            });
+        }
+
+        // Animated Layer
+        if (!currentMap.getLayer(animLayerId)) {
+            currentMap.addLayer({
+                id: animLayerId,
+                type: 'line',
+                source: sourceId,
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': [
+                        'case',
+                        ['boolean', ['get', 'isHighlighted'], false],
+                        '#FFD700', // Gold highlight
+                        '#4dabf7'  // Bright Blue
+                    ],
+                    'line-width': [
+                        'case',
+                        ['boolean', ['get', 'isHighlighted'], false],
+                        3,
+                        2
+                    ],
+                    'line-opacity': [
+                         'case',
+                        ['boolean', ['get', 'isHighlighted'], false],
+                        1,
+                        0.7
+                    ],
+                    'line-dasharray': [0, 4, 3]
+                }
+            });
+             currentMap.setPaintProperty(animLayerId, 'line-dasharray', [2, 4]);
+        }
+
+        // Animation Loop
+        const startTime = Date.now();
+        const animate = () => {
+            const time = Date.now() - startTime;
+            const dashArray = [2, 4];
+            const totalLength = dashArray[0] + dashArray[1];
+            // Animate offset to make it flow
+            const offset = (totalLength - (time / 50) % totalLength); 
+            
+            if (currentMap.getLayer(animLayerId)) {
+                 currentMap.setPaintProperty(animLayerId, 'line-dashoffset', offset);
+                 animationRef.current = requestAnimationFrame(animate);
+            }
+        };
+
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        animationRef.current = requestAnimationFrame(animate);
     };
 
-    if (source) {
-      source.setData(geojson);
-    } else {
-      currentMap.addSource(sourceId, { type: 'geojson', data: geojson });
-      currentMap.addLayer({
-        id: layerId,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': [
-            'case',
-            ['boolean', ['get', 'isHighlighted'], false],
-            '#FFD700', // Highlight color
-            '#FFFFFF'
-          ],
-          'line-width': [
-            'case',
-            ['boolean', ['get', 'isHighlighted'], false],
-            2.5,
-            1
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['get', 'isHighlighted'], false],
-            0.9,
-            0.4
-          ],
-        },
-      });
-    }
+    updateLayers();
+
+    return () => {
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
   }, [flightPathFeatures]);
 
   // --- MAP INTERACTIVITY ---
@@ -253,6 +305,7 @@ export default function MapPage() {
     const popup = new mapboxgl.Popup({
       closeButton: false,
       closeOnClick: false,
+      className: 'bg-background text-foreground'
     });
 
     const handleMouseMove = (e: mapboxgl.MapLayerMouseEvent) => {
@@ -266,12 +319,12 @@ export default function MapPage() {
 
         if (fromAirport && toAirport) {
           const description = `
-            <div class="text-sm">
-              <strong>${fromAirport.name} (${from})</strong>
-              <br/>
-              to <strong>${toAirport.name} (${to})</strong>
-              <br/>
-              Flights: <strong>${count}</strong>
+            <div class="text-slate-900 dark:text-slate-100 p-2">
+              <div class="font-bold text-base mb-1">${fromAirport.city} ✈ ${toAirport.city}</div>
+              <div class="text-xs opacity-80">
+                 ${from} - ${to}<br/>
+                 Flights: ${count}
+              </div>
             </div>
           `;
           popup.setLngLat(e.lngLat).setHTML(description).addTo(currentMap);
@@ -287,19 +340,42 @@ export default function MapPage() {
       setHighlightedRoute(null);
     };
 
-    currentMap.on('mousemove', 'flight-paths-layer', handleMouseMove);
-    currentMap.on('mouseleave', 'flight-paths-layer', handleMouseLeave);
+    const layerId = 'flight-paths-bg';
+    
+    const attachListeners = () => {
+       if (currentMap.getLayer(layerId)) {
+          currentMap.on('mousemove', layerId, handleMouseMove);
+          currentMap.on('mouseleave', layerId, handleMouseLeave);
+       } else {
+          // If layer not ready, retry slightly later or wait for style load
+          // But usually layer is added in the other effect immediately if style is loaded
+          if (currentMap.isStyleLoaded()) {
+             // If style loaded but layer not there, it might be added next tick
+             setTimeout(() => {
+                 if (currentMap.getLayer(layerId)) {
+                     currentMap.on('mousemove', layerId, handleMouseMove);
+                     currentMap.on('mouseleave', layerId, handleMouseLeave);
+                 }
+             }, 100);
+          } else {
+             currentMap.once('style.load', attachListeners);
+          }
+       }
+    }
+    
+    attachListeners();
 
     return () => {
       if (currentMap.isStyleLoaded()) {
-          currentMap.off('mousemove', 'flight-paths-layer', handleMouseMove);
-          currentMap.off('mouseleave', 'flight-paths-layer', handleMouseLeave);
-          popup.remove();
+           try {
+              currentMap.off('mousemove', layerId, handleMouseMove);
+              currentMap.off('mouseleave', layerId, handleMouseLeave);
+           } catch (_) {}
+           popup.remove();
       }
     };
-  }, [airports, flightPathFeatures]); // Rerun if airports or features change
+  }, [airports, flightPathFeatures]);
 
-  // --- RENDER ---
   if (!MAPBOX_ACCESS_TOKEN) {
     return <div className="p-4">Mapbox access token is not configured.</div>;
   }
