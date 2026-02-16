@@ -1,10 +1,10 @@
 // Unified statistics calculator with consistent calculation methods
 
-import { 
-  FlightData, 
-  AirportData, 
-  UnifiedStatistics, 
-  RouteInfo, 
+import {
+  FlightData,
+  AirportData,
+  UnifiedStatistics,
+  RouteInfo,
   AirlineInfo,
   MonthlyActivity,
   CalculationOptions,
@@ -158,6 +158,21 @@ function calculateTZDurationMinutes(f: FlightData): number | undefined {
 }
 
 /**
+ * Calculate flight duration in minutes, preferring timezone-aware calculation
+ * but falling back to naive calculation if timezone data is missing.
+ */
+export function calculateFlightDuration(flight: FlightData): number {
+  if (!flight.departure_time || !flight.arrival_time) return 0
+
+  const tzMinutes = calculateTZDurationMinutes(flight)
+  if (typeof tzMinutes === 'number') {
+    return tzMinutes
+  }
+
+  return calculateNaiveDurationMinutes(flight.departure_time, flight.arrival_time)
+}
+
+/**
  * Calculate distance between two points using Haversine formula
  */
 export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -194,7 +209,7 @@ export function getCountryFromIATA(iata: string): string | undefined {
  * Main unified statistics calculation function
  */
 export function calculateUnifiedStatistics(
-  flights: FlightData[], 
+  flights: FlightData[],
   airports: AirportData[],
   options: CalculationOptions = DEFAULT_CALCULATION_OPTIONS
 ): UnifiedStatistics {
@@ -212,7 +227,7 @@ export function calculateUnifiedStatistics(
   const airportVisits = new Map<string, number>()
   const routeDistances = new Map<string, { count: number; distance: number; sample?: FlightData }>()
   const monthCounts = new Map<string, number>()
-  
+
   let totalKilometers = 0
   let totalMinutesActual = 0
   let flightsWithActualTimes = 0
@@ -305,10 +320,10 @@ export function calculateUnifiedStatistics(
   const taxiPerFlight = options.taxiTimeHours || 0
   const actualHours = Math.round(((totalMinutesActual / 60) + flightsWithActualTimes * taxiPerFlight) * 10) / 10
   const derivedHours = Math.round(
-    ((totalKilometers / (options.cruiseSpeedKmh || 840)) + 
-     (flightsWithDistance * (options.taxiTimeHours || 0.5))) * 10
+    ((totalKilometers / (options.cruiseSpeedKmh || 840)) +
+      (flightsWithDistance * (options.taxiTimeHours || 0.5))) * 10
   ) / 10
-  
+
   // Prefer actual hours if we have flight time data, otherwise use derived
   const finalHours = actualHours > 0 ? actualHours : derivedHours
 
@@ -338,7 +353,7 @@ export function calculateUnifiedStatistics(
   // Find most flown and longest routes
   let mostFlown: { key: string; count: number } | undefined
   let longest: { key: string; distance: number } | undefined
-  
+
   if (options.includeRouteAnalysis) {
     for (const [key, info] of routeDistances.entries()) {
       if (!mostFlown || info.count > mostFlown.count) {
@@ -353,14 +368,14 @@ export function calculateUnifiedStatistics(
   // Helper to resolve route names
   const resolveRouteNames = (key?: string): RouteInfo | undefined => {
     if (!key) return undefined
-    
+
     const [iataA, iataB] = key.split('-')
     const routeInfo = routeDistances.get(key)
     const sample = routeInfo?.sample
-    
+
     const airportA = airportMap.get(iataA)
     const airportB = airportMap.get(iataB)
-    
+
     return {
       from: {
         iata: iataA,
@@ -400,7 +415,7 @@ export function calculateUnifiedStatistics(
       if (unmappedCodes.size) {
         console.debug('[stats] unmapped IATA codes:', Array.from(unmappedCodes).sort())
       }
-    } catch {}
+    } catch { }
   }
 
   const statistics: UnifiedStatistics = {
