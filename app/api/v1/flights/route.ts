@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -57,11 +57,11 @@ export async function GET(request: Request) {
         // Validate query parameters
         const validatedParams = querySchema.parse(queryParams)
 
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createSupabaseServer()
 
-        // Authenticate user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
+        // Authenticate user via Clerk
+        const userId = await resolveSupabaseUserId()
+        if (!userId) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
                 error: 'Unauthorized'
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         let query = supabase
             .from('vidmaflights')
             .select('*', { count: 'exact' })
-            .eq('owner_id', session.user.id)
+            .eq('owner_id', userId)
             .order(validatedParams.sort_by, { ascending: validatedParams.sort_order === 'asc' })
 
         // Apply filters
@@ -128,11 +128,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createSupabaseServer()
 
-        // Authenticate user
-        const { data: { session }, error: authError } = await supabase.auth.getSession()
-        if (authError || !session) {
+        // Authenticate user via Clerk
+        const userId = await resolveSupabaseUserId()
+        if (!userId) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
                 error: 'Unauthorized'
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
             .from('vidmaflights')
             .insert([{
                 ...validatedData,
-                owner_id: session.user.id
+                owner_id: userId
             }])
             .select()
             .single()
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
         try {
             const { error: logErr } = await supabase.from('event_logs').insert([
                 {
-                    user_id: session.user.id,
+                    user_id: userId,
                     action: 'add_flight',
                     metadata: { ids: [data.id], type: 'v1' },
                     page: '/flights',

@@ -1,13 +1,21 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useRef, useMemo } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { User } from '@supabase/auth-helpers-nextjs'
-import { useNotification } from './notification-context'
+import { createContext, useContext } from 'react'
+import { useUser, useClerk } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 
+type AuthUser = {
+  id: string
+  email: string | undefined
+  user_metadata: {
+    full_name: string | null
+    nickname: string | null
+    avatar_url: string | null
+  }
+}
+
 type AuthContextType = {
-  user: User | null
+  user: AuthUser | null
   loading: boolean
   error: Error | null
   signOut: () => Promise<void>
@@ -17,172 +25,34 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   error: null,
-  signOut: async () => {},
+  signOut: async () => { },
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-  const supabase = useMemo(() => createClientComponentClient(), [])
-  const { showSuccess, showError } = useNotification()
-  const initialLoadRef = useRef(true)
-  const lastNotificationRef = useRef<string | null>(null)
-  const initializedRef = useRef(false)
-  const prevUserIdRef = useRef<string | null>(null)
+  const { user: clerkUser, isLoaded } = useUser()
+  const { signOut: clerkSignOut } = useClerk()
   const router = useRouter()
 
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    // Prevent duplicate notifications within 2 seconds
-    const now = Date.now()
-    if (lastNotificationRef.current === message) {
-      return
+  // Map Clerk user to our AuthUser shape so existing consumers don't break
+  const user: AuthUser | null = clerkUser
+    ? {
+      id: clerkUser.id,
+      email: clerkUser.primaryEmailAddress?.emailAddress,
+      user_metadata: {
+        full_name: clerkUser.fullName,
+        nickname: clerkUser.username,
+        avatar_url: clerkUser.imageUrl,
+      },
     }
-    lastNotificationRef.current = message
-    setTimeout(() => {
-      if (lastNotificationRef.current === message) {
-        lastNotificationRef.current = null
-      }
-    }, 2000)
-
-    if (type === 'success') {
-      showSuccess(message)
-    } else {
-      showError(message)
-    }
-  }
-
-  const createUserProfile = async (user: User) => {
-    try {
-      // Check if profile already exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (existingProfile) {
-        return // Profile already exists
-      }
-
-      // Also check by email to avoid unique constraint violations on unique email index
-      if (user.email) {
-        const { data: emailProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', user.email)
-          .single()
-
-        if (emailProfile) {
-          // A profile already exists for this email, skip creating a new one
-          return
-        }
-      }
-
-      // Create new profile
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: user.id,
-            username: user.email?.split('@')[0] || `user_${user.id.substring(0, 8)}`,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || null,
-            avatar_url: user.user_metadata?.avatar_url || null,
-            updated_at: new Date().toISOString(),
-          },
-        ])
-
-      if (insertError) {
-        throw insertError
-      }
-    } catch (error: any) {
-      // Log more details for debugging
-      console.error('Error creating user profile:', { code: error?.code, message: error?.message, details: error?.details });
-
-      // Handle duplicate profile error gracefully (Postgres code 23505 or duplicate message)
-      if (error?.code === '23505' || (typeof error?.message === 'string' && error.message.includes('duplicate'))) {
-        // Profile already exists, do not show notification
-        return;
-      }
-
-      showNotification(
-        'Failed to create user profile. Please update your profile information.',
-        'error'
-      );
-    }
-  }
-
-  useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-    const getUser = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser()
-        if (error) throw error
-        setUser(user)
-        prevUserIdRef.current = user?.id ?? null
-        if (user) {
-          await createUserProfile(user)
-        }
-      } catch (error) {
-        setError(error instanceof Error ? error : new Error('An error occurred'))
-        showNotification(
-          error instanceof Error ? error.message : 'An error occurred during authentication',
-          'error'
-        )
-      } finally {
-        setLoading(false)
-        initialLoadRef.current = false
-      }
-    }
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const newUser = session?.user ?? null
-      const newId = newUser?.id ?? null
-      const prevId = prevUserIdRef.current
-      if (newId === prevId) return
-      prevUserIdRef.current = newId
-
-      setUser(newUser)
-      setLoading(false)
-
-      if (!initialLoadRef.current) {
-        if (newUser) {
-          await createUserProfile(newUser)
-          showNotification('Successfully signed in', 'success')
-        } else if (prevId) {
-          showNotification('Successfully signed out', 'success')
-          router.push('/')
-        }
-      }
-    })
-
-    getUser()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [supabase.auth, showSuccess, showError, router])
+    : null
 
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut()
-      setUser(null)
-      localStorage.clear()
-      sessionStorage.clear()
-    } catch (error) {
-      setError(error instanceof Error ? error : new Error('An error occurred during sign out'))
-      showNotification(
-        error instanceof Error ? error.message : 'An error occurred during sign out',
-        'error'
-      )
-    }
+    await clerkSignOut()
+    router.push('/')
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, signOut }}>
+    <AuthContext.Provider value={{ user, loading: !isLoaded, error: null, signOut }}>
       {children}
     </AuthContext.Provider>
   )
@@ -194,4 +64,4 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-} 
+}

@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { parseCSV } from '@/lib/csv'
 
@@ -43,9 +43,9 @@ function toISODate(d?: string | null): string | null {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const supabase = createSupabaseServer()
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     let csvText = ''
     const contentType = request.headers.get('content-type') || ''
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       if (FIELD_MAP[norm]) idxMap[FIELD_MAP[norm]] = i
     })
 
-    const required = ['departure_airport','arrival_airport','departure_date','departure_time','arrival_time']
+    const required = ['departure_airport', 'arrival_airport', 'departure_date', 'departure_time', 'arrival_time']
     const missing = required.filter((k) => idxMap[k] === undefined)
     if (missing.length) {
       return NextResponse.json({ error: `Missing required columns: ${missing.join(', ')}` }, { status: 400 })
@@ -78,14 +78,14 @@ export async function POST(request: Request) {
     const { data: existing, error: exErr } = await supabase
       .from('vidmaflights')
       .select('id,reservation_number,flight_number,departure_date')
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
     if (exErr) {
       // Not fatal; proceed without dedupe
       console.error('Existing fetch error:', exErr.message)
     }
     const existingSet = new Set<string>()
     for (const f of existing || []) {
-      const key = [f.reservation_number||'', f.flight_number||'', f.departure_date||''].join('|')
+      const key = [f.reservation_number || '', f.flight_number || '', f.departure_date || ''].join('|')
       existingSet.add(key)
     }
 
@@ -102,14 +102,14 @@ export async function POST(request: Request) {
       const reservation_number = String(pick('reservation_number') || '').trim() || null
       const flight_number = String(pick('flight_number') || '').trim() || null
 
-      const dedupeKey = [reservation_number||'', flight_number||'', depDateISO||''].join('|')
+      const dedupeKey = [reservation_number || '', flight_number || '', depDateISO || ''].join('|')
       if (existingSet.has(dedupeKey)) {
         skipped_duplicates++
         continue
       }
 
       const row = {
-        owner_id: user.id,
+        owner_id: userId,
         passenger_name: String(pick('passenger_name') || '').trim() || null,
         reservation_number,
         flight_number,

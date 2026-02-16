@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { stringifyCSV } from '@/lib/csv'
 
@@ -27,9 +27,9 @@ const HEADERS = [
 
 export async function GET(req: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const supabase = createSupabaseServer()
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     let query = supabase
       .from('vidmaflights')
       .select('*')
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
 
     if (start) query = query.gte('departure_date', start)
     if (end) query = query.lte('departure_date', end)

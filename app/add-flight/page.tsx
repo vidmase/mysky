@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from "next/navigation"
 import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft, X, Loader2, Check } from "lucide-react"
 import { format, isBefore } from "date-fns"
@@ -26,7 +27,6 @@ import { Airport } from "@/lib/airports"
 import { Passenger } from "@/lib/passengers"
 import { BoardingPassScanner } from "../components/boarding-pass-scanner"
 import { europeanAirports } from "@/lib/airports"
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface FormState {
   passenger_name: string
@@ -108,7 +108,7 @@ function getFlagEmoji(countryName: string): string {
 
 export default function AddFlightPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const { user } = useAuth()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [selectedPassengers, setSelectedPassengers] = useState<Passenger[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -175,12 +175,8 @@ export default function AddFlightPage() {
   }, [departureDate, arrivalDate])
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsAuthenticated(!!session)
-    }
-    checkSession()
-  }, [supabase])
+    setIsAuthenticated(user ? true : false)
+  }, [user])
 
   useEffect(() => {
     if (isAuthenticated === false) {
@@ -372,7 +368,7 @@ export default function AddFlightPage() {
           body: JSON.stringify({ action: 'add_flight', metadata: { ids, source: 'client' }, page: '/flights' }),
           keepalive: true,
         })
-      } catch {}
+      } catch { }
 
       router.push('/flights')
     } catch (err) {

@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useState } from "react"
 import { LogOut, User } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { UserButton, SignedIn, SignedOut } from "@clerk/nextjs"
 
 import {
   DropdownMenu,
@@ -16,46 +16,30 @@ import {
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth } from "@/contexts/auth-context"
 import { UserManagement } from "../src/components/user-management/UserManagement"
 
 export function UserMenu() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
-  const [userData, setUserData] = useState<{
-    full_name: string | null
-    nickname: string | null
-    email: string | null
-  } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading, signOut } = useAuth()
   const [showUserManagement, setShowUserManagement] = useState(false)
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserData({
-          full_name: user.user_metadata.full_name || null,
-          nickname: user.user_metadata.nickname || null,
-          email: user.email || null,
-        })
-      }
-      setLoading(false)
-    }
-    fetchUserData()
-  }, [supabase.auth])
-
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await signOut()
     router.push("/auth")
   }
 
-  const initials = userData?.full_name
-    ? userData.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-    : userData?.email?.[0].toUpperCase() || "U"
+  const fullName = user?.user_metadata?.full_name as string | undefined
+  const nickname = user?.user_metadata?.nickname as string | undefined
+  const email = user?.email ?? null
+
+  const initials = fullName
+    ? fullName
+      .split(" ")
+      .map((namePart) => namePart[0])
+      .join("")
+      .toUpperCase()
+    : email?.[0]?.toUpperCase() || "U"
 
   if (loading) {
     return (
@@ -65,7 +49,7 @@ export function UserMenu() {
     )
   }
 
-  if (!userData) {
+  if (!user) {
     return (
       <Button
         asChild
@@ -95,11 +79,11 @@ export function UserMenu() {
         <DropdownMenuContent className="w-64" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-base font-semibold leading-none text-foreground">{userData.full_name || "User"}</p>
+              <p className="text-base font-semibold leading-none text-foreground">{fullName || "User"}</p>
               <p className="text-xs leading-none text-muted-foreground">
-                {userData.nickname && <span className="text-flight">@{userData.nickname}</span>}
-                {userData.nickname && userData.email && " • "}
-                {userData.email}
+                {nickname && <span className="text-flight">@{nickname}</span>}
+                {nickname && email && " • "}
+                {email}
               </p>
             </div>
           </DropdownMenuLabel>
@@ -151,4 +135,4 @@ export function UserMenu() {
       )}
     </>
   )
-} 
+}

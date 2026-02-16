@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -10,10 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
+    const supabase = createSupabaseServer()
     const { sessionId } = await params
 
     // Query session progress from database
@@ -21,7 +21,7 @@ export async function GET(
       .from('gmail_import_sessions')
       .select('*')
       .eq('id', sessionId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (error || !session) {
@@ -68,8 +68,8 @@ export async function GET(
 
   } catch (e: any) {
     console.error('Progress polling error:', e)
-    return NextResponse.json({ 
-      error: 'server_error', 
+    return NextResponse.json({
+      error: 'server_error',
       message: e?.message || 'Unknown error'
     }, { status: 500 })
   }

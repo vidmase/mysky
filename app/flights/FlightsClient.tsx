@@ -19,6 +19,7 @@ import { FlightsTable } from "@/app/flights/components/FlightsTable"
 import { DeleteFlightDialog } from "@/app/flights/components/DeleteFlightDialog"
 import { CsvImportDialog } from "@/app/flights/components/CsvImportDialog"
 import { CsvExportDialog } from "@/app/flights/components/CsvExportDialog"
+import { Flightradar24ExportDialog } from "@/app/flights/components/Flightradar24ExportDialog"
 import { ImportProgressIndicator } from "@/app/flights/components/ImportProgressIndicator"
 import { PreviewProgressIndicator } from "@/app/flights/components/PreviewProgressIndicator"
 import { ModernSpinner } from "@/app/flights/components/ModernSpinner"
@@ -80,6 +81,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [isImportingSelected, setIsImportingSelected] = useState(false)
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
+  const [isFlightradar24ExportDialogOpen, setIsFlightradar24ExportDialogOpen] = useState(false)
   
   // Enhanced loading states
   const [importProgress, setImportProgress] = useState<{
@@ -533,6 +535,10 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
               <Download className="h-4 w-4" />
               Export CSV
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsFlightradar24ExportDialogOpen(true)} className="gap-2">
+              <Plane className="h-4 w-4 text-orange-500" />
+              Export for Flightradar24
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={openImportDialog}
@@ -597,6 +603,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
 
       {/* CSV Export Dialog */}
       <CsvExportDialog open={isCsvExportDialogOpen} onOpenChange={setIsCsvExportDialogOpen} flights={flights} />
+      <Flightradar24ExportDialog open={isFlightradar24ExportDialogOpen} onOpenChange={setIsFlightradar24ExportDialogOpen} flights={flights} />
 
       {/* Mobile cards */}
       <div className="grid grid-cols-1 gap-4 md:hidden mb-4">
@@ -908,10 +915,26 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                       </tr>
                     )
                   })}
-                  {gmailItems.length === 0 && (
+                  {gmailItems.length === 0 && !isLoadingPreview && (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-sm text-muted-foreground">
-                        No matching Ryanair emails found.
+                      <td colSpan={10} className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <Mail className="h-12 w-12 text-muted-foreground/50" />
+                          <div className="text-sm text-muted-foreground font-medium">
+                            No matching Ryanair emails found.
+                          </div>
+                          <div className="text-xs text-muted-foreground/70 max-w-md">
+                            <p className="mb-2">This could mean:</p>
+                            <ul className="text-left list-disc list-inside space-y-1">
+                              <li>No booking confirmations in the selected date range</li>
+                              <li>Gmail might not be properly connected</li>
+                              <li>The email search didn&apos;t find relevant messages</li>
+                            </ul>
+                            <p className="mt-3 text-center">
+                              Try selecting a different date range or check your Gmail connection.
+                            </p>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}

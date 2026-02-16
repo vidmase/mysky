@@ -10,6 +10,7 @@
     "vercel-build": "next build"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.37.4",
     "@deck.gl/core": "^9.1.8",
     "@deck.gl/layers": "^9.1.8",
     "@deck.gl/react": "^9.1.8",

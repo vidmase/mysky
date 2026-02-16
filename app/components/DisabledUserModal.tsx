@@ -1,26 +1,25 @@
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/contexts/auth-context'
 
 export const useDisabledUserModal = () => {
   const [show, setShow] = useState(false)
   const [checked, setChecked] = useState(false)
-  const supabase = createClientComponentClient()
+  const { user, signOut } = useAuth()
 
   useEffect(() => {
     const checkDisabled = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('disabled')
-          .eq('id', user.id)
-          .single()
-        if (profile?.disabled) {
-          setShow(true)
-          // Immediately sign out and redirect
-          await supabase.auth.signOut()
-          window.location.href = '/auth?disabled=1'
-        } else {
+        try {
+          const res = await fetch('/api/check-disabled')
+          const data = await res.json()
+          if (data?.disabled) {
+            setShow(true)
+            await signOut()
+            window.location.href = '/auth?disabled=1'
+          } else {
+            setShow(false)
+          }
+        } catch {
           setShow(false)
         }
       } else {
@@ -31,7 +30,7 @@ export const useDisabledUserModal = () => {
     checkDisabled()
     const interval = setInterval(checkDisabled, 30000)
     return () => clearInterval(interval)
-  }, [supabase])
+  }, [user, signOut])
 
   // Modal is now only a fallback in case redirect fails
   const modal = show ? (
@@ -47,4 +46,4 @@ export const useDisabledUserModal = () => {
   ) : null
 
   return { DisabledUserModal: modal, isDisabled: show }
-} 
+}

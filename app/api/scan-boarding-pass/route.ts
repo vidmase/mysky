@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI, Part, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { europeanAirports, Airport } from '@/lib/airports'
 
 // Initialize Gemini API
@@ -377,8 +376,8 @@ export async function POST(request: Request) {
             mimeType = file.type
         }
 
-        // Initialize Gemini 1.5 Flash model - optimized for OCR and text extraction
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+        // Initialize Gemini 2.0 Flash model - optimized for OCR and text extraction
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0 } })
 
         // Enhanced prompt for better OCR accuracy
         const prompt = `Extract text from this boarding pass or flight confirmation ${isPDF ? 'PDF document' : 'image'} with high precision.

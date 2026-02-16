@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getUserStats } from "../../../src/lib/services/stats"
@@ -45,7 +45,7 @@ async function retryWithBackoff<T>(
       return await fn()
     } catch (error: any) {
       if (attempt === maxRetries) throw error
-      
+
       // Check if it's a rate limit error
       if (error?.status === 429) {
         const delay = baseDelay * Math.pow(2, attempt - 1)
@@ -53,7 +53,7 @@ async function retryWithBackoff<T>(
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
-      
+
       throw error
     }
   }
@@ -139,7 +139,7 @@ function filterFlightsByQuestion(flights: any[], question: string): { matches: a
     if (matches.length > 0) return { matches, explanation: `Matched date: ${dateMatch[1]}` };
   }
   // Month (e.g., 'april', 'may')
-  const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   for (const month of monthNames) {
     if (q.includes(month)) {
       matches = flights.filter(f => {
@@ -219,11 +219,11 @@ function getSampledCSV(filePath: string, maxLines: number = 100): string {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
     // Authenticate user
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session) {
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -236,19 +236,19 @@ export async function POST(request: Request) {
 
     // Limit message length to avoid quota issues
     if (message.length > 1000) {
-      return NextResponse.json({ 
-        error: 'Message too long. Please keep messages under 1000 characters.' 
+      return NextResponse.json({
+        error: 'Message too long. Please keep messages under 1000 characters.'
       }, { status: 400 })
     }
 
     // Get user's flight statistics for context
-    const userStats = await getUserStats(supabase, session.user.id)
+    const userStats = await getUserStats(supabase, userId)
 
     // Dynamic context: filter flights based on user question
     const { data: allFlights } = await supabase
       .from('vidmaflights')
       .select('*')
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
     const filterResult = filterFlightsByQuestion(allFlights || [], message)
     let relevantFlights = filterResult.matches
     let filterExplanation = filterResult.explanation
@@ -287,7 +287,7 @@ export async function POST(request: Request) {
     await supabase
       .from('chat_messages')
       .insert({
-        user_id: session.user.id,
+        user_id: userId,
         role: 'user',
         content: message,
         user_stats: userStats
@@ -317,7 +317,7 @@ export async function POST(request: Request) {
     await supabase
       .from('chat_messages')
       .insert({
-        user_id: session.user.id,
+        user_id: userId,
         role: 'assistant',
         content: responseText,
         user_stats: userStats
@@ -339,7 +339,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Chat API error:', error)
-    
+
     // Handle specific rate limit errors
     if (error?.status === 429) {
       return NextResponse.json({
@@ -356,16 +356,16 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session) {
+    const supabase = createSupabaseServer()
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     // Delete all chat messages for this user
     const { error: deleteError } = await supabase
       .from('chat_messages')
       .delete()
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
     if (deleteError) {
       return NextResponse.json({ error: 'Failed to delete messages' }, { status: 500 })
     }

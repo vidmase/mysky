@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -7,12 +7,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
     const { id } = await params
 
-    // Check if user is authenticated
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
+    // Check if user is authenticated via Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -23,7 +23,7 @@ export async function GET(
       .from('vidmaflights')
       .select('*')
       .eq('id', id)
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
       .single()
 
     if (error) {
@@ -50,11 +50,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
     const { id } = await params
-    const { data: { session } } = await supabase.auth.getSession()
 
-    if (!session) {
+    // Authenticate via Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -83,10 +84,10 @@ export async function PUT(
     } = body
 
     // Validate required fields
-    if (!passenger_name || !reservation_number || !flight_number || 
-        !departure_airport || !arrival_airport || !departure_date || 
-        !departure_time || !arrival_time || !total_receipt || 
-        !purchased_date || !purchase_time) {
+    if (!passenger_name || !reservation_number || !flight_number ||
+      !departure_airport || !arrival_airport || !departure_date ||
+      !departure_time || !arrival_time || !total_receipt ||
+      !purchased_date || !purchase_time) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -116,7 +117,7 @@ export async function PUT(
         notes
       })
       .eq('id', id)
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
       .select()
       .single()
 
@@ -131,12 +132,12 @@ export async function PUT(
     // Best-effort event logging
     try {
       await supabase.from('event_logs').insert({
-        user_id: session.user.id,
+        user_id: userId,
         action: 'update_flight',
         metadata: { id },
         page: '/flights',
       })
-    } catch {}
+    } catch { }
 
     return NextResponse.json(data, { status: 200 })
   } catch (error) {
@@ -153,12 +154,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
     const { id } = await params
 
-    // Check if user is authenticated
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
+    // Check if user is authenticated via Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -170,7 +171,7 @@ export async function DELETE(
       .from('vidmaflights')
       .select('*')
       .eq('id', id)
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
       .single()
 
     if (fetchError) {
@@ -186,7 +187,7 @@ export async function DELETE(
       .from('vidmaflights')
       .delete()
       .eq('id', id)
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
 
     if (deleteError) {
       console.error('Error deleting flight:', deleteError)

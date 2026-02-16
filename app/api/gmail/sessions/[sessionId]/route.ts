@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -11,10 +11,9 @@ export async function GET(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const supabase = createSupabaseServer()
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
     const { sessionId } = params
 
@@ -23,7 +22,7 @@ export async function GET(
       .from('gmail_import_sessions')
       .select('*')
       .eq('id', sessionId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (error || !session) {
@@ -48,8 +47,8 @@ export async function GET(
 
   } catch (e: any) {
     console.error('Session status error:', e)
-    return NextResponse.json({ 
-      error: 'server_error', 
+    return NextResponse.json({
+      error: 'server_error',
       message: e?.message || 'Unknown error'
     }, { status: 500 })
   }
@@ -61,36 +60,35 @@ export async function DELETE(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const supabase = createSupabaseServer()
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
     const { sessionId } = params
 
     // Update session status to cancelled
     const { error } = await supabase
       .from('gmail_import_sessions')
-      .update({ 
+      .update({
         status: 'cancelled',
         updated_at: new Date().toISOString()
       })
       .eq('id', sessionId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
 
     if (error) {
       return NextResponse.json({ error: 'cancel_failed' }, { status: 400 })
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       message: 'Session cancelled successfully'
     })
 
   } catch (e: any) {
     console.error('Session cancel error:', e)
-    return NextResponse.json({ 
-      error: 'server_error', 
+    return NextResponse.json({
+      error: 'server_error',
       message: e?.message || 'Unknown error'
     }, { status: 500 })
   }

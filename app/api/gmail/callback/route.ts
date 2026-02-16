@@ -33,7 +33,22 @@ export async function GET(request: Request) {
     }
     // Redirect back; if no refresh token returned (already granted), user can still fetch messages
     return NextResponse.redirect(new URL('/add-flight?gmail=connected', url.origin))
-  } catch (e) {
+  } catch (e: any) {
+    console.error('[Gmail OAuth Callback] Token exchange failed:', e?.message || e)
+
+    try {
+      const fs = require('fs')
+      const path = require('path')
+      const logPath = path.join(process.cwd(), 'gmail-auth-debug.log')
+      const errorMsg = `[${new Date().toISOString()}] Token exchange failed: ${e?.message || e}\nFull Error: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}\n`
+      fs.appendFileSync(logPath, errorMsg)
+      if (e?.response?.data) {
+        fs.appendFileSync(logPath, `Google API Error Data: ${JSON.stringify(e.response.data)}\n`)
+      }
+    } catch {
+      // ignore
+    }
+
     return NextResponse.redirect(new URL('/add-flight?gmail=exchange_failed', url.origin))
   }
 }

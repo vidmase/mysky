@@ -1,34 +1,32 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
     try {
         const flightData = await request.json()
 
-        // Get authenticated Supabase client
-        const supabase = createRouteHandlerClient({ cookies })
+        // Get authenticated user's Supabase UUID
+        const userId = await resolveSupabaseUserId()
 
-        // Get the user's session
-        const { data: { session } } = await supabase.auth.getSession()
-
-        if (!session) {
+        if (!userId) {
             return NextResponse.json(
                 { error: 'Unauthorized' },
                 { status: 401 }
             )
         }
 
-        // Add user_id to the flight data
+        const supabase = createSupabaseServer()
+
+        // Add owner_id to the flight data
         const flightDataWithUser = {
             ...flightData,
-            user_id: session.user.id,
-            created_at: new Date().toISOString()
+            owner_id: userId,
         }
 
         // Insert the flight data into the database
         const { data, error } = await supabase
-            .from('flights')
+            .from('vidmaflights')
             .insert([flightDataWithUser])
             .select()
 
@@ -42,6 +40,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             message: 'Flight saved successfully',
+            id: data[0]?.id,
             flight: data[0]
         })
     } catch (error) {
@@ -51,4 +50,4 @@ export async function POST(request: Request) {
             { status: 500 }
         )
     }
-} 
+}

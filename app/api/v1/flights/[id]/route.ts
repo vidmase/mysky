@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -54,11 +54,11 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createSupabaseServer()
 
-        // Authenticate user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
+        // Authenticate user via Clerk
+        const userId = await resolveSupabaseUserId()
+        if (!userId) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
                 error: 'Unauthorized'
@@ -66,7 +66,7 @@ export async function GET(
         }
 
         // Check flight ownership
-        const isOwner = await checkFlightOwnership(supabase, params.id, session.user.id)
+        const isOwner = await checkFlightOwnership(supabase, params.id, userId)
         if (!isOwner) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
@@ -108,11 +108,11 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     try {
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createSupabaseServer()
 
-        // Authenticate user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
+        // Authenticate user via Clerk
+        const userId = await resolveSupabaseUserId()
+        if (!userId) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
                 error: 'Unauthorized'
@@ -120,7 +120,7 @@ export async function PUT(
         }
 
         // Check flight ownership
-        const isOwner = await checkFlightOwnership(supabase, params.id, session.user.id)
+        const isOwner = await checkFlightOwnership(supabase, params.id, userId)
         if (!isOwner) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
@@ -175,11 +175,11 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const supabase = createRouteHandlerClient({ cookies })
+        const supabase = createSupabaseServer()
 
-        // Authenticate user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
+        // Authenticate user via Clerk
+        const userId = await resolveSupabaseUserId()
+        if (!userId) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,
                 error: 'Unauthorized'
@@ -187,7 +187,7 @@ export async function DELETE(
         }
 
         // Check flight ownership
-        const isOwner = await checkFlightOwnership(supabase, params.id, session.user.id)
+        const isOwner = await checkFlightOwnership(supabase, params.id, userId)
         if (!isOwner) {
             return NextResponse.json<ApiResponse<null>>({
                 success: false,

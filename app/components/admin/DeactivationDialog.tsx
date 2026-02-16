@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface DeactivationDialogProps {
   isOpen: boolean;
@@ -24,7 +23,7 @@ type DurationOptions = {
 export function DeactivationDialog({ isOpen, onClose, userId, userEmail, onDeactivate }: DeactivationDialogProps) {
   const [duration, setDuration] = useState<keyof DurationOptions>("1_day");
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClientComponentClient();
+  // Supabase client removed - using Clerk auth via useAuth()
 
   const durationOptions: DurationOptions = {
     "1_hour": { label: "1 Hour", hours: 1 },

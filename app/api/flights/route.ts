@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { format } from 'date-fns'
@@ -24,25 +24,21 @@ const flightSchema = z.object({
 
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
-    // Get the current user's session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError) {
-      console.error('Session error:', sessionError)
+    // Get the current user from Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    if (!session) {
-      return NextResponse.json({ error: 'No active session' }, { status: 401 })
-    }
 
-    console.log('Current user:', session.user.id) // Debug log
+    console.log('Current user:', userId) // Debug log
 
     // First check if user profile exists
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single()
 
     if (profileError) {
@@ -50,15 +46,15 @@ export async function GET() {
     }
 
     if (!profile) {
-      console.log('Creating new profile for user:', session.user.id) // Debug log
+      console.log('Creating new profile for user:', userId) // Debug log
 
       // Create profile if it doesn't exist
       const { data: newProfile, error: createProfileError } = await supabase
         .from('profiles')
         .insert([{
-          id: session.user.id,
-          email: session.user.email,
-          full_name: session.user.user_metadata?.full_name || null,
+          id: userId,
+          email: null,
+          full_name: null,
           updated_at: new Date().toISOString()
         }])
         .select()
@@ -79,7 +75,7 @@ export async function GET() {
     const { data: flights, error: flightsError } = await supabase
       .from('vidmaflights')
       .select('*')
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
       .order('departure_date', { ascending: false })
 
     if (flightsError) {
@@ -99,11 +95,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 }
@@ -117,7 +112,7 @@ export async function POST(request: Request) {
     // Add the owner_id to the flight data
     const baseFlightData = {
       ...data,
-      owner_id: user.id,
+      owner_id: userId,
       departure_longitude: data.departure_longitude || null,
       departure_latitude: data.departure_latitude || null,
       arrival_longitude: data.arrival_longitude || null,
@@ -194,7 +189,7 @@ export async function POST(request: Request) {
         const ids = (flights ?? []).map((f: any) => f.id)
         const { error: logErr } = await supabase.from('event_logs').insert([
           {
-            user_id: user.id,
+            user_id: userId,
             action: 'add_flight',
             metadata: { ids, type: 'return' },
             page: '/flights',
@@ -243,7 +238,7 @@ export async function POST(request: Request) {
         const ids = Array.isArray(flight) ? flight.map((f: any) => f.id) : []
         const { error: logErr } = await supabase.from('event_logs').insert([
           {
-            user_id: user.id,
+            user_id: userId,
             action: 'add_flight',
             metadata: { ids, type: 'one-way' },
             page: '/flights',
@@ -267,11 +262,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    // Get the current user from Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 }
@@ -292,7 +287,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         arrival_latitude: flightData.arrival_latitude || null
       })
       .eq('id', params.id)
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
       .select()
 
     if (error) {

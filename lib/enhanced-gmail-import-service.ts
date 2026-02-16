@@ -4,6 +4,7 @@ import { RobustGmailParser } from './robust-gmail-parser'
 import { DeduplicationEngine, FlightData } from './deduplication-engine'
 import { ErrorRecoveryManager } from './error-recovery-manager'
 import { ProgressiveImporter, ImportConfig, ImportProgress as NewImportProgress, ImportSession } from './progressive-importer'
+import { GmailImportService } from './gmail-import-service'
 
 // Legacy interface compatibility
 export interface ImportProgress {
@@ -79,7 +80,7 @@ export class EnhancedGmailImportService {
   private gmailClient: any
   private supabaseClient: any
   private options: EnhancedGmailImportOptions
-  
+
   // Enhanced components
   private resilientClient?: ResilientGmailClient
   private classifier?: EmailClassifier
@@ -122,26 +123,26 @@ export class EnhancedGmailImportService {
   private initializeEnhancedComponents(): void {
     try {
       console.log('Initializing enhanced components...')
-      
+
       // Initialize resilient Gmail client
       this.resilientClient = new ResilientGmailClient(this.gmailClient)
       console.log('✓ ResilientGmailClient initialized')
-      
+
       // Initialize email classifier
       this.classifier = new EmailClassifier()
       console.log('✓ EmailClassifier initialized')
-      
+
       // Initialize robust parser
       this.parser = new RobustGmailParser()
       console.log('✓ RobustGmailParser initialized')
-      
+
       // Initialize deduplication engine
       this.deduplicator = new DeduplicationEngine({
         similarityThreshold: 0.85,
         mergeStrategy: 'highest_confidence'
       })
       console.log('✓ DeduplicationEngine initialized')
-      
+
       // Initialize error recovery manager
       this.errorManager = new ErrorRecoveryManager({
         maxRetries: this.options.maxRetries || 3,
@@ -149,7 +150,7 @@ export class EnhancedGmailImportService {
         logErrors: true
       })
       console.log('✓ ErrorRecoveryManager initialized')
-      
+
       // Initialize progressive importer
       this.progressiveImporter = new ProgressiveImporter(
         this.resilientClient,
@@ -160,7 +161,7 @@ export class EnhancedGmailImportService {
       )
       console.log('✓ ProgressiveImporter initialized')
       console.log('All enhanced components initialized successfully')
-      
+
     } catch (error) {
       console.error('Failed to initialize enhanced components:', error)
       throw error
@@ -176,34 +177,49 @@ export class EnhancedGmailImportService {
   }
 
   private async importFlightsEnhanced(userId: string): Promise<ImportResult> {
-    const startTime = Date.now()
-    console.log('Starting enhanced import for user:', userId)
-    
-    try {
-      // For now, return immediate mock results to avoid hanging
-      // TODO: Implement proper enhanced import processing
-      console.log('Returning immediate mock results to avoid session polling hang')
-      
-      const result: ImportResult = {
-        success: true,
-        imported: 0,
-        skipped: 0,
-        duplicates: 0,
-        errors: 0,
-        processingTime: Date.now() - startTime,
-        stats: {
-          totalMessages: 0,
-          validMessages: 0,
-          filteredMessages: 0,
-          duplicateMessages: 0,
-          errorMessages: 0
-        },
-        errorDetails: []
-      }
-      
-      console.log('Enhanced import completed with result:', result)
-      return result
+    console.log('Enhanced import: delegating to core GmailImportService for user:', userId)
+    return this.runCoreImport(userId)
+  }
 
+  private async importFlightsLegacy(userId: string): Promise<ImportResult> {
+    console.log('Legacy import: delegating to core GmailImportService for user:', userId)
+    return this.runCoreImport(userId)
+  }
+
+  /**
+   * Delegates to the real, working GmailImportService which handles
+   * Gmail search, message fetching, parsing, and database import.
+   */
+  private async runCoreImport(userId: string): Promise<ImportResult> {
+    const startTime = Date.now()
+    try {
+      const coreService = new GmailImportService(
+        this.gmailClient,
+        this.supabaseClient,
+        {
+          useLLM: this.options.useLLM ?? true,
+          forceLLM: this.options.forceLLM ?? false,
+          retryFailed: this.options.retryFailed ?? true,
+          maxRetries: this.options.maxRetries ?? 3,
+          batchSize: this.options.batchSize ?? 50,
+          concurrency: this.options.concurrency ?? 5,
+          onProgress: this.options.onProgress,
+          onError: this.options.onError,
+        }
+      )
+      const coreResult = await coreService.importFlights(userId)
+
+      // Map the core result into the EnhancedImportResult shape
+      return {
+        success: coreResult.success,
+        imported: coreResult.imported,
+        skipped: coreResult.skipped,
+        duplicates: coreResult.duplicates,
+        errors: coreResult.errors,
+        processingTime: coreResult.processingTime,
+        stats: coreResult.stats,
+        errorDetails: (coreResult as any).errors ?? [],
+      }
     } catch (error) {
       return {
         success: false,
@@ -217,42 +233,15 @@ export class EnhancedGmailImportService {
           validMessages: 0,
           filteredMessages: 0,
           duplicateMessages: 0,
-          errorMessages: 1
+          errorMessages: 1,
         },
         errorDetails: [{
-          stage: 'enhanced_import',
+          stage: 'core_import',
           error: error instanceof Error ? error.message : 'Unknown error',
           retryCount: 0,
-          maxRetries: this.options.maxRetries || 3
-        }]
+          maxRetries: this.options.maxRetries || 3,
+        }],
       }
-    }
-  }
-
-  private async importFlightsLegacy(userId: string): Promise<ImportResult> {
-    // Fallback to original implementation logic
-    // This would contain the original gmail-import-service logic
-    // For brevity, returning a basic structure
-    return {
-      success: false,
-      imported: 0,
-      skipped: 0,
-      duplicates: 0,
-      errors: 1,
-      processingTime: 0,
-      stats: {
-        totalMessages: 0,
-        validMessages: 0,
-        filteredMessages: 0,
-        duplicateMessages: 0,
-        errorMessages: 1
-      },
-      errors: [{
-        stage: 'legacy_fallback',
-        error: 'Legacy import not implemented in enhanced service',
-        retryCount: 0,
-        maxRetries: 0
-      }]
     }
   }
 
@@ -261,7 +250,7 @@ export class EnhancedGmailImportService {
       'flight', 'booking', 'confirmation', 'itinerary', 'boarding pass',
       'reservation', 'ticket', 'travel', 'airline'
     ]
-    
+
     const airlineDomains = [
       'ryanair.com', 'easyjet.com', 'britishairways.com', 'lufthansa.com',
       'klm.com', 'airfrance.com', 'emirates.com', 'qatarairways.com'
@@ -269,7 +258,7 @@ export class EnhancedGmailImportService {
 
     const subjectTerms = flightTerms.map(term => `subject:${term}`).join(' OR ')
     const domainTerms = airlineDomains.map(domain => `from:${domain}`).join(' OR ')
-    
+
     return `(${subjectTerms}) OR (${domainTerms})`
   }
 
@@ -314,7 +303,7 @@ export class EnhancedGmailImportService {
 
     while (Date.now() - startTime < maxWaitTime) {
       const session = this.progressiveImporter!.getSession(sessionId)
-      
+
       if (!session) {
         return null
       }
@@ -353,8 +342,8 @@ export class EnhancedGmailImportService {
         .eq('owner_id', userId)
 
       const existingKeys = new Set(
-        (existingFlights ?? []).map((f: any) => 
-          `${(f.flight_number || '').trim()}|${(f.reservation_number || '').trim()}|${new Date(f.departure_date).toISOString().slice(0,10)}`
+        (existingFlights ?? []).map((f: any) =>
+          `${(f.flight_number || '').trim()}|${(f.reservation_number || '').trim()}|${new Date(f.departure_date).toISOString().slice(0, 10)}`
         )
       )
 
@@ -443,13 +432,13 @@ export class EnhancedGmailImportService {
 
   private calculateAverageConfidence(flights: FlightData[]): number {
     if (!flights || flights.length === 0) return 0
-    
+
     const confidenceValues = flights
       .map(f => f.confidence || 0)
       .filter(c => c > 0)
-    
+
     if (confidenceValues.length === 0) return 0
-    
+
     return confidenceValues.reduce((sum, conf) => sum + conf, 0) / confidenceValues.length
   }
 
@@ -526,11 +515,11 @@ export class EnhancedGmailImportService {
 
   public validateConfig(): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
-    
+
     if (!this.gmailClient) {
       errors.push('Gmail client not initialized')
     }
-    
+
     if (!this.supabaseClient) {
       errors.push('Supabase client not initialized')
     }

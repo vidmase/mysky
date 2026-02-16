@@ -1,5 +1,6 @@
+'use client'
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/contexts/auth-context'
 import { Dialog } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { CalendarX, Clock, AlertTriangle } from 'lucide-react'
@@ -10,142 +11,77 @@ export const useRealtimeDisabled = () => {
   const [remainingTime, setRemainingTime] = useState<string | null>(null)
   const [isPermanent, setIsPermanent] = useState(true)
   const [endDate, setEndDate] = useState<Date | null>(null)
-  const supabase = createClientComponentClient()
+  const { user, signOut } = useAuth()
 
-  // Format time remaining in a human-readable way
   const formatTimeRemaining = (endDateStr: string) => {
     const end = new Date(endDateStr);
     const now = new Date();
-    
-    // Calculate the difference in milliseconds
     const diffMs = end.getTime() - now.getTime();
-    
-    if (diffMs <= 0) return null; // Already expired
-    
-    // Convert to minutes, hours, and days
+    if (diffMs <= 0) return null;
+
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
     const diffHrs = Math.floor(diffMin / 60);
     const diffDays = Math.floor(diffHrs / 24);
-    
-    // Format based on the duration
-    if (diffDays > 0) {
-      return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
-    } else if (diffHrs > 0) {
-      return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''}`;
-    } else if (diffMin > 0) {
-      return `${diffMin} minute${diffMin !== 1 ? 's' : ''}`;
-    } else {
-      return 'less than a minute';
-    }
+
+    if (diffDays > 0) return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    if (diffHrs > 0) return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''}`;
+    if (diffMin > 0) return `${diffMin} minute${diffMin !== 1 ? 's' : ''}`;
+    return 'less than a minute';
   };
 
   useEffect(() => {
-    let subscription: any
-    let userId: string | null = null
+    if (!user) return
+
     let timer: NodeJS.Timeout | null = null
 
-    const setup = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      userId = user.id
+    const checkDisabled = async () => {
+      try {
+        const res = await fetch('/api/check-disabled')
+        const data = await res.json()
 
-      // First check if already disabled
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('disabled, deactivation_end_date')
-        .eq('id', userId)
-        .single()
-        
-      if (profile?.disabled) {
-        if (profile.deactivation_end_date) {
-          const deactivationEnd = new Date(profile.deactivation_end_date);
-          const now = new Date();
-          
-          if (deactivationEnd > now) {
-            // Account is temporarily disabled
-            setIsPermanent(false);
-            setEndDate(deactivationEnd);
-            setRemainingTime(formatTimeRemaining(profile.deactivation_end_date));
-            setShow(true);
-            
-            // Set up a timer to update the remaining time
-            timer = setInterval(() => {
-              const timeLeft = formatTimeRemaining(profile.deactivation_end_date);
-              if (timeLeft) {
-                setRemainingTime(timeLeft);
-              } else {
-                // Time expired, refresh the page to allow login
-                window.location.reload();
-              }
-            }, 60000); // Update every minute
-          }
-        } else {
-          // Account is permanently disabled
-          setIsPermanent(true);
-          setShow(true);
-        }
-        return;
-      }
+        if (data?.disabled) {
+          if (data.deactivation_end_date) {
+            const deactivationEnd = new Date(data.deactivation_end_date);
+            const now = new Date();
 
-      // Subscribe to changes on this user's profile
-      subscription = supabase
-        .channel('realtime-disabled')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'profiles',
-            filter: `id=eq.${userId}`,
-          },
-          (payload: any) => {
-            if (payload.new.disabled) {
-              if (payload.new.deactivation_end_date) {
-                // Account is temporarily disabled
-                const deactivationEnd = new Date(payload.new.deactivation_end_date);
-                const now = new Date();
-                
-                if (deactivationEnd > now) {
-                  setIsPermanent(false);
-                  setEndDate(deactivationEnd);
-                  setRemainingTime(formatTimeRemaining(payload.new.deactivation_end_date));
-                  
-                  // Set up a timer to update the remaining time
-                  if (timer) clearInterval(timer);
-                  timer = setInterval(() => {
-                    const timeLeft = formatTimeRemaining(payload.new.deactivation_end_date);
-                    if (timeLeft) {
-                      setRemainingTime(timeLeft);
-                    } else {
-                      // Time expired, refresh the page to allow login
-                      window.location.reload();
-                    }
-                  }, 60000); // Update every minute
-                }
-              } else {
-                // Account is permanently disabled
-                setIsPermanent(true);
-              }
+            if (deactivationEnd > now) {
+              setIsPermanent(false);
+              setEndDate(deactivationEnd);
+              setRemainingTime(formatTimeRemaining(data.deactivation_end_date));
               setShow(true);
+
+              if (timer) clearInterval(timer);
+              timer = setInterval(() => {
+                const timeLeft = formatTimeRemaining(data.deactivation_end_date);
+                if (timeLeft) {
+                  setRemainingTime(timeLeft);
+                } else {
+                  window.location.reload();
+                }
+              }, 60000);
             }
+          } else {
+            setIsPermanent(true);
+            setShow(true);
           }
-        )
-        .subscribe()
+        }
+      } catch {
+        // Silently ignore check failures
+      }
     }
 
-    setup()
+    checkDisabled()
 
     return () => {
-      if (subscription) supabase.removeChannel(subscription)
       if (timer) clearInterval(timer)
     }
-  }, [supabase])
+  }, [user])
 
   const handleAcknowledge = async () => {
     setLoading(true)
     try {
-      await supabase.auth.signOut()
+      await signOut()
       window.location.href = `/auth?disabled=1${isPermanent ? '' : '&temporary=1'}`
     } catch (error) {
       console.error('Error signing out:', error)
@@ -153,7 +89,6 @@ export const useRealtimeDisabled = () => {
     }
   }
 
-  // Render the dialog component
   const DisabledDialog = show ? (
     <Dialog open={show} onOpenChange={setShow}>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -162,7 +97,7 @@ export const useRealtimeDisabled = () => {
             <AlertTriangle className="h-8 w-8 text-red-400" />
             <h2 className="text-xl font-bold text-white">Account Deactivated</h2>
           </div>
-          
+
           <p className="text-red-200 mb-4">
             {isPermanent ? (
               "Your account has been deactivated by an administrator. You no longer have access to the system."
@@ -170,7 +105,7 @@ export const useRealtimeDisabled = () => {
               "Your account has been temporarily deactivated by an administrator."
             )}
           </p>
-          
+
           {!isPermanent && remainingTime && (
             <div className="bg-red-950 border border-red-800 rounded-lg p-4 mb-4">
               <div className="flex items-center gap-2 text-amber-400 font-medium mb-2">
@@ -188,11 +123,11 @@ export const useRealtimeDisabled = () => {
               )}
             </div>
           )}
-          
+
           <p className="text-red-300 text-sm mb-6">
             If you believe this is a mistake, please contact your system administrator.
           </p>
-          
+
           <Button
             onClick={handleAcknowledge}
             className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg transition"
@@ -206,4 +141,4 @@ export const useRealtimeDisabled = () => {
   ) : null;
 
   return DisabledDialog;
-} 
+}

@@ -1,26 +1,30 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { FlightsClient, type FlightsCounts } from './FlightsClient'
 import type { Flight } from '@/types/flight'
 
-// Define the Flight type based on the table schema
 // Types re-exported from FlightsClient
 
 export const dynamic = 'force-dynamic'
 
 export default async function FlightsPage() {
-  const supabase = createServerComponentClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { userId: clerkId } = await auth()
+  if (!clerkId) {
     redirect('/auth')
   }
 
+  const userId = await resolveSupabaseUserId()
+  if (!userId) {
+    redirect('/auth')
+  }
+
+  const supabase = createSupabaseServer()
   const { data: flights, error } = await supabase
     .from('vidmaflights')
     .select('*')
-    .eq('owner_id', session.user.id)
+    .eq('owner_id', userId)
     .order('departure_date', { ascending: false })
 
   if (error) {

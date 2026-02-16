@@ -1,18 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
 export default function LogoutButton() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      router.push('/admin/login');
+      await signOut();
+      router.push('/auth');
       router.refresh();
     } catch (error) {
       console.error('Error logging out:', error);
@@ -30,4 +30,4 @@ export default function LogoutButton() {
       <span>Logout</span>
     </Button>
   );
-} 
+}

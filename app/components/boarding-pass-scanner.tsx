@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
 import {
     Upload,
@@ -64,7 +64,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
     const [rawResponse, setRawResponse] = useState<string | null>(null)
     const [parsedData, setParsedData] = useState<Partial<BoardingPassData>[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = createClientComponentClient()
+    const { user } = useAuth()
     const router = useRouter()
 
     const resetState = () => {
@@ -88,7 +88,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         // Check file type - now accepting both images and PDFs
         const isImage = selectedFile.type.startsWith('image/')
         const isPDF = selectedFile.type === 'application/pdf'
-        
+
         if (!isImage && !isPDF) {
             setError('Please upload an image file (JPG, PNG) or PDF file')
             return
@@ -181,10 +181,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
         }
 
         try {
-            // Get the current user
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-            if (authError || !user) {
+            if (!user) {
                 toast.error('Authentication error', {
                     description: 'Please sign in to save flight details.',
                 });
@@ -213,17 +210,18 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
 
             // Prepare the data object with type checking and proper nulls/numbers
             const parsedTotal = (() => {
-                if (typeof flightData.total_receipt === 'number') return flightData.total_receipt
-                if (typeof flightData.total_receipt === 'string') {
-                    // Remove currency symbols and whitespace, keep digits, dot, comma
+                if (typeof flightData.total_receipt === 'number') {
+                    return String(flightData.total_receipt)
+                }
+                if (typeof flightData.total_receipt === 'string' && flightData.total_receipt.trim()) {
                     const cleaned = flightData.total_receipt.replace(/[^0-9,.-]/g, '').replace(/,/g, '.')
                     const n = parseFloat(cleaned)
-                    return Number.isFinite(n) ? n : null
+                    return Number.isFinite(n) ? String(n) : ''
                 }
-                return null
+                return ''
             })()
 
-            // Normalize date to yyyy-MM-dd if provided in y-M-d format
+            // Normalize date to yyyy-MM-dd
             const padDate = (d?: string) => {
                 if (!d) return ''
                 const parts = d.split('-')
@@ -241,15 +239,27 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             const normalizedArrivalDate = padDate(flightData.arrival_date || flightData.departure_date)
 
             const flightDataToSave = {
-                passenger_name: flightData.passenger_name ?? null,
-                reservation_number: flightData.reservation_number ?? null,
-                flight_number: flightData.flight_number ?? null,
+                passenger_name: flightData.passenger_name || 'Unknown',
+                reservation_number: flightData.reservation_number || '',
+                flight_number: flightData.flight_number || '',
                 departure_airport: flightData.departure_airport || '',
                 arrival_airport: flightData.arrival_airport || '',
-                departure_date: normalizedDepartureDate || '',
-                departure_time: flightData.departure_time || '',
-                arrival_time: flightData.arrival_time || '',
-                total_receipt: parsedTotal,
+                departure_date: normalizedDepartureDate || format(new Date(), 'yyyy-MM-dd'),
+                departure_time: (() => {
+                    const time = flightData.departure_time || '00:00:00'
+                    const parts = time.split(':')
+                    if (parts.length === 2) return `${time}:00`
+                    if (parts.length === 3) return time
+                    return '00:00:00'
+                })(),
+                arrival_time: (() => {
+                    const time = flightData.arrival_time || '00:00:00'
+                    const parts = time.split(':')
+                    if (parts.length === 2) return `${time}:00`
+                    if (parts.length === 3) return time
+                    return '00:00:00'
+                })(),
+                total_receipt: parsedTotal || '',
                 airline: flightData.airline ?? null,
                 seat: flightData.seat ?? null,
                 departure_iata: flightData.departure_iata ?? null,
@@ -262,7 +272,6 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                 return_arrival_time: flightData.return_arrival_time ?? null,
                 purchased_date: flightData.purchased_date || format(new Date(), 'yyyy-MM-dd'),
                 purchase_time: flightData.purchase_time || format(new Date(), 'HH:mm'),
-                owner_id: user.id,
                 notes: flightData.passengers && flightData.passengers.length > 0
                     ? `Additional passengers: ${flightData.passengers
                         .filter(p => p.name && p.name !== flightData.passenger_name)
@@ -271,46 +280,27 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                     : null
             };
 
-            // Log the data being sent
-            console.log('Attempting to save flight data:', flightDataToSave);
+            console.log('Saving flight data via API:', {
+                ...flightDataToSave,
+            });
 
-            const { error: supabaseError } = await supabase
-                .from('vidmaflights')
-                .insert([flightDataToSave]);
+            // Save via API route (authenticated by Clerk)
+            const response = await fetch('/api/save-flight', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(flightDataToSave),
+            });
 
-            if (supabaseError) {
-                console.error('Supabase Error:', {
-                    code: supabaseError.code,
-                    message: supabaseError.message,
-                    details: supabaseError.details,
-                    hint: supabaseError.hint
-                });
-
-                let errorMessage = 'Failed to save flight details.';
-                switch (supabaseError.code) {
-                    case '23505':
-                        errorMessage = 'This flight record already exists.';
-                        break;
-                    case '23503':
-                        errorMessage = 'Invalid reference in flight data.';
-                        break;
-                    case '42P01':
-                        errorMessage = 'Database configuration error. Please contact support.';
-                        break;
-                    case '23502':
-                        errorMessage = `Required field missing: ${supabaseError.details}`;
-                        break;
-                    default:
-                        errorMessage = supabaseError.message;
-                }
-
-                toast.error('Save failed', {
-                    description: errorMessage
-                });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.error || errorData.message || 'Failed to save flight';
+                toast.error('Save failed', { description: errorMessage });
                 return;
             }
 
-            // Success notification
+            const insertedData = await response.json();
+            console.log('Flight saved successfully:', insertedData?.id);
+
             toast.success('Flight details saved successfully!', {
                 description: 'The flight information has been added to your records.',
             });
@@ -332,22 +322,10 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             // Navigate to flights to show the newly added record
             try {
                 router.push('/flights?source=scanner')
-            } catch {}
+            } catch { }
 
         } catch (err) {
-            console.error('Save operation failed:', {
-                timestamp: new Date().toISOString(),
-                error: err instanceof Error ? {
-                    name: err.name,
-                    message: err.message,
-                    stack: err.stack
-                } : err,
-                flightData: {
-                    flightNumber: flightData.flight_number,
-                    passenger: flightData.passenger_name
-                }
-            });
-
+            console.error('Save operation failed:', err);
             toast.error('Failed to save flight details', {
                 description: err instanceof Error ? err.message : 'An unexpected error occurred.',
             });
@@ -534,8 +512,8 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                     {flight.total_receipt && (
                                         <div>
                                             <p className="text-muted-foreground text-sm">
-                                                {flight.booking_type === 'OUTBOUND' ? 'Outbound Price' : 
-                                                 flight.booking_type === 'RETURN' ? 'Return Price' : 'Flight Cost'}
+                                                {flight.booking_type === 'OUTBOUND' ? 'Outbound Price' :
+                                                    flight.booking_type === 'RETURN' ? 'Return Price' : 'Flight Cost'}
                                             </p>
                                             <p className="font-medium text-green-600">{flight.total_receipt}</p>
                                         </div>

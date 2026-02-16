@@ -1,25 +1,30 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { CalendarClient } from './CalendarClient'
 import { Flight } from '@/app/flights/FlightsClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CalendarPage() {
-  const supabase = createServerComponentClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
-  
-  if (!session) {
+  const { userId: clerkId } = await auth()
+
+  if (!clerkId) {
     redirect('/auth')
   }
 
+  const userId = await resolveSupabaseUserId()
+  if (!userId) {
+    redirect('/auth')
+  }
+
+  const supabase = createSupabaseServer()
   // Fetch flights data for calendar
   const { data: flights, error } = await supabase
     .from('vidmaflights')
     .select('*')
-    .eq('owner_id', session.user.id)
+    .eq('owner_id', userId)
     .order('departure_date', { ascending: false })
 
   if (error) {
@@ -36,7 +41,7 @@ export default async function CalendarPage() {
           Visualize your flights in calendar view
         </p>
       </div>
-      
+
       <Suspense fallback={
         <div className="flex items-center justify-center h-96">
           <div className="text-center">

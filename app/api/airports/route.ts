@@ -1,11 +1,11 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
         const { departure, arrival } = await request.json()
-          const supabase = createRouteHandlerClient({ cookies })
+          const supabase = createSupabaseServer()
 
         // Fetch coordinates for both airports in parallel
         const [departureResult, arrivalResult] = await Promise.all([

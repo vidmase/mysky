@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 
 export async function POST(req: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { session } } = await supabase.auth.getSession()
+    const userId = await resolveSupabaseUserId()
 
-    if (!session) {
+    if (!userId) {
       return NextResponse.json({ error: 'No active session' }, { status: 401 })
     }
+
+    const supabase = createSupabaseServer()
 
     const body = await req.json().catch(() => ({}))
     const {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     const { error } = await supabase.from('event_logs').insert({
-      user_id: session.user.id,
+      user_id: userId,
       action,
       metadata,
       context,

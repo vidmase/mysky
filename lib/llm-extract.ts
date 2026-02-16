@@ -145,7 +145,7 @@ export function parseGeminiResponse(text: string): FlightData[] {
 }
 
 export async function extractFlightsFromTextLLM(emailText: string, hints?: { subject?: string; receivedAt?: string }): Promise<FlightData[]> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro', generationConfig: { temperature: 0 } })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0 } })
 
   // 1) Normalize noisy email text a bit for better extraction
   const normalize = (t: string) =>
@@ -211,9 +211,7 @@ export async function extractFlightsFromTextLLM(emailText: string, hints?: { sub
     },
   }
 
-  const instruction = [
-    {
-      text: `Task: Extract ALL flight segments from the airline itinerary/confirmation email and return a JSON array strictly matching the provided schema.
+  const promptText = `Task: Extract ALL flight segments from the airline itinerary/confirmation email and return a JSON array strictly matching the provided schema.
 
 Absolute rules:
 - Dates must be ISO: YYYY-MM-DD. Times must be 24h HH:mm.
@@ -245,10 +243,14 @@ EMAIL CONTEXT: ${hints?.subject ? `Subject: ${hints.subject}` : ''} ${hints?.rec
 
 Mini example (Ryanair-like):
 Text snippet: "Outbound Fri, 31 Jul 2025 FR6882 Riga (RIX) 06:30 → London Stansted (STN) 07:35  Return Tue, 05 Aug 2025 FR6881 STN 20:45 → RIX 00:15"
-Expected JSON (abbrev): [{"flight_number":"FR6882","departure_iata":"RIX","arrival_iata":"STN","departure_date":"2025-07-31","departure_time":"06:30","arrival_time":"07:35","booking_type":"OUTBOUND"},{"flight_number":"FR6881","departure_iata":"STN","arrival_iata":"RIX","departure_date":"2025-08-05","departure_time":"20:45","arrival_time":"00:15","booking_type":"RETURN"}]`,
-    },
-    { text },
-  ] as const
+Expected JSON (abbrev): [{"flight_number":"FR6882","departure_iata":"RIX","arrival_iata":"STN","departure_date":"2025-07-31","departure_time":"06:30","arrival_time":"07:35","booking_type":"OUTBOUND"},{"flight_number":"FR6881","departure_iata":"STN","arrival_iata":"RIX","departure_date":"2025-08-05","departure_time":"20:45","arrival_time":"00:15","booking_type":"RETURN"}]
+
+EMAIL CONTENT:
+${text}`
+
+  const instruction = [
+    { role: 'user', parts: [{ text: promptText }] }
+  ]
 
   // Helper: sleep
   const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
@@ -259,7 +261,7 @@ Expected JSON (abbrev): [{"flight_number":"FR6882","departure_iata":"RIX","arriv
     let lastError: unknown = null
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const result = await model.generateContent({ contents: instruction as any, generationConfig })
+        const result = await model.generateContent({ contents: instruction, generationConfig })
         const res = await result.response
         const jsonText = res.text()
         if (jsonText) {
@@ -300,11 +302,15 @@ Expected JSON (abbrev): [{"flight_number":"FR6882","departure_iata":"RIX","arriv
         console.warn(`[llm-extract] Attempt ${attempt}/${maxAttempts}: no usable JSON returned`)
       } catch (e) {
         lastError = e
-        console.warn(`[llm-extract] Attempt ${attempt}/${maxAttempts} failed: ${e instanceof Error ? e.message : String(e)}`)
+        const errMsg = e instanceof Error ? e.message : String(e)
+        // Only log the first line of the error to avoid cluttering logs
+        const shortMsg = errMsg.split('\n')[0].slice(0, 100)
+        console.warn(`[llm-extract] Attempt ${attempt}/${maxAttempts} failed: ${shortMsg}`)
       }
       if (attempt < maxAttempts) await sleep(400 * attempt) // simple backoff
     }
-    // continue to fallbacks after retries
+    // LLM failed, continue to fallbacks
+    console.log(`[llm-extract] LLM extraction failed after ${maxAttempts} attempts, using regex fallback`)
   }
 
   // 3) Fallback to legacy text format + parser
@@ -341,9 +347,15 @@ Duration: [XXh YYm]
 Direct: Yes
 Price: [AMOUNT]
 
-Total receipt: [AMOUNT]`
+Total receipt: [AMOUNT]
 
-    const out = await model.generateContent([legacyPrompt, text])
+Email content to extract from:
+${text}`
+
+    const legacyInstruction = [
+      { role: 'user' as const, parts: [{ text: legacyPrompt }] }
+    ]
+    const out = await model.generateContent({ contents: legacyInstruction })
     const legacy = out.response.text()
     if (legacy && legacy.trim()) {
       const parsed = parseGeminiResponse(legacy)
@@ -373,34 +385,80 @@ Total receipt: [AMOUNT]`
 // Very lightweight heuristic extraction for resilience when LLM fails
 function extractWithRegex(t: string): FlightData[] {
   const results: FlightData[] = []
-  const flightRegex = /(FR\s?\d{3,4}|[A-Z]{2}\s?\d{3,4})/g
-  const dateRegex = /(20\d{2}[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01]))/ // YYYY-MM-DD or YYYY/MM/DD
-  const timeRegex = /\b([01]?\d|2[0-3]):([0-5]\d)\b/
-  const iataRegex = /\b([A-Z]{3})\b/
-
-  // Try to find the first plausible segment
-  const flights = Array.from(new Set(Array.from(t.matchAll(flightRegex)).map(m => m[1].replace(/\s+/g, ''))))
-  if (flights.length) {
-    const depDate = t.match(dateRegex)?.[1] || ''
-    const times = Array.from(t.matchAll(timeRegex)).map(m => m[0])
-    const depTime = times[0] || ''
-    const arrTime = times[1] || ''
-    const iatas = Array.from(t.matchAll(iataRegex)).map(m => m[1])
-    const depIata = iatas[0]
-    const arrIata = iatas[1]
-    results.push({
-      passenger_name: '',
-      reservation_number: '',
-      flight_number: flights[0],
-      departure_airport: depIata || '',
-      arrival_airport: arrIata || '',
-      departure_date: depDate,
-      departure_time: depTime,
-      arrival_time: arrTime,
-      total_receipt: '',
-      purchased_date: '',
-      purchase_time: ''
-    })
+  
+  // Only extract VALID flight numbers (FR + 3-5 digits for Ryanair)
+  const isRyanair = /ryanair/i.test(t)
+  const flightRegex = isRyanair ? /\bFR\s?\d{3,5}\b/gi : /\b[A-Z]{2}\s?\d{3,5}\b/g
+  
+  const flights = Array.from(new Set(
+    Array.from(t.matchAll(flightRegex))
+      .map(m => m[0].replace(/\s+/g, '').toUpperCase())
+      .filter(f => {
+        // Validate it's a proper flight number pattern
+        if (isRyanair) {
+          return /^FR\d{3,5}$/.test(f)
+        }
+        // For other airlines, must be 2 uppercase letters + digits
+        return /^[A-Z]{2}\d{3,5}$/.test(f)
+      })
+  ))
+  
+  if (flights.length === 0) return []
+  
+  // Date extraction - multiple formats
+  const datePatterns = [
+    /(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])/,  // YYYY-MM-DD or YYYY/MM/DD
+    /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(20\d{2})/i,  // 31 Jul 2025
+    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(20\d{2})/i,  // Jul 31, 2025
+  ]
+  
+  let depDate = ''
+  for (const pattern of datePatterns) {
+    const match = t.match(pattern)
+    if (match) {
+      depDate = match[0]
+      break
+    }
   }
+  
+  const timeRegex = /\b([01]?\d|2[0-3]):([0-5]\d)\b/g
+  const times = Array.from(t.matchAll(timeRegex)).map(m => m[0])
+  const depTime = times[0] || ''
+  const arrTime = times[1] || ''
+  
+  // Extract IATA codes (3 uppercase letters)
+  const iataRegex = /\b([A-Z]{3})\b/g
+  const iatas = Array.from(t.matchAll(iataRegex))
+    .map(m => m[1])
+    .filter(code => {
+      // Filter out common non-airport codes
+      const nonAirportCodes = ['EUR', 'USD', 'GBP', 'THE', 'AND', 'FOR', 'YOU', 'ARE', 'NOT', 'ALL', 'NEW', 'PDF', 'JPG', 'PNG']
+      return !nonAirportCodes.includes(code)
+    })
+  
+  const depIata = iatas[0]
+  const arrIata = iatas[1]
+  
+  // Extract PNR (booking reference) - 6-8 alphanumeric characters
+  const pnrMatch = t.match(/\b([A-Z0-9]{6})\b/)
+  const pnr = pnrMatch ? pnrMatch[1] : ''
+  
+  results.push({
+    passenger_name: '',
+    reservation_number: pnr,
+    flight_number: flights[0],
+    departure_airport: depIata || '',
+    arrival_airport: arrIata || '',
+    departure_date: depDate,
+    departure_time: depTime,
+    arrival_time: arrTime,
+    total_receipt: '',
+    purchased_date: '',
+    purchase_time: '',
+    airline: isRyanair ? 'Ryanair' : undefined,
+    departure_iata: depIata,
+    arrival_iata: arrIata,
+  })
+  
   return results
 }

@@ -1,5 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export async function PATCH(
@@ -8,11 +8,11 @@ export async function PATCH(
 ) {
   try {
     const { notes } = await request.json()
-      const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
     // Check if user is authenticated
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
+    const userId = await resolveSupabaseUserId()
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -23,7 +23,7 @@ export async function PATCH(
       .from('vidmaflights')
       .update({ notes })
       .eq('id', params.id)
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', userId)
       .select()
       .single()
 

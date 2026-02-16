@@ -1,8 +1,8 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { unstable_cache } from 'next/cache'
-import { 
+import {
   calculateUnifiedStatistics,
   batchFetchFlightData,
   getCacheKey
@@ -13,11 +13,11 @@ export const revalidate = 60 // Revalidate every minute
 
 export async function GET(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createSupabaseServer()
 
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const userId = await resolveSupabaseUserId()
 
-    if (sessionError || !session) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -27,18 +27,18 @@ export async function GET(request: Request) {
     // Implement stale-while-revalidate caching
     const cachedStats = await unstable_cache(
       async () => {
-        const { flights, airports } = await batchFetchFlightData(supabase, session.user.id)
+        const { flights, airports } = await batchFetchFlightData(supabase, userId)
         const stats = calculateUnifiedStatistics(flights, airports)
-        
+
         return {
           ...stats,
           lastUpdated: new Date().toISOString()
         }
       },
-      [getCacheKey(session.user.id)],
+      [getCacheKey(userId)],
       {
         revalidate: 3600, // Cache for 1 hour
-        tags: ['flight-statistics', `user-${session.user.id}`]
+        tags: ['flight-statistics', `user-${userId}`]
       }
     )()
 

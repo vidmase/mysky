@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { getAuthUrl, getGmailClient, getUserOAuth2Client } from '@/lib/google'
 import { extractFlightsFromTextLLM } from '@/lib/llm-extract'
 
@@ -17,10 +17,30 @@ function extractPlainText(payload: any): string {
   if (!payload) return ''
   const mimeType = payload.mimeType
   if (mimeType === 'text/plain') return decodeBase64Url(payload.body?.data)
-  if (mimeType === 'text/html') return decodeBase64Url(payload.body?.data).replace(/<[^>]+>/g, ' ')
+  if (mimeType === 'text/html') {
+    const html = decodeBase64Url(payload.body?.data)
+    // Preserve structure: convert common HTML separators to newlines/spaces
+    const withBreaks = html
+      .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+      .replace(/<\s*\/p\s*>/gi, '\n')
+      .replace(/<\s*p\b[^>]*>/gi, '')
+      .replace(/<\s*\/(tr|div|li|h\d)\s*>/gi, '\n')
+      .replace(/<\s*(td|th)\b[^>]*>/gi, '\t')
+      .replace(/<\s*\/(td|th)\s*>/gi, '\t')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&middot;/gi, '·')
+    const text = withBreaks.replace(/<[^>]+>/g, ' ')
+    return text
+      .replace(/[\t ]+/g, ' ')
+      .replace(/\s*\n\s*/g, '\n')
+      .trim()
+  }
   if (payload.parts && Array.isArray(payload.parts)) {
     const plain = payload.parts.find((p: any) => p.mimeType === 'text/plain')
     if (plain) return extractPlainText(plain)
+    const html = payload.parts.find((p: any) => p.mimeType === 'text/html')
+    if (html) return extractPlainText(html)
     for (const p of payload.parts) {
       const text = extractPlainText(p)
       if (text) return text
@@ -31,11 +51,11 @@ function extractPlainText(payload: any): string {
 
 export async function POST(req: Request) {
   try {
-    // Ensure user session
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    // Ensure user session via Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+    const supabase = createSupabaseServer()
 
     // Ensure Gmail connection
     const { client, hasToken } = await getUserOAuth2Client()
@@ -58,7 +78,7 @@ export async function POST(req: Request) {
       if (json && typeof json.start === 'string') start = json.start
       if (json && typeof json.end === 'string') end = json.end
       if (json && typeof json.purchasedDate === 'string') purchasedDate = json.purchasedDate
-    } catch {}
+    } catch { }
 
     // Build Gmail query by received date window when ids not provided
     let query = 'from:itinerary@ryanair.com'
@@ -91,10 +111,10 @@ export async function POST(req: Request) {
     const { data: existingFlights } = await supabase
       .from('vidmaflights')
       .select('id, reservation_number, flight_number, departure_date')
-      .eq('owner_id', user.id)
+      .eq('owner_id', userId)
 
     const existingKeys = new Set(
-      (existingFlights ?? []).map((f: any) => `${(f.flight_number || '').trim()}|${(f.reservation_number || '').trim()}|${new Date(f.departure_date).toISOString().slice(0,10)}`)
+      (existingFlights ?? []).map((f: any) => `${(f.flight_number || '').trim()}|${(f.reservation_number || '').trim()}|${new Date(f.departure_date).toISOString().slice(0, 10)}`)
     )
 
     let pageToken: string | undefined = undefined
@@ -122,7 +142,7 @@ export async function POST(req: Request) {
 
           // Basic validation to insert
           const depDate = parsed.departure_date ? new Date(parsed.departure_date) : null
-          const depISO = depDate ? depDate.toISOString().slice(0,10) : null
+          const depISO = depDate ? depDate.toISOString().slice(0, 10) : null
           const key = `${(parsed.flight_number || '').trim()}|${(parsed.reservation_number || '').trim()}|${depISO || ''}`
           if (!parsed.flight_number || !parsed.reservation_number || !depISO) {
             errors.push({ id, reason: 'missing_required_fields' })
@@ -137,14 +157,14 @@ export async function POST(req: Request) {
 
           // Build DB row with safe fallbacks
           const row = {
-            owner_id: user.id,
-            passenger_name: (parsed as any).passenger_name || user.user_metadata?.full_name || user.email,
+            owner_id: userId,
+            passenger_name: (parsed as any).passenger_name || 'Unknown',
             reservation_number: (parsed as any).reservation_number,
             flight_number: (parsed as any).flight_number,
             departure_airport: (parsed as any).departure_airport || (parsed as any).departure_iata || 'Unknown',
             arrival_airport: (parsed as any).arrival_airport || (parsed as any).arrival_iata || 'Unknown',
             departure_date: depISO,
-            arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0,10) : depISO),
+            arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0, 10) : depISO),
             departure_time: (parsed as any).departure_time || '00:00',
             arrival_time: (parsed as any).arrival_time || '00:00',
             total_receipt: (parsed as any).total_receipt || '0',
@@ -187,7 +207,7 @@ export async function POST(req: Request) {
 
             // Basic validation to insert
             const depDate = parsed.departure_date ? new Date(parsed.departure_date) : null
-            const depISO = depDate ? depDate.toISOString().slice(0,10) : null
+            const depISO = depDate ? depDate.toISOString().slice(0, 10) : null
             const key = `${(parsed.flight_number || '').trim()}|${(parsed.reservation_number || '').trim()}|${depISO || ''}`
             if (!parsed.flight_number || !parsed.reservation_number || !depISO) {
               errors.push({ id, reason: 'missing_required_fields' })
@@ -202,14 +222,14 @@ export async function POST(req: Request) {
 
             // Build DB row with safe fallbacks
             const row = {
-              owner_id: user.id,
-              passenger_name: (parsed as any).passenger_name || user.user_metadata?.full_name || user.email,
+              owner_id: userId,
+              passenger_name: (parsed as any).passenger_name || 'Unknown',
               reservation_number: (parsed as any).reservation_number,
               flight_number: (parsed as any).flight_number,
               departure_airport: (parsed as any).departure_airport || (parsed as any).departure_iata || 'Unknown',
               arrival_airport: (parsed as any).arrival_airport || (parsed as any).arrival_iata || 'Unknown',
               departure_date: depISO,
-              arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0,10) : depISO),
+              arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0, 10) : depISO),
               departure_time: (parsed as any).departure_time || '00:00',
               arrival_time: (parsed as any).arrival_time || '00:00',
               total_receipt: (parsed as any).total_receipt || '0',

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { getAuthUrl, getGmailClient, getUserOAuth2Client } from '@/lib/google'
 import { EnhancedGmailImportService } from '@/lib/enhanced-gmail-import-service'
 
@@ -9,10 +9,10 @@ export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    // Ensure user session
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    // Ensure user session via Clerk
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const supabase = createSupabaseServer()
 
     // Ensure Gmail connection
     const { client, hasToken } = await getUserOAuth2Client()
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
     // Build enhanced search query based on import mode
     let enhancedSearchQuery = searchQuery || 'flight OR booking OR confirmation OR itinerary OR reservation'
-    
+
     if (importMode === 'future') {
       // Add future-specific terms for better detection
       const futureTerms = ['upcoming', 'departure', 'check-in', 'reminder', 'travel', 'boarding']
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     console.log('Starting enhanced import with options:', importOptions)
 
     // Execute enhanced import using the correct method
-    const result = await enhancedService.importFlights(user.id)
+    const result = await enhancedService.importFlights(userId!)
 
     console.log('Enhanced import result:', result)
 
@@ -114,13 +114,13 @@ export async function POST(req: Request) {
   } catch (e: any) {
     const message = e?.message || 'Unknown error'
     console.error('Enhanced Gmail import error:', e)
-    
+
     if (message.includes('invalid_grant') || message.includes('unauthorized_client')) {
       return NextResponse.json({ error: 'reauthorize', authUrl: getAuthUrl() }, { status: 401 })
     }
-    
-    return NextResponse.json({ 
-      error: 'server_error', 
+
+    return NextResponse.json({
+      error: 'server_error',
       message,
       details: e?.stack || null
     }, { status: 500 })
@@ -130,9 +130,8 @@ export async function POST(req: Request) {
 // GET endpoint to check system health and capabilities
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const userId = await resolveSupabaseUserId()
+    if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
     // Return enhanced system capabilities and presets for UI
     return NextResponse.json({
@@ -169,7 +168,7 @@ export async function GET() {
       ],
       supportedAirlines: [
         'ryanair',
-        'easyjet', 
+        'easyjet',
         'british_airways',
         'lufthansa',
         'united',
@@ -224,9 +223,9 @@ export async function GET() {
   } catch (e: any) {
     const message = e?.message || 'Unknown error'
     console.error('Enhanced system health check error:', e)
-    
-    return NextResponse.json({ 
-      error: 'server_error', 
+
+    return NextResponse.json({
+      error: 'server_error',
       message,
       systemStatus: 'unhealthy'
     }, { status: 500 })

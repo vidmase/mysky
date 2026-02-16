@@ -95,9 +95,12 @@ function extractRyanairFlightSegments(content: string): RyanairFlightSegment[] {
   // New approach: Look for complete flight information blocks that contain both departure and arrival times
   // This is much more targeted and avoids picking up random content
   
-  // Find all occurrences of "Departure time - XX:XX" and "Arrival time - XX:XX"
-  const departureTimeMatches = Array.from(content.matchAll(/Departure time\s*-\s*(\d{1,2}:\d{2})/gi))
-  const arrivalTimeMatches = Array.from(content.matchAll(/Arrival time\s*-\s*(\d{1,2}:\d{2})/gi))
+  // Find all occurrences of various time formats
+  const departureTimeMatches = Array.from(content.matchAll(/(?:Departure time|Departs?|Dep\.?)\s*[-:]?\s*(\d{1,2}:\d{2})/gi))
+  const arrivalTimeMatches = Array.from(content.matchAll(/(?:Arrival time|Arrives?|Arr\.?)\s*[-:]?\s*(\d{1,2}:\d{2})/gi))
+  
+  // Also look for simple time format with arrow: "06:30 → 07:35"
+  const arrowTimeMatches = Array.from(content.matchAll(/(\d{1,2}:\d{2})\s*[→>-]\s*(\d{1,2}:\d{2})/gi))
   
   // For each departure time, find the corresponding flight information
   for (let i = 0; i < departureTimeMatches.length; i++) {
@@ -165,6 +168,58 @@ function extractRyanairFlightSegments(content: string): RyanairFlightSegment[] {
     }
     
     segments.push(segment)
+  }
+  
+  // Also try to extract from arrow-format times if we didn't find structured times
+  if (segments.length === 0) {
+    for (const arrowMatch of arrowTimeMatches) {
+      const depTime = arrowMatch[1]
+      const arrTime = arrowMatch[2]
+      const matchIndex = arrowMatch.index || 0
+      
+      // Look for context around the time
+      const sectionStart = Math.max(0, matchIndex - 300)
+      const sectionEnd = Math.min(content.length, matchIndex + 200)
+      const sectionContent = content.substring(sectionStart, sectionEnd)
+      
+      // Skip non-flight content
+      if (isNonFlightContent(sectionContent)) continue
+      
+      // Extract flight number
+      const flightNumberMatch = /(FR\d{3,5})/i.exec(sectionContent)
+      if (!flightNumberMatch) continue
+      
+      const segment: RyanairFlightSegment = {
+        flight_number: flightNumberMatch[1].toUpperCase(),
+        departure_time: depTime,
+        arrival_time: arrTime
+      }
+      
+      // Extract route from "City (XXX) → City (YYY)" or just "XXX → YYY"
+      const routeMatch = /\b([A-Z]{3})\s*[→>-]\s*([A-Z]{3})\b/i.exec(sectionContent)
+      if (routeMatch) {
+        segment.departure_iata = routeMatch[1].toUpperCase()
+        segment.arrival_iata = routeMatch[2].toUpperCase()
+      }
+      
+      // Extract date
+      const datePatterns = [
+        /([A-Za-z]{3},?\s+\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4})/i,
+        /(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})/i,
+        /([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})/i,
+        /(\d{4}[-/]\d{2}[-/]\d{2})/
+      ]
+      
+      for (const pattern of datePatterns) {
+        const dateMatch = pattern.exec(sectionContent)
+        if (dateMatch) {
+          segment.departure_date = normalizeDateString(dateMatch[1])
+          break
+        }
+      }
+      
+      segments.push(segment)
+    }
   }
   
   return segments
