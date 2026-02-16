@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { CalendarClient } from './CalendarClient'
-import { Flight } from '@/app/flights/FlightsClient'
+import type { Flight } from "@/types/flight"
 
 export const dynamic = 'force-dynamic'
 

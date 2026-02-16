@@ -82,7 +82,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
   const [isFlightradar24ExportDialogOpen, setIsFlightradar24ExportDialogOpen] = useState(false)
-  
+
   // Enhanced loading states
   const [importProgress, setImportProgress] = useState<{
     step: string
@@ -95,13 +95,13 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
     message: string
   } | null>(null)
   const [loadingButton, setLoadingButton] = useState<'30days' | '90days' | 'next60days' | 'next90days' | null>(null)
-  
+
   // Gmail date range (YYYY-MM-DD)
-  const todayISO = useMemo(() => new Date().toISOString().slice(0,10), [])
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const defaultStartISO = useMemo(() => {
     const d = new Date()
     d.setUTCDate(d.getUTCDate() - 30)
-    return d.toISOString().slice(0,10)
+    return d.toISOString().slice(0, 10)
   }, [])
   const [gmailStart, setGmailStart] = useState<string>(defaultStartISO)
   const [gmailEnd, setGmailEnd] = useState<string>(todayISO)
@@ -160,17 +160,17 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
     setIsLoadingPreview(true)
     setLoadingButton(buttonId || null)
     setPreviewProgress({ step: 'connecting', message: 'Connecting to Gmail...' })
-    
+
     try {
       const params = new URLSearchParams()
       const startQ = override?.start ?? gmailStart
       const endQ = override?.end ?? gmailEnd
       if (startQ) params.set('start', startQ)
       if (endQ) params.set('end', endQ)
-      
+
       setPreviewProgress({ step: 'searching', message: 'Searching for Ryanair emails...' })
       const res = await fetch(`/api/gmail/preview?${params.toString()}`)
-      
+
       if (res.status === 401) {
         const data = await res.json().catch(() => ({}))
         if (data?.authUrl) {
@@ -180,24 +180,24 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         showError('Gmail not connected')
         return
       }
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         showError(data?.message || data?.error || 'Failed to load Gmail previews')
         return
       }
-      
+
       setPreviewProgress({ step: 'processing', message: 'Processing flight data...' })
       const data = await res.json()
       const items: GmailPreviewItem[] = data.items || []
-      
+
       setPreviewProgress({ step: 'complete', message: `Found ${items.length} flight emails` })
       setGmailItems(items)
       setSelectedIds(new Set(items.filter(i => !i.duplicate).map(i => i.id)))
-      
+
       // Clear progress after a short delay
       setTimeout(() => setPreviewProgress(null), 3000)
-      
+
     } catch (e) {
       showError('Failed to load Gmail previews')
     } finally {
@@ -233,23 +233,23 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       total: selectedIds.size,
       message: 'Preparing to import flights...'
     })
-    
+
     try {
       const ids = Array.from(selectedIds)
-      
+
       setImportProgress({
         step: 'connecting',
         current: 0,
         total: ids.length,
         message: 'Connecting to Gmail...'
       })
-      
-      const res = await fetch('/api/gmail/import', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ ids }) 
+
+      const res = await fetch('/api/gmail/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
       })
-      
+
       if (res.status === 401) {
         const data = await res.json().catch(() => ({}))
         if (data?.authUrl) {
@@ -259,36 +259,36 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         showError('Gmail not connected')
         return
       }
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         showError(data?.message || data?.error || 'Import failed')
         return
       }
-      
+
       setImportProgress({
         step: 'processing',
         current: ids.length,
         total: ids.length,
         message: 'Processing imported flights...'
       })
-      
+
       const data = await res.json()
-      
+
       setImportProgress({
         step: 'complete',
         current: ids.length,
         total: ids.length,
         message: `Successfully imported ${data.inserted} flights`
       })
-      
-      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`) 
+
+      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`)
       setIsDialogOpen(false)
       await refetch()
-      
+
       // Clear progress after a short delay
       setTimeout(() => setImportProgress(null), 3000)
-      
+
     } catch (e) {
       showError('Import error')
     } finally {
@@ -335,7 +335,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         return
       }
       const data = await res.json()
-      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`) 
+      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`)
       await refetch()
     } catch (e) {
       showError('Import error')
@@ -367,7 +367,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         body: JSON.stringify({ action, metadata, page: "/flights" }),
         keepalive: true,
       })
-    } catch {}
+    } catch { }
   }
 
   const airlines = useMemo(() => {
@@ -509,7 +509,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
 
   return (
     <div className="container mx-auto p-4">
-       <div className="relative mb-8">
+      <div className="relative mb-8">
         <div className="absolute -left-12 -top-12 h-56 w-56 rounded-full bg-primary/10 blur-3xl animate-pulse" />
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -518,49 +518,49 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
             </h1>
             <p className="text-muted-foreground">Manage, track, and analyze your flight history.</p>
           </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Tools
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
-              <Upload className="h-4 w-4" />
-              Import CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsCsvExportDialogOpen(true)} className="gap-2">
-              <Download className="h-4 w-4" />
-              Export CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsFlightradar24ExportDialogOpen(true)} className="gap-2">
-              <Plane className="h-4 w-4 text-orange-500" />
-              Export for Flightradar24
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={openImportDialog}
-              className="gap-2"
-            >
-              {isLoadingPreview ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Tools
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsCsvExportDialogOpen(true)} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsFlightradar24ExportDialogOpen(true)} className="gap-2">
+                <Plane className="h-4 w-4 text-orange-500" />
+                Export for Flightradar24
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={openImportDialog}
+                className="gap-2"
+              >
+                {isLoadingPreview ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
+                Import from Gmail (Legacy)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setShowEnhancedGmailImport(true)}
+                className="gap-2"
+              >
                 <Mail className="h-4 w-4" />
-              )}
-              Import from Gmail (Legacy)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setShowEnhancedGmailImport(true)}
-              className="gap-2"
-            >
-              <Mail className="h-4 w-4" />
-              Enhanced Gmail Import ✨
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+                Enhanced Gmail Import ✨
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Counts section */}
@@ -608,13 +608,13 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       {/* Mobile cards */}
       <div className="grid grid-cols-1 gap-4 md:hidden mb-4">
         {currentFlights.map((flight) => (
-          <FlightCard 
-            key={flight.id} 
-            flight={flight} 
+          <FlightCard
+            key={flight.id}
+            flight={flight}
             onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
             onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
-            onDeleteRequest={(f) => setFlightToDelete(f)} 
-            isUpcoming={isUpcoming} 
+            onDeleteRequest={(f) => setFlightToDelete(f)}
+            isUpcoming={isUpcoming}
           />
         ))}
       </div>
@@ -661,21 +661,21 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
           {/* Quick actions */}
           <div className="mb-3 space-y-3">
             {/* Preview Progress Indicator */}
-            <PreviewProgressIndicator 
-              progress={previewProgress} 
-              isVisible={isLoadingPreview} 
+            <PreviewProgressIndicator
+              progress={previewProgress}
+              isVisible={isLoadingPreview}
             />
-            
+
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   const d = new Date()
-                  const endISO = d.toISOString().slice(0,10)
+                  const endISO = d.toISOString().slice(0, 10)
                   const dStart = new Date(d)
                   dStart.setUTCDate(dStart.getUTCDate() - 30)
-                  const startISO = dStart.toISOString().slice(0,10)
+                  const startISO = dStart.toISOString().slice(0, 10)
                   setGmailStart(startISO)
                   setGmailEnd(endISO)
                   void loadPreview({ start: startISO, end: endISO }, '30days')
@@ -696,10 +696,10 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 size="sm"
                 onClick={() => {
                   const d = new Date()
-                  const endISO = d.toISOString().slice(0,10)
+                  const endISO = d.toISOString().slice(0, 10)
                   const dStart = new Date(d)
                   dStart.setUTCDate(dStart.getUTCDate() - 90)
-                  const startISO = dStart.toISOString().slice(0,10)
+                  const startISO = dStart.toISOString().slice(0, 10)
                   setGmailStart(startISO)
                   setGmailEnd(endISO)
                   void loadPreview({ start: startISO, end: endISO }, '90days')
@@ -720,10 +720,10 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 size="sm"
                 onClick={() => {
                   const d = new Date()
-                  const startISO = d.toISOString().slice(0,10)
+                  const startISO = d.toISOString().slice(0, 10)
                   const dEnd = new Date(d)
                   dEnd.setUTCDate(dEnd.getUTCDate() + 60)
-                  const endISO = dEnd.toISOString().slice(0,10)
+                  const endISO = dEnd.toISOString().slice(0, 10)
                   setGmailStart(startISO)
                   setGmailEnd(endISO)
                   void loadPreview({ start: startISO, end: endISO }, 'next60days')
@@ -744,10 +744,10 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 size="sm"
                 onClick={() => {
                   const d = new Date()
-                  const startISO = d.toISOString().slice(0,10)
+                  const startISO = d.toISOString().slice(0, 10)
                   const dEnd = new Date(d)
                   dEnd.setUTCDate(dEnd.getUTCDate() + 90)
-                  const endISO = dEnd.toISOString().slice(0,10)
+                  const endISO = dEnd.toISOString().slice(0, 10)
                   setGmailStart(startISO)
                   setGmailEnd(endISO)
                   void loadPreview({ start: startISO, end: endISO }, 'next90days')
@@ -795,8 +795,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 <tbody className="divide-y divide-border">
                   {gmailItems.map((item, index) => {
                     const p = item.parsed || {}
-                    console.log('FlightsClient - Item parsed data:', { 
-                      departure_date: p.departure_date, 
+                    console.log('FlightsClient - Item parsed data:', {
+                      departure_date: p.departure_date,
                       purchased_date: p.purchased_date,
                       received_at: item.received_at,
                       flight_number: p.flight_number
@@ -877,8 +877,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                             <div className="font-medium text-sm truncate">{depAirport}</div>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12,6 12,12 16,14"/>
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12,6 12,12 16,14" />
                               </svg>
                               <span className="font-mono">{depTime}</span>
                             </div>
@@ -894,8 +894,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                             <div className="font-medium text-sm truncate">{arrAirport}</div>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12,6 12,12 16,14"/>
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12,6 12,12 16,14" />
                               </svg>
                               <span className="font-mono">{arrTime}</span>
                             </div>
@@ -904,8 +904,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                         <td className="p-3 text-sm">
                           <div className="flex items-center gap-1 text-sm font-medium">
                             <svg className="h-3 w-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="10"/>
-                              <polyline points="12,6 12,12 16,14"/>
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12,6 12,12 16,14" />
                             </svg>
                             <span className="font-mono tabular-nums">{duration}</span>
                           </div>
@@ -958,7 +958,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Enhanced Gmail Import Dialog */}
       {showEnhancedGmailImport && (
         <Dialog open={showEnhancedGmailImport} onOpenChange={setShowEnhancedGmailImport}>
@@ -975,9 +975,9 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       )}
 
       {/* Import Progress Indicator */}
-      <ImportProgressIndicator 
-        progress={importProgress} 
-        isVisible={isImportingSelected} 
+      <ImportProgressIndicator
+        progress={importProgress}
+        isVisible={isImportingSelected}
       />
     </div>
   )
@@ -1005,16 +1005,16 @@ interface FlightCardProps {
 }
 
 const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, isUpcoming }) => (
-  <div 
+  <div
     className="relative rounded-xl border border-zinc-800 bg-zinc-950/30 backdrop-blur-sm p-4 transition-all duration-300 hover:border-zinc-700 cursor-pointer"
     onClick={() => onRowClick(flight)}
   >
     <div className="flex items-start justify-between mb-3">
       <div className="flex items-center gap-3">
         <div className="relative w-10 h-10 rounded-md overflow-hidden flex items-center justify-center bg-zinc-800/50">
-          <img 
-            src={getAirlineLogo(flight.airline ?? null, flight.flight_number)} 
-            alt={flight.airline || "Airline"} 
+          <img
+            src={getAirlineLogo(flight.airline ?? null, flight.flight_number)}
+            alt={flight.airline || "Airline"}
             className="w-7 h-7 object-contain"
             onError={(e) => {
               const target = e.currentTarget;
@@ -1025,7 +1025,7 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onD
               }
             }}
           />
-          <div className="fallback-icon items-center justify-center" style={{display: 'none'}}>
+          <div className="fallback-icon items-center justify-center" style={{ display: 'none' }}>
             <Plane className="h-5 w-5 text-zinc-500" />
           </div>
         </div>
@@ -1034,10 +1034,10 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onD
           <p className="text-xs text-zinc-400">{flight.airline} • {flight.flight_number}</p>
         </div>
       </div>
-      <Badge 
+      <Badge
         variant="outline"
-        className={`text-xs ${isUpcoming(flight.departure_date) 
-          ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' 
+        className={`text-xs ${isUpcoming(flight.departure_date)
+          ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
           : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}
       >
         {isUpcoming(flight.departure_date) ? "Upcoming" : "Past"}
