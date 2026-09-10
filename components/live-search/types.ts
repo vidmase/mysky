@@ -49,3 +49,9 @@ export interface LiveSearchResponse {
   message?: string | null
   error?: string
 }
+
+export type TripType = 'one-way' | 'round-trip'
+
+export type SortKey = 'best' | 'price' | 'duration' | 'departure'
+
+export type StopsFilter = 'any' | 'nonstop' | 'one-stop'
