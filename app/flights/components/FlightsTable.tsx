@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowRight, Clock, Pencil, Trash2, Building, Loader2 } from "lucide-react"
+import { ArrowRight, Clock, Pencil, Trash2, Building, Loader2, RotateCcw } from "lucide-react"
 import { calculateDuration, formatTimeToHHMM, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { DateTime } from "luxon"
 import { AIRPORT_TIMEZONES } from "@/lib/airport-timezones"
@@ -19,6 +19,7 @@ export interface FlightsTableProps {
   flights: Flight[]
   onEdit: (flight: Flight) => void
   onDeleteRequest: (flight: Flight) => void
+  onFlyAgain?: (flight: Flight) => void
   onRowClick: (flight: Flight) => void
 }
 
@@ -157,7 +158,7 @@ function DeltaBadge({ flight, kind }: { flight: Flight; kind: 'dep' | 'arr' }) {
   )
 }
 
-export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onRowClick }: FlightsTableProps) {
+export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onFlyAgain, onRowClick }: FlightsTableProps) {
   return (
     <div className="hidden lg:block rounded-md border shadow-sm overflow-hidden">
       <Table>
@@ -367,6 +368,20 @@ export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onRowC
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center justify-end gap-2">
+                    {onFlyAgain && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Fly it again"
+                        className="text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onFlyAgain(flight)
+                        }}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
