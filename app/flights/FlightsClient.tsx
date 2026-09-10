@@ -25,6 +25,7 @@ import { PreviewProgressIndicator } from "@/app/flights/components/PreviewProgre
 import { ModernSpinner } from "@/app/flights/components/ModernSpinner"
 import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
 import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
+import { NextTripCard } from "@/components/next-trip/NextTripCard"
 import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import { format } from "date-fns"
 import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
@@ -592,6 +593,11 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
           </div>
         </div>
       </div>
+
+      <NextTripCard
+        className="mb-6"
+        onExplore={({ from, to, date }) => openLiveSearch({ from, to, date })}
+      />
 
       {/* Counts section */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

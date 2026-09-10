@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -538,6 +539,23 @@ export default function StatsPage() {
             </Button>
           </div>
         </div>
+
+        {/* Compact smart next-trip nudge */}
+        <Link
+          href="/flights"
+          className="group flex items-center justify-between gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-5 py-3 backdrop-blur-sm transition-colors hover:border-sky-400/40 hover:bg-sky-500/10"
+        >
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-sky-400" />
+            <div>
+              <p className="text-sm font-medium text-white">Smart next trip</p>
+              <p className="text-xs text-slate-400">
+                See live prices on your most-flown route on Flight Deck
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-sky-400 transition-transform group-hover:translate-x-0.5" />
+        </Link>
 
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
