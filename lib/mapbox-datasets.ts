@@ -9,11 +9,11 @@ const MAPBOX_DATASETS_BASE_URL = "https://api.mapbox.com/datasets/v1"
 
 // Environment variables
 const getMapboxConfig = () => {
-  const accessToken = process.env.MAPBOX_DATASETS_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+  const accessToken = process.env.MAPBOX_DATASETS_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN
   const username = process.env.MAPBOX_USERNAME
-  
+
   if (!accessToken) {
-    throw new Error("MAPBOX_DATASETS_ACCESS_TOKEN or NEXT_PUBLIC_MAPBOX_TOKEN is required")
+    throw new Error("MAPBOX_DATASETS_ACCESS_TOKEN, NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN or NEXT_PUBLIC_MAPBOX_TOKEN is required")
   }
   if (!username) {
     throw new Error("MAPBOX_USERNAME is required")

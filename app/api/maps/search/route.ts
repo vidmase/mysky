@@ -12,7 +12,7 @@ export async function POST(request: Request) {
         }
 
         // Call Mapbox Geocoding API
-        const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+        const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN
         const encodedQuery = encodeURIComponent(query)
         const response = await fetch(
             `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_TOKEN}&types=poi&limit=1`,

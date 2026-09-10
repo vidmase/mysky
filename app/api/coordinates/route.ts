@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         }
 
         // Use Mapbox Geocoding API to get coordinates
-        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN
         if (!mapboxToken) {
             const errorResponse: ErrorResponse = {
                 error: true,
