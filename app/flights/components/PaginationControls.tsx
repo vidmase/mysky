@@ -1,8 +1,8 @@
 "use client"
 
 import { Fragment } from 'react'
-import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import s from '@/app/flights/flights.module.css'
 
 export interface PaginationControlsProps {
   currentPage: number
@@ -30,85 +30,100 @@ export function PaginationControls({
   if (loading || totalItems === 0) return null
 
   return (
-    <div className="flex flex-col gap-4 px-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="text-sm text-muted-foreground text-center sm:text-left">
-        Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} flights
-      </div>
-      <div className="flex items-center justify-center space-x-2">
-        {/* Mobile controls */}
-        <div className="flex items-center space-x-1 sm:hidden">
-          <Button variant="outline" size="sm" onClick={() => goToPage(currentPage - 1)} disabled={!canGoPrevious}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-3 py-1 text-sm font-medium">
-            {currentPage} of {totalPages}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => goToPage(currentPage + 1)} disabled={!canGoNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className={s.pagination}>
+      <span className={s.paginationNote}>
+        Legs {startIndex + 1}–{Math.min(endIndex, totalItems)} of {totalItems}
+      </span>
 
-        {/* Desktop controls */}
-        <div className="hidden sm:flex items-center space-x-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goToPage(1)} disabled={!canGoPrevious}>
-            <span className="sr-only">Go to first page</span>
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
+      <div className={s.pager}>
+        {/* Narrow screens: prev / page-of / next */}
+        <div className={`${s.pagerMobile} ${s.pager}`}>
+          <button
+            type="button"
+            className={s.pageBtn}
             onClick={() => goToPage(currentPage - 1)}
             disabled={!canGoPrevious}
+            aria-label="Previous page"
           >
-            <span className="sr-only">Go to previous page</span>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((page) => {
-                const nearCurrent = Math.abs(page - currentPage) <= 1
-                const isFirstPage = page === 1
-                const isLastPage = page === totalPages
-                return nearCurrent || isFirstPage || isLastPage
-              })
-              .map((page, index, array) => (
-                <Fragment key={page}>
-                  {index > 0 && array[index - 1] !== page - 1 && (
-                    <span className="text-muted-foreground">...</span>
-                  )}
-                  <Button
-                    variant={currentPage === page ? 'default' : 'outline'}
-                    size="icon"
-                    className={`h-8 w-8 ${currentPage === page ? 'bg-flight hover:bg-flight/90' : ''}`}
-                    onClick={() => goToPage(page)}
-                  >
-                    <span className="sr-only">Go to page {page}</span>
-                    {page}
-                  </Button>
-                </Fragment>
-              ))}
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
+            <ChevronLeft />
+          </button>
+          <span className={s.paginationNote}>
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className={s.pageBtn}
             onClick={() => goToPage(currentPage + 1)}
             disabled={!canGoNext}
+            aria-label="Next page"
           >
-            <span className="sr-only">Go to next page</span>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
+            <ChevronRight />
+          </button>
+        </div>
+
+        {/* Wide screens: the full numbered run */}
+        <div className={`${s.pagerDesktop} ${s.pager}`}>
+          <button
+            type="button"
+            className={s.pageBtn}
+            onClick={() => goToPage(1)}
+            disabled={!canGoPrevious}
+            aria-label="Go to first page"
+          >
+            <ChevronsLeft />
+          </button>
+          <button
+            type="button"
+            className={s.pageBtn}
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={!canGoPrevious}
+            aria-label="Go to previous page"
+          >
+            <ChevronLeft />
+          </button>
+
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((page) => {
+              const nearCurrent = Math.abs(page - currentPage) <= 1
+              const isFirstPage = page === 1
+              const isLastPage = page === totalPages
+              return nearCurrent || isFirstPage || isLastPage
+            })
+            .map((page, index, array) => (
+              <Fragment key={page}>
+                {index > 0 && array[index - 1] !== page - 1 && (
+                  <span className={s.ellipsis}>···</span>
+                )}
+                <button
+                  type="button"
+                  className={`${s.pageBtn} ${currentPage === page ? s.pageBtnActive : ''}`}
+                  onClick={() => goToPage(page)}
+                  aria-label={`Go to page ${page}`}
+                  aria-current={currentPage === page ? 'page' : undefined}
+                >
+                  {page}
+                </button>
+              </Fragment>
+            ))}
+
+          <button
+            type="button"
+            className={s.pageBtn}
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={!canGoNext}
+            aria-label="Go to next page"
+          >
+            <ChevronRight />
+          </button>
+          <button
+            type="button"
+            className={s.pageBtn}
             onClick={() => goToPage(totalPages)}
             disabled={!canGoNext}
+            aria-label="Go to last page"
           >
-            <span className="sr-only">Go to last page</span>
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
+            <ChevronsRight />
+          </button>
         </div>
       </div>
     </div>

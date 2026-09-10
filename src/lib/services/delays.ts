@@ -84,6 +84,7 @@ export async function fetchAirportWindowFromProvider(iata: string, start: Date, 
       { 'x-api-key': MARKET_KEY as string, 'Accept': 'application/json' },
       { 'authorization': `Bearer ${MARKET_KEY}`, 'Accept': 'application/json' },
     ]
+
     for (const headers of headerAttempts) {
       const res = await fetch(url, { headers, next: { revalidate: 300 } })
       if (res.ok) {
@@ -91,9 +92,9 @@ export async function fetchAirportWindowFromProvider(iata: string, start: Date, 
         if (!json) return null
         return Array.isArray(json) ? json : (Array.isArray(json.flights) ? json.flights : [])
       }
-      const body = await res.text().catch(() => '')
-      console.warn('Delay provider (market) error', res.status, body || '(no body)', 'using headers:', Object.keys(headers))
+      // console.warn('Delay provider (market) error', res.status)
     }
+
     return null
   }
 

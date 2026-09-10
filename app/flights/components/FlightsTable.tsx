@@ -4,15 +4,12 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ArrowRight, Clock, Pencil, Trash2, Building, Loader2 } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Building, Loader2 } from "lucide-react"
 import { calculateDuration, formatTimeToHHMM, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { DateTime } from "luxon"
 import { AIRPORT_TIMEZONES } from "@/lib/airport-timezones"
 import type { Flight } from "@/types/flight"
+import s from "@/app/flights/flights.module.css"
 
 export interface FlightsTableProps {
   loading: boolean
@@ -127,15 +124,13 @@ function DeltaBadge({ flight, kind }: { flight: Flight; kind: 'dep' | 'arr' }) {
     } catch { setDelta(null) }
   }
 
-  if (loading) return (
-    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-  )
+  if (loading) return <Loader2 className={s.spin} />
   if (delta == null || !actualText) return (
-    <span className="text-[10px] px-1 py-0.5 rounded bg-muted/30 text-muted-foreground/80">—</span>
+    <span className={`${s.chip} ${s.chipMuted}`}>—</span>
   )
   // Compose: show actual/estimated time chip, then delta chip
   const timeChip = (
-    <span className="text-[10px] px-1 py-0.5 rounded bg-muted/30 text-muted-foreground/90 mr-1">
+    <span className={s.chip}>
       {isEstimated ? 'est ' : ''}{actualText}
     </span>
   )
@@ -143,270 +138,213 @@ function DeltaBadge({ flight, kind }: { flight: Flight; kind: 'dep' | 'arr' }) {
     return (
       <>
         {timeChip}
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">on time</span>
+        <span className={`${s.chip} ${s.chipOnTime}`}>on time</span>
       </>
     )
   }
   const late = delta > 0
-  const cls = late ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-green-500/15 text-green-600 dark:text-green-400'
   return (
     <>
       {timeChip}
-      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${cls}`}>{late ? '+' : ''}{delta}m</span>
+      <span className={`${s.chip} ${late ? s.chipLate : s.chipEarly}`}>
+        {late ? '+' : ''}{delta}m
+      </span>
     </>
   )
 }
 
+/** IATA when we have one, otherwise the first three letters of the airport. */
+function iataOf(iata: string | null | undefined, airportName: string) {
+  return iata && iata !== "None" ? iata : airportName.slice(0, 3).toUpperCase()
+}
+
 export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onRowClick }: FlightsTableProps) {
   return (
-    <div className="hidden lg:block rounded-md border shadow-sm overflow-hidden">
-      <Table>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            <TableHead className="w-[160px]">Flight Date</TableHead>
-            <TableHead className="w-[140px]">Passenger</TableHead>
-            <TableHead>Reservation</TableHead>
-            <TableHead>Flight Details</TableHead>
-            <TableHead>Departure</TableHead>
-            <TableHead>Arrival</TableHead>
-            <TableHead className="w-[80px]">Duration</TableHead>
-            <TableHead>Purchase Info</TableHead>
-            <TableHead className="w-[50px] text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <div className={s.tableWrap}>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Route</th>
+            <th scope="col">Flight</th>
+            <th scope="col">Departs</th>
+            <th scope="col">Arrives</th>
+            <th scope="col">Block</th>
+            <th scope="col">Fare</th>
+            <th scope="col">Reference</th>
+            <th scope="col">
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center py-8">
-                <div className="flex flex-col items-center">
-                  <ArrowRight className="h-8 w-8 mb-2 animate-pulse text-flight rotate-180" />
-                  <p>Loading flights...</p>
+            <tr>
+              <td colSpan={9}>
+                <div className={s.state}>
+                  <h3 className={s.stateTitle}>Pulling the log</h3>
+                  <p className={s.stateNote}>One moment.</p>
                 </div>
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           ) : flights.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                <div className="flex flex-col items-center">
-                  <ArrowRight className="h-8 w-8 mb-2 text-muted-foreground/50 rotate-180" />
-                  <p>No flights found. Try adjusting your search or filters.</p>
+            <tr>
+              <td colSpan={9}>
+                <div className={s.state}>
+                  <h3 className={s.stateTitle}>Nothing filed under these terms</h3>
+                  <p className={s.stateNote}>Adjust the search or clear a filter to widen the page.</p>
                 </div>
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           ) : (
-            flights.map((flight) => (
-              <TableRow
+            flights.map((flight, i) => (
+              <tr
                 key={flight.id}
-                className="hover:bg-muted/30 cursor-pointer group"
+                className={s.row}
+                style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}
                 onClick={() => onRowClick(flight)}
               >
-                <TableCell>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      <span className="font-medium">
-                        {format(new Date(flight.departure_date), "MMM d, yyyy", { locale: enUS })}
-                      </span>
-                      {isUpcoming(flight.departure_date) && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/30 transition-colors px-1.5 py-0 text-[0.65rem]"
-                        >
-                          ✈️Upcoming
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="text-[11px] leading-tight text-muted-foreground">
-                      {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="max-w-[120px]">
-                          <span className="block truncate font-medium">
-                            {flight.passenger_name}
-                          </span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{flight.passenger_name}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <Badge variant="outline" className="w-fit bg-muted/30 text-foreground">
-                      {flight.reservation_number}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2 relative">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
-                              {(flight.airline || flight.flight_number) ? (
-                                <Image
-                                  src={getAirlineLogo(flight.airline, flight.flight_number)}
-                                  alt={`${flight.airline ?? flight.flight_number ?? 'Airline'} logo`}
-                                  width={flight.airline?.toLowerCase() === 'easyjet' ? 40 : 28}
-                                  height={flight.airline?.toLowerCase() === 'easyjet' ? 40 : 28}
-                                  className={`object-contain p-0.5 ${flight.airline?.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none'
-                                    e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
-                                  }}
-                                />
-                              ) : (
-                                <Building className="h-5 w-5 text-muted-foreground" />
-                              )}
-                              <Building className="h-5 w-5 text-muted-foreground absolute fallback-icon hidden" />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="font-medium">
-                            {flight.airline || "Unknown Airline"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <div className="flex flex-col">
-                        <div className="flex items-baseline gap-1.5">
-                          <Badge
-                            variant="outline"
-                            className="bg-flight/10 text-flight border-flight/20 px-1.5 py-0 text-[0.7rem] font-medium"
-                          >
-                            {flight.flight_number}
-                          </Badge>
-                        </div>
-                        {flight.seat && (
-                          <span className="text-xs text-muted-foreground">
-                            Seat {flight.seat}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium flex items-center">
-                      <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
-                        {flight.departure_iata || flight.departure_airport}
-                      </Badge>
-                    </span>
-                    <span className="text-xs text-muted-foreground">{flight.departure_airport}</span>
-                    <span className="text-xs text-muted-foreground flex items-center mt-1 gap-1.5">
-                      <Clock className="mr-1 h-3 w-3" />
-                      {formatTimeToHHMM(flight.departure_time)}
-                      <DeltaBadge flight={flight} kind="dep" />
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <span className="font-medium flex items-center">
-                      <Badge variant="outline" className="mr-1 bg-airport/10 text-airport border-airport/20 px-1 py-0">
-                        {flight.arrival_iata || flight.arrival_airport}
-                      </Badge>
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {flight.arrival_airport}
-                      {flight.arrival_country && ` (${flight.arrival_country})`}
-                    </span>
-                    <span className="text-xs text-muted-foreground flex items-center mt-1 gap-1.5">
-                      <Clock className="mr-1 h-3 w-3" />
-                      {formatTimeToHHMM(flight.arrival_time)}
-                      <DeltaBadge flight={flight} kind="arr" />
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="w-[80px]">
-                  <div className="flex items-center">
-                    <Clock className="mr-1 h-3 w-3 text-muted-foreground shrink-0" />
-                    <span className="text-sm whitespace-nowrap">
-                      {calculateDuration(
-                        flight.departure_time,
-                        flight.arrival_time,
-                        {
-                          departureDate: flight.departure_date,
-                          arrivalDate: flight.arrival_date,
-                          departureIata: flight.departure_iata,
-                          arrivalIata: flight.arrival_iata,
-                          departureAirportName: flight.departure_airport,
-                          arrivalAirportName: flight.arrival_airport,
-                        }
-                      )}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{flight.total_receipt}</span>
-                          <span className="text-xs text-muted-foreground truncate">
-                            Purchased: {format(new Date(flight.purchased_date), "MMM d, yyyy", { locale: enUS })}
-                          </span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent className="flex flex-col gap-1">
-                        <p className="font-medium">Purchase Details</p>
-                        <div className="text-xs">
-                          <p>Date: {format(new Date(flight.purchased_date), "MMMM d, yyyy", { locale: enUS })}</p>
-                          <p>Time: {flight.purchase_time}</p>
-                          <p>Total: {flight.total_receipt}</p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEdit(flight)
-                      }}
+                <td>
+                  <span className={s.date}>
+                    {format(new Date(flight.departure_date), "dd MMM yyyy", { locale: enUS })}
+                  </span>
+                  <span className={s.weekday}>
+                    {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
+                  </span>
+                  {isUpcoming(flight.departure_date) && (
+                    <span className={s.upcoming}>Upcoming</span>
+                  )}
+                </td>
+
+                <td>
+                  <span className={s.route}>
+                    {iataOf(flight.departure_iata, flight.departure_airport)}
+                    <svg
+                      className={s.routeArrow}
+                      width="18"
+                      height="8"
+                      viewBox="0 0 18 8"
+                      fill="none"
+                      aria-hidden="true"
                     >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDeleteRequest(flight)
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-flight hover:bg-flight/10 rounded-full p-2 hover:scale-110 active:scale-95 transition-all duration-200"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onRowClick(flight)
-                      }}
-                    >
-                      <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                    </Button>
+                      <path d="M0 4h16M12.5 1L16 4l-3.5 3" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
+                    {iataOf(flight.arrival_iata, flight.arrival_airport)}
+                  </span>
+                  <span className={s.routeNames}>
+                    {flight.departure_airport} — {flight.arrival_airport}
+                    {flight.arrival_country && flight.arrival_country !== "None"
+                      ? ` (${flight.arrival_country})`
+                      : ""}
+                  </span>
+                </td>
+
+                <td>
+                  <div className={s.flightCell}>
+                    <span className={s.logo}>
+                      {(flight.airline || flight.flight_number) ? (
+                        <Image
+                          src={getAirlineLogo(flight.airline, flight.flight_number)}
+                          alt=""
+                          width={22}
+                          height={22}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.parentElement
+                              ?.querySelector('.fallback-icon')
+                              ?.classList.remove('hidden')
+                          }}
+                        />
+                      ) : null}
+                      <Building className="fallback-icon hidden h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className={s.flightNo}>{flight.flight_number}</span>
+                      <span className={s.airline}>{flight.airline || "Unknown airline"}</span>
+                      {flight.seat && <span className={s.seat}>Seat {flight.seat}</span>}
+                    </span>
                   </div>
-                </TableCell>
-              </TableRow>
+                </td>
+
+                <td>
+                  <span className={s.time}>{formatTimeToHHMM(flight.departure_time) || "—"}</span>
+                  <span className={s.timeMeta}>
+                    <DeltaBadge flight={flight} kind="dep" />
+                  </span>
+                </td>
+
+                <td>
+                  <span className={s.time}>{formatTimeToHHMM(flight.arrival_time) || "—"}</span>
+                  <span className={s.timeMeta}>
+                    <DeltaBadge flight={flight} kind="arr" />
+                  </span>
+                </td>
+
+                <td>
+                  <span className={s.duration}>
+                    {calculateDuration(
+                      flight.departure_time,
+                      flight.arrival_time,
+                      {
+                        departureDate: flight.departure_date,
+                        arrivalDate: flight.arrival_date,
+                        departureIata: flight.departure_iata,
+                        arrivalIata: flight.arrival_iata,
+                        departureAirportName: flight.departure_airport,
+                        arrivalAirportName: flight.arrival_airport,
+                      }
+                    )}
+                  </span>
+                </td>
+
+                <td>
+                  <span className={s.fare}>{flight.total_receipt}</span>
+                  <span className={s.fareMeta}>
+                    Bought {format(new Date(flight.purchased_date), "d MMM yyyy", { locale: enUS })}
+                  </span>
+                </td>
+
+                <td>
+                  <span className={s.ref}>{flight.reservation_number}</span>
+                  <span className={s.passenger} title={flight.passenger_name}>
+                    {flight.passenger_name}
+                  </span>
+                </td>
+
+                <td>
+                  <div className={s.actions}>
+                    <button
+                      type="button"
+                      className={s.iconBtn}
+                      aria-label="Edit flight"
+                      onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
+                    >
+                      <Pencil />
+                    </button>
+                    <button
+                      type="button"
+                      className={s.iconBtn}
+                      aria-label="Delete flight"
+                      onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
+                    >
+                      <Trash2 />
+                    </button>
+                    <button
+                      type="button"
+                      className={s.iconBtn}
+                      aria-label="Open flight"
+                      onClick={(e) => { e.stopPropagation(); onRowClick(flight) }}
+                    >
+                      <ArrowRight />
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ))
           )}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   )
 }
+

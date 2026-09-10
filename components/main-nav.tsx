@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard, MessageCircle, Calendar } from "lucide-react"
+import { BarChart3, Home, List, MapPin, PlaneTakeoff, Plus, Menu, X, CreditCard, MessageCircle, Calendar, Clock } from "lucide-react"
 import { useState } from "react"
 
 import { cn } from "@/lib/utils"
@@ -13,10 +13,24 @@ import { UserMenu } from "@/components/user-menu"
 import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
 
+/** Routes that render <PaperNav /> themselves. */
+const PAPER_ROUTES = ["/", "/flights", "/map", "/stats"]
+
+/** Same, for routes with a dynamic segment. */
+const PAPER_ROUTE_PATTERNS = [/^\/flights\/[^/]+\/edit\/?$/]
+
+function isPaperRoute(pathname: string) {
+  return PAPER_ROUTES.includes(pathname) || PAPER_ROUTE_PATTERNS.some((p) => p.test(pathname))
+}
+
 export function MainNav() {
   const pathname = usePathname()
   const { user, loading, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
+
+  // The paper-stock pages ship their own masthead in their own aesthetic; the
+  // dark app chrome would clash with it, so stay out of the way on those.
+  if (pathname && isPaperRoute(pathname)) return null
 
   const navItems = [
     {
@@ -63,10 +77,10 @@ export function MainNav() {
     },
     {
       name: "Delays",
-      href: "/delays/BRS",
-      icon: BarChart3,
-      color: "text-stats",
-      bgColor: "bg-stats/10",
+      href: "/delays",
+      icon: Clock,
+      color: "text-amber-400",
+      bgColor: "bg-amber-400/10",
     },
     {
       name: "Chat",

@@ -18,7 +18,7 @@ export interface DeleteFlightDialogProps {
 export function DeleteFlightDialog({ open, flight, onOpenChange, onConfirm, isDeleting }: DeleteFlightDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="mx-4 sm:mx-0 sm:max-w-[425px]">
+      <AlertDialogContent className="paper-surface mx-4 sm:mx-0 sm:max-w-[425px]">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="h-5 w-5" />
@@ -38,12 +38,12 @@ export function DeleteFlightDialog({ open, flight, onOpenChange, onConfirm, isDe
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
                   {flight?.departure_airport}
-                  {flight?.departure_iata && ` (${flight?.departure_iata})`}
+                  {flight?.departure_iata && flight?.departure_iata !== "None" && ` (${flight?.departure_iata})`}
                 </Badge>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 <Badge variant="outline" className="bg-airport/10 text-airport border-airport/20">
                   {flight?.arrival_airport}
-                  {flight?.arrival_iata && ` (${flight?.arrival_iata})`}
+                  {flight?.arrival_iata && flight?.arrival_iata !== "None" && ` (${flight?.arrival_iata})`}
                   {flight?.arrival_country && ` (${flight?.arrival_country})`}
                 </Badge>
               </div>

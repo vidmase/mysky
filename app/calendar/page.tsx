@@ -14,9 +14,13 @@ export default async function CalendarPage() {
     redirect('/auth')
   }
 
+  // Same as /flights: an authenticated user must not be sent to /auth, which
+  // redirects them right back here and loops.
   const userId = await resolveSupabaseUserId()
   if (!userId) {
-    redirect('/auth')
+    throw new Error(
+      'No flight profile is linked to this account. Signed in with Clerk, but no matching row in the Supabase profiles table.'
+    )
   }
 
   const supabase = createSupabaseServer()

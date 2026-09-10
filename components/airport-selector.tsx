@@ -66,7 +66,7 @@ export function AirportSelector({
             {value ? (
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-airport" />
-                <span>{value.city} ({value.iata})</span>
+                <span>{value.iata ? `${value.city} (${value.iata})` : value.city}</span>
               </div>
             ) : (
               <span className="text-muted-foreground">{placeholder}</span>
@@ -101,7 +101,7 @@ export function AirportSelector({
                   />
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{airport.city}</span>
-                    <span className="text-sm text-muted-foreground">({airport.iata})</span>
+                    {airport.iata && <span className="text-sm text-muted-foreground">({airport.iata})</span>}
                   </div>
                 </CommandItem>
               ))}

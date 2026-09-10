@@ -28,3 +28,18 @@ Full Error: {"code":"23502","details":"Failing row contains (d499d715-b5c1-4abd-
 [2026-02-16T23:08:18.894Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
 [2026-02-16T23:08:20.173Z] Token exchange failed: null value in column "username" of relation "profiles" violates not-null constraint
 Full Error: {"code":"23502","details":"Failing row contains (d499d715-b5c1-4abd-ba94-372a3ae73d2d, vidmase@gmail.com, null, null, 2026-02-16 23:08:19.894712+00, 2026-02-16 23:08:19.894712+00, null, , null, null, f, null, 1//03uIzknhK835eCgYIARAAGAMSNwF-L9IrE2pjdIqpT4Acq4Mvlw-kn8hy7gGa..., null).","hint":null,"message":"null value in column \"username\" of relation \"profiles\" violates not-null constraint"}
+[2026-07-25T11:04:57.727Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:04:57.772Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:05:09.376Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:05:10.237Z] Token exchange failed: null value in column "username" of relation "profiles" violates not-null constraint
+Full Error: {"code":"23502","details":"Failing row contains (d499d715-b5c1-4abd-ba94-372a3ae73d2d, vidmase@gmail.com, null, null, 2026-07-25 11:05:09.894821+00, 2026-07-25 11:05:09.894821+00, null, , null, null, f, null, 1//03sCZNW3xpU_NCgYIARAAGAMSNwF-L9IrSCfwe6X4XaaLM_80Yrh57iu-RPy8..., null).","hint":null,"message":"null value in column \"username\" of relation \"profiles\" violates not-null constraint"}
+[2026-07-25T11:05:35.874Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:05:35.936Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:05:45.203Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T11:05:46.013Z] Token exchange failed: null value in column "username" of relation "profiles" violates not-null constraint
+Full Error: {"code":"23502","details":"Failing row contains (d499d715-b5c1-4abd-ba94-372a3ae73d2d, vidmase@gmail.com, null, null, 2026-07-25 11:05:45.708336+00, 2026-07-25 11:05:45.708336+00, null, , null, null, f, null, 1//03VMByeM_IuAlCgYIARAAGAMSNwF-L9IrlNLEiIE9NCtVQqqU5vQs6viFup2l..., null).","hint":null,"message":"null value in column \"username\" of relation \"profiles\" violates not-null constraint"}
+[2026-07-25T16:26:20.779Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T16:26:20.846Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T16:27:33.593Z] createOAuth2Client Redirect URI: http://localhost:3000/api/gmail/callback
+[2026-07-25T16:27:34.543Z] Token exchange failed: null value in column "username" of relation "profiles" violates not-null constraint
+Full Error: {"code":"23502","details":"Failing row contains (d499d715-b5c1-4abd-ba94-372a3ae73d2d, vidmase@gmail.com, null, null, 2026-07-25 16:27:34.133426+00, 2026-07-25 16:27:34.133426+00, null, , null, null, f, null, 1//03auduLmCa1IECgYIARAAGAMSNwF-L9Ir2kXKlXG8CkKg39LFbKdvTvfZTG9y..., null).","hint":null,"message":"null value in column \"username\" of relation \"profiles\" violates not-null constraint"}

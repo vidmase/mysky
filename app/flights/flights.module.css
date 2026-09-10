@@ -1,0 +1,1102 @@
+/* ============================================================
+   THE LOGBOOK — /flights
+   Same press as the landing page: warm paper stock, hairline
+   rules, letterpress micro-labels, one hot vermillion accent.
+   Palette + type stack come from `.paper-stock` (app/styles/paper.css),
+   which an ancestor applies; everything here just consumes the vars.
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+.shell {
+  width: min(1440px, 100% - 3rem);
+  margin-inline: auto;
+}
+
+/* the all-caps letterpress tag, used throughout */
+.tag {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   MASTHEAD
+   ============================================================ */
+.masthead {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: end;
+  gap: 1.5rem;
+  padding: clamp(2rem, 4vw, 3.25rem) 0 clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.mastheadCopy {
+  grid-column: 1 / span 7;
+}
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.stamp span:first-child {
+  display: inline-block;
+  width: 26px;
+  height: 1px;
+  background: var(--vermillion);
+}
+
+.title {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(2.5rem, 5.4vw, 4.5rem);
+  line-height: 0.94;
+  letter-spacing: -0.028em;
+  margin: 0;
+}
+
+.title em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--vermillion);
+}
+
+.lede {
+  max-width: 42ch;
+  margin: 1.1rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.mastheadActions {
+  grid-column: 9 / span 4;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 1080px) {
+  .mastheadCopy,
+  .mastheadActions {
+    grid-column: 1 / -1;
+  }
+  .mastheadActions {
+    justify-content: flex-start;
+  }
+}
+
+/* ---- buttons ---- */
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 1.3rem;
+  background: var(--vermillion);
+  color: #fff5ee;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
+}
+
+.btnPrimary:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.btnPrimary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.btnPrimary svg {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.btnPrimary:hover svg {
+  transform: translateX(3px);
+}
+
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 1.1rem;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule-strong);
+  transition: border-color 0.25s, color 0.25s, background 0.25s;
+}
+
+.btnOutline:hover {
+  color: var(--vermillion);
+  border-color: var(--vermillion);
+  background: rgba(206, 59, 30, 0.05);
+}
+
+/* ============================================================
+   LEDGER — the three counts, as hairline facts
+   ============================================================ */
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 0 0 clamp(1.75rem, 3.5vw, 2.5rem);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledgerCell {
+  padding: 1.1rem 1.25rem 1.15rem 0;
+  border-left: 1px solid var(--rule);
+  padding-left: 1.25rem;
+}
+
+.ledgerCell:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.ledgerLabel {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.55rem;
+}
+
+.ledgerValue {
+  margin: 0;
+  font-family: var(--code);
+  font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerValueHot {
+  color: var(--vermillion);
+}
+
+@media (max-width: 640px) {
+  .ledger {
+    grid-template-columns: 1fr;
+  }
+  .ledgerCell {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-block: 0.75rem;
+  }
+  .ledgerCell:first-child {
+    border-top: 0;
+  }
+  .ledgerLabel {
+    margin: 0;
+  }
+  .ledgerValue {
+    font-size: 1.5rem;
+  }
+}
+
+/* ============================================================
+   FILING BLOCK — search + filters
+   ============================================================ */
+.filing {
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+}
+
+.filingHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.6rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* the quick-search line: an underlined field, not a boxed input */
+.search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--rule-strong);
+  padding-bottom: 0.5rem;
+  transition: border-color 0.25s;
+}
+
+.search:focus-within {
+  border-bottom-color: var(--vermillion);
+}
+
+.searchIcon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  color: var(--ink-3);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  padding: 0.15rem 0;
+}
+
+.searchInput::placeholder {
+  color: var(--ink-3);
+}
+
+.searchClear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: var(--ink-3);
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.searchClear:hover {
+  color: var(--vermillion);
+}
+
+/* ============================================================
+   THE LOG TABLE
+   ============================================================ */
+.tableWrap {
+  display: none;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+@media (min-width: 1024px) {
+  .tableWrap {
+    display: block;
+  }
+}
+
+.table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  font-family: var(--body);
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--paper);
+  padding: 0.7rem 0.9rem 0.6rem;
+  text-align: left;
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.table thead th:first-child {
+  padding-left: 0;
+}
+
+.table thead th:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+
+.row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.row:hover {
+  background: var(--paper-2);
+}
+
+.row td {
+  padding: 0.95rem 0.9rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.row:last-child td {
+  border-bottom: 0;
+}
+
+.row td:first-child {
+  padding-left: 0;
+}
+
+.row td:last-child {
+  padding-right: 0;
+}
+
+/* --- date cell --- */
+.date {
+  font-family: var(--code);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.weekday {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* the "still to come" marker — a vermillion rule + word */
+.upcoming {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--vermillion);
+}
+
+.upcoming::before {
+  content: "";
+  width: 12px;
+  height: 1px;
+  background: var(--vermillion);
+}
+
+/* --- route cell: the headline of every row --- */
+.route {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--code);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.routeArrow {
+  color: var(--vermillion);
+  flex: none;
+}
+
+.routeNames {
+  display: block;
+  margin-top: 0.45rem;
+  max-width: 22ch;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- flight cell --- */
+.flightCell {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.logo {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fbf7ef;
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.logo img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+/* shown by the <img> onError handler when a carrier has no mark on file */
+.logo :global(.fallback-icon) {
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+}
+
+.flightNo {
+  display: block;
+  font-family: var(--code);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.airline {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+}
+
+.seat {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* --- time cells --- */
+.time {
+  font-family: var(--code);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+/* actual/estimated readout + the delta against schedule */
+.chip {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.chipMuted {
+  border-style: dashed;
+  color: var(--ink-3);
+}
+
+.chipLate {
+  border-color: rgba(206, 59, 30, 0.4);
+  background: rgba(206, 59, 30, 0.08);
+  color: var(--vermillion-dk);
+}
+
+.chipEarly {
+  border-color: rgba(47, 107, 83, 0.4);
+  background: rgba(47, 107, 83, 0.08);
+  color: var(--jade);
+}
+
+.chipOnTime {
+  border-color: var(--rule-strong);
+  color: var(--ink-2);
+}
+
+.spin {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--ink-3);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- duration --- */
+.duration {
+  font-family: var(--code);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+/* --- fare --- */
+.fare {
+  font-family: var(--code);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.fareMeta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* --- reference --- */
+.ref {
+  display: inline-block;
+  font-family: var(--code);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  background: #fbf7ef;
+  white-space: nowrap;
+}
+
+.passenger {
+  display: block;
+  margin-top: 0.4rem;
+  max-width: 16ch;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- row actions --- */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  opacity: 0.45;
+  transition: opacity 0.25s;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.iconBtn:hover {
+  color: var(--vermillion);
+  border-color: var(--vermillion);
+  background: rgba(206, 59, 30, 0.06);
+}
+
+.iconBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- table states --- */
+.state {
+  padding: clamp(3rem, 7vw, 5rem) 1rem;
+  text-align: center;
+}
+
+.stateTitle {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+}
+
+.stateNote {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   MOBILE — each leg as a torn boarding-pass stub
+   ============================================================ */
+.cards {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .cards {
+    display: none;
+  }
+}
+
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 74px;
+  background: #fbf7ef;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 14px 28px -18px rgba(23, 19, 14, 0.55), 0 1px 3px rgba(23, 19, 14, 0.12);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s;
+}
+
+.card:active {
+  transform: translateY(1px);
+}
+
+.cardMain {
+  padding: 0.95rem 1rem 1rem;
+  border-right: 2px dashed rgba(23, 19, 14, 0.28);
+  min-width: 0;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--ink);
+}
+
+.cardFlight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.cardAirline {
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the "still to come" flag, sitting on the head rule */
+.cardFlag {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fff5ee;
+  background: var(--vermillion);
+  padding: 0.2rem 0.4rem;
+}
+
+/* on a card there is no hover to reveal them, so keep them lit */
+.cardFoot .actions {
+  opacity: 1;
+}
+
+.cardRoute {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 0 0.7rem;
+}
+
+.cardIata {
+  font-family: var(--code);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.cardIata small {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardArc {
+  height: 22px;
+  width: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: rgba(23, 19, 14, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.cardData {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+  margin: 0;
+}
+
+.cardField dt {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.25rem;
+}
+
+.cardField dd {
+  margin: 0;
+  font-family: var(--code);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
+  margin-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+
+.cardStub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.95rem 0.4rem 1rem;
+  background: #f6f0e5;
+}
+
+.notch {
+  position: absolute;
+  left: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset -1px 0 1px rgba(23, 19, 14, 0.18);
+}
+
+.notchTop {
+  top: -7px;
+}
+
+.notchBottom {
+  bottom: -7px;
+}
+
+.stubLabel {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.stubValue {
+  font-family: var(--code);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.barcode {
+  width: 100%;
+  height: 40px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--ink) 0 2px,
+    transparent 2px 4px,
+    var(--ink) 4px 5px,
+    transparent 5px 9px,
+    var(--ink) 9px 12px,
+    transparent 12px 13px,
+    var(--ink) 13px 14px,
+    transparent 14px 18px
+  );
+  opacity: 0.86;
+}
+
+/* ============================================================
+   PAGINATION — a printed page-footer rule
+   ============================================================ */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  margin-top: 1.25rem;
+}
+
+.paginationNote {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pageBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 0.4rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-family: var(--code);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  color: var(--vermillion);
+  border-color: var(--vermillion);
+}
+
+.pageBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pageBtnActive {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.pageBtnActive:hover:not(:disabled) {
+  background: var(--vermillion);
+  border-color: var(--vermillion);
+  color: var(--paper);
+}
+
+.pageBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ellipsis {
+  padding-inline: 0.15rem;
+  font-family: var(--code);
+  font-size: 0.625rem;
+  color: var(--ink-3);
+}
+
+.pagerMobile {
+  display: flex;
+}
+
+.pagerDesktop {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .pagerMobile {
+    display: none;
+  }
+  .pagerDesktop {
+    display: flex;
+  }
+}
+
+/* ============================================================
+   COLOPHON
+   ============================================================ */
+.colophon {
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule-strong);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+}
+
+.colophonNote {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  max-width: 60ch;
+}
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .row {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .spin {
+    animation-duration: 2s;
+  }
+  .page *,
+  .page *::before,
+  .page *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   SHADCN GUESTS — the filter panel and its controls still come
+   from the app's component library. Square them off and drop
+   the drop shadows so they read as printed forms.
+   ============================================================ */
+.filing :global(.rounded-lg),
+.filing :global(.rounded-md),
+.filing :global(.rounded-xl) {
+  border-radius: 0;
+}
+
+.filing :global([data-radix-collection-item]),
+.filing :global(button),
+.filing :global(input),
+.filing :global([role="combobox"]) {
+  border-radius: 0;
+}
+
+.filing :global(label) {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}

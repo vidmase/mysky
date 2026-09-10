@@ -27,8 +27,20 @@ import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
 import { format } from "date-fns"
 import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { SearchBar } from "@/app/flights/components/SearchBar"
+import { PaperNav } from "@/app/components/paper-nav"
 import { Plane } from "lucide-react"
 import type { Flight } from "@/types/flight"
+import s from "./flights.module.css"
+
+const Arrow = () => (
+  <svg width="16" height="8" viewBox="0 0 16 8" fill="none" aria-hidden="true">
+    <path d="M0 4h14M10.5 1L14 4l-3.5 3" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+)
+
+/** IATA when we have one, otherwise the first three letters of the airport. */
+const iataOf = (iata: string | null | undefined, airportName: string) =>
+  iata && iata !== "None" ? iata : airportName.slice(0, 3).toUpperCase()
 
 
 export type FlightsCounts = {
@@ -508,25 +520,41 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   }, [flights])
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="relative mb-8">
-        <div className="absolute -left-12 -top-12 h-56 w-56 rounded-full bg-primary/10 blur-3xl animate-pulse" />
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-sky-300">
-              Your Flight Deck
+    <div className={s.page}>
+      <div className={s.shell}>
+        <PaperNav />
+      </div>
+
+      <header className={s.shell}>
+        <div className={s.masthead}>
+          <div className={s.mastheadCopy}>
+            <p className={`${s.stamp} ${s.tag} ${s.rise}`} style={{ animationDelay: "40ms" }}>
+              <span />
+              <span>Section 02 · The logbook</span>
+            </p>
+            <h1 className={`${s.title} ${s.rise}`} style={{ animationDelay: "110ms" }}>
+              Every leg <em>you have filed</em>
             </h1>
-            <p className="text-muted-foreground">Manage, track, and analyze your flight history.</p>
+            <p className={`${s.lede} ${s.rise}`} style={{ animationDelay: "200ms" }}>
+              The whole record, sorted and searchable down to a single reservation
+              number. Filed legs are printed below in reverse order of departure.
+            </p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Tools
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+
+          <div className={`${s.mastheadActions} ${s.rise}`} style={{ animationDelay: "280ms" }}>
+            <a href="/add-flight" className={s.btnPrimary}>
+              File a flight
+              <Arrow />
+            </a>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={s.btnOutline}>
+                  <Settings className="h-3.5 w-3.5" />
+                  Tools
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="paper-surface w-56">
               <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
                 <Upload className="h-4 w-4" />
                 Import CSV
@@ -558,26 +586,38 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 <Mail className="h-4 w-4" />
                 Enhanced Gmail Import ✨
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Counts section */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard title="Total Flights" value={counts.total} />
-        <StatCard title="Upcoming" value={counts.upcoming} />
-        <StatCard title="Past" value={counts.past} />
-      </div>
+      <main className={s.shell}>
+        {/* Counts, kept as a ledger strip rather than cards */}
+        <dl className={`${s.ledger} ${s.rise}`} style={{ animationDelay: "340ms" }}>
+          <div className={s.ledgerCell}>
+            <dt className={s.ledgerLabel}>Legs filed</dt>
+            <dd className={s.ledgerValue}>{counts.total}</dd>
+          </div>
+          <div className={s.ledgerCell}>
+            <dt className={s.ledgerLabel}>Still to come</dt>
+            <dd className={`${s.ledgerValue} ${s.ledgerValueHot}`}>{counts.upcoming}</dd>
+          </div>
+          <div className={s.ledgerCell}>
+            <dt className={s.ledgerLabel}>Flown</dt>
+            <dd className={s.ledgerValue}>{counts.past}</dd>
+          </div>
+        </dl>
 
-      {/* Quick Search: reservation number or single date */}
-      <SearchBar
-        setSearchTerm={(v) => { setSearchTerm(v); logEvent("quick_search", { term: v }) }}
-        setDateRange={(range) => { setDateRange(range); logEvent("quick_search_date", { from: range?.from, to: range?.to }) }}
-      />
+        <div className={s.filing}>
+          {/* Quick Search: reservation number or single date */}
+          <SearchBar
+            setSearchTerm={(v) => { setSearchTerm(v); logEvent("quick_search", { term: v }) }}
+            setDateRange={(range) => { setDateRange(range); logEvent("quick_search_date", { from: range?.from, to: range?.to }) }}
+          />
 
-      {/* Filters */}
-      <FiltersPanel
+          {/* Filters */}
+          <FiltersPanel
         dateRange={dateRange}
         setDateRange={(range) => { setDateRange(range); logEvent("filter_date_range", { from: range?.from, to: range?.to }) }}
         initialDate={initialDate}
@@ -594,51 +634,61 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         setTripType={(v) => { setTripType(v); logEvent("filter_trip_type", { tripType: v }) }}
         sortBy={sortBy}
         setSortBy={(v) => { setSortBy(v); logEvent("sort_by", { sortBy: v }) }}
-        sortOrder={sortOrder}
-        setSortOrder={(v: string) => { setSortOrder(v as "asc" | "desc"); logEvent("sort_order", { sortOrder: v }) }}
-      />
-
-      {/* CSV Import Dialog */}
-      <CsvImportDialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen} onImported={async () => { await refetch() }} />
-
-      {/* CSV Export Dialog */}
-      <CsvExportDialog open={isCsvExportDialogOpen} onOpenChange={setIsCsvExportDialogOpen} flights={flights} />
-      <Flightradar24ExportDialog open={isFlightradar24ExportDialogOpen} onOpenChange={setIsFlightradar24ExportDialogOpen} flights={flights} />
-
-      {/* Mobile cards */}
-      <div className="grid grid-cols-1 gap-4 md:hidden mb-4">
-        {currentFlights.map((flight) => (
-          <FlightCard
-            key={flight.id}
-            flight={flight}
-            onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
-            onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
-            onDeleteRequest={(f) => setFlightToDelete(f)}
-            isUpcoming={isUpcoming}
+            sortOrder={sortOrder}
+            setSortOrder={(v: string) => { setSortOrder(v as "asc" | "desc"); logEvent("sort_order", { sortOrder: v }) }}
           />
-        ))}
-      </div>
+        </div>
 
-      {/* Desktop table */}
-      <FlightsTable
-        loading={isFetching}
-        flights={currentFlights}
-        onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
-        onDeleteRequest={(f) => setFlightToDelete(f)}
-        onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
-      />
+        {/* CSV Import Dialog */}
+        <CsvImportDialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen} onImported={async () => { await refetch() }} />
 
-      <PaginationControls
-        loading={isFetching}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        canGoPrevious={canGoPrevious}
-        canGoNext={canGoNext}
-        goToPage={goToPage}
-        startIndex={startIndex}
-        endIndex={endIndex}
-        totalItems={sortedFlights.length}
-      />
+        {/* CSV Export Dialog */}
+        <CsvExportDialog open={isCsvExportDialogOpen} onOpenChange={setIsCsvExportDialogOpen} flights={flights} />
+        <Flightradar24ExportDialog open={isFlightradar24ExportDialogOpen} onOpenChange={setIsFlightradar24ExportDialogOpen} flights={flights} />
+
+        {/* Narrow screens: each leg as a torn boarding-pass stub */}
+        <div className={s.cards}>
+          {currentFlights.map((flight) => (
+            <FlightCard
+              key={flight.id}
+              flight={flight}
+              onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
+              onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
+              onDeleteRequest={(f) => setFlightToDelete(f)}
+              isUpcoming={isUpcoming}
+            />
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <FlightsTable
+          loading={isFetching}
+          flights={currentFlights}
+          onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
+          onDeleteRequest={(f) => setFlightToDelete(f)}
+          onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
+        />
+
+        <PaginationControls
+          loading={isFetching}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          canGoPrevious={canGoPrevious}
+          canGoNext={canGoNext}
+          goToPage={goToPage}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          totalItems={sortedFlights.length}
+        />
+
+        <div className={s.colophon}>
+          <span className={s.tag}>MySky · Personal flight record</span>
+          <p className={s.colophonNote}>
+            Scheduled times are as filed. Actual and estimated times are supplied by
+            third parties and shown for reference only.
+          </p>
+        </div>
+      </main>
 
       <DeleteFlightDialog
         open={!!flightToDelete}
@@ -983,19 +1033,6 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   )
 }
 
-interface StatCardProps {
-  title: string;
-  value: number | string;
-}
-
-const StatCard = ({ title, value }: StatCardProps) => (
-  <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-5 shadow-lg backdrop-blur-sm">
-    <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-primary/10 blur-2xl" />
-    <p className="text-sm text-muted-foreground">{title}</p>
-    <p className="text-3xl font-bold text-zinc-50">{value}</p>
-  </div>
-);
-
 interface FlightCardProps {
   flight: Flight;
   onRowClick: (flight: Flight) => void;
@@ -1005,62 +1042,92 @@ interface FlightCardProps {
 }
 
 const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, isUpcoming }) => (
-  <div
-    className="relative rounded-xl border border-zinc-800 bg-zinc-950/30 backdrop-blur-sm p-4 transition-all duration-300 hover:border-zinc-700 cursor-pointer"
-    onClick={() => onRowClick(flight)}
-  >
-    <div className="flex items-start justify-between mb-3">
-      <div className="flex items-center gap-3">
-        <div className="relative w-10 h-10 rounded-md overflow-hidden flex items-center justify-center bg-zinc-800/50">
-          <img
-            src={getAirlineLogo(flight.airline ?? null, flight.flight_number)}
-            alt={flight.airline || "Airline"}
-            className="w-7 h-7 object-contain"
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              const fallbackIcon = target.parentElement?.querySelector('.fallback-icon') as HTMLElement;
-              if (fallbackIcon) {
-                fallbackIcon.style.display = 'flex';
-              }
-            }}
-          />
-          <div className="fallback-icon items-center justify-center" style={{ display: 'none' }}>
-            <Plane className="h-5 w-5 text-zinc-500" />
-          </div>
+  <article className={s.card} onClick={() => onRowClick(flight)}>
+    <div className={s.cardMain}>
+      <div className={s.cardHead}>
+        <div className={s.cardFlight}>
+          <span className={s.logo}>
+            <img
+              src={getAirlineLogo(flight.airline ?? null, flight.flight_number)}
+              alt=""
+              onError={(e) => {
+                const target = e.currentTarget
+                target.style.display = 'none'
+                const fallbackIcon = target.parentElement?.querySelector('.fallback-icon') as HTMLElement
+                if (fallbackIcon) fallbackIcon.style.display = 'flex'
+              }}
+            />
+            <span className="fallback-icon" style={{ display: 'none' }}>
+              <Plane className="h-4 w-4" />
+            </span>
+          </span>
+          <span className={s.flightNo}>{flight.flight_number}</span>
+          <span className={s.cardAirline}>{flight.airline || "Unknown"}</span>
         </div>
-        <div>
-          <p className="font-semibold text-zinc-100">{flight.departure_iata} → {flight.arrival_iata}</p>
-          <p className="text-xs text-zinc-400">{flight.airline} • {flight.flight_number}</p>
+        {isUpcoming(flight.departure_date) && <span className={s.cardFlag}>Upcoming</span>}
+      </div>
+
+      <div className={s.cardRoute}>
+        <div className={s.cardIata}>
+          {iataOf(flight.departure_iata, flight.departure_airport)}
+          <small>{flight.departure_airport}</small>
+        </div>
+        <svg className={s.cardArc} viewBox="0 0 104 22" aria-hidden="true">
+          <path d="M2 19 C 28 2, 76 2, 102 19" />
+        </svg>
+        <div className={s.cardIata} style={{ textAlign: "right" }}>
+          {iataOf(flight.arrival_iata, flight.arrival_airport)}
+          <small>{flight.arrival_airport}</small>
         </div>
       </div>
-      <Badge
-        variant="outline"
-        className={`text-xs ${isUpcoming(flight.departure_date)
-          ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-          : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}
-      >
-        {isUpcoming(flight.departure_date) ? "Upcoming" : "Past"}
-      </Badge>
+
+      <dl className={s.cardData}>
+        <div className={s.cardField}>
+          <dt>Date</dt>
+          <dd>{format(new Date(flight.departure_date), "dd MMM").toUpperCase()}</dd>
+        </div>
+        <div className={s.cardField}>
+          <dt>Dep</dt>
+          <dd>{formatTimeToHHMM(flight.departure_time) || "—"}</dd>
+        </div>
+        <div className={s.cardField}>
+          <dt>Arr</dt>
+          <dd>{formatTimeToHHMM(flight.arrival_time) || "—"}</dd>
+        </div>
+      </dl>
+
+      <div className={s.cardFoot}>
+        <span className={s.ref}>{flight.reservation_number}</span>
+        <div className={s.actions}>
+          <button
+            type="button"
+            className={s.iconBtn}
+            aria-label="Edit flight"
+            onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
+          >
+            <Pencil />
+          </button>
+          <button
+            type="button"
+            className={s.iconBtn}
+            aria-label="Delete flight"
+            onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
+          >
+            <Trash2 />
+          </button>
+        </div>
+      </div>
     </div>
-    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+
+    <aside className={s.cardStub}>
+      <span className={`${s.notch} ${s.notchTop}`} aria-hidden="true" />
+      <span className={`${s.notch} ${s.notchBottom}`} aria-hidden="true" />
       <div>
-        <p className="text-zinc-400 text-xs">Departure</p>
-        <p className="text-zinc-100 font-medium">{format(new Date(flight.departure_date), "MMM d, yyyy")}</p>
-        <p className="text-zinc-300">{formatTimeToHHMM(flight.departure_time)}</p>
+        <div className={s.stubLabel}>Seat</div>
+        <div className={s.stubValue}>{flight.seat || "—"}</div>
       </div>
-      <div className="text-right">
-        <p className="text-zinc-400 text-xs">Arrival</p>
-        <p className="text-zinc-100 font-medium">{flight.arrival_date ? format(new Date(flight.arrival_date), "MMM d, yyyy") : "-"}</p>
-        <p className="text-zinc-300">{formatTimeToHHMM(flight.arrival_time)}</p>
-      </div>
-    </div>
-    <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
-      <p className="text-xs text-zinc-500">Confirmation: {flight.reservation_number}</p>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white" onClick={(e) => { e.stopPropagation(); onEdit(flight); }}><Pencil className="h-4 w-4" /></Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-zinc-800/50 hover:bg-destructive/10 text-zinc-300 hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight); }}><Trash2 className="h-4 w-4" /></Button>
-      </div>
-    </div>
-  </div>
+      <div className={s.barcode} aria-hidden="true" />
+      <span className={s.stubLabel}>{flight.flight_number}</span>
+    </aside>
+  </article>
 );

@@ -1,0 +1,786 @@
+/* ============================================================
+   THE NUMBERS — /stats
+   A statistical abstract, set the way the landing page and the
+   logbook are: warm stock, hairline rules, figures numbered like
+   plates. Palette + type come from `.paper-stock`.
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: clamp(2.5rem, 5vw, 4rem);
+}
+
+.shell {
+  width: min(1440px, 100% - 3rem);
+  margin-inline: auto;
+}
+
+.tag {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   MASTHEAD
+   ============================================================ */
+.masthead {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: end;
+  gap: 1.25rem 1.5rem;
+  padding: clamp(1.75rem, 3.5vw, 2.75rem) 0 clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+.mastheadCopy {
+  grid-column: 1 / span 7;
+}
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.stamp span:first-child {
+  display: inline-block;
+  width: 26px;
+  height: 1px;
+  background: var(--vermillion);
+}
+
+.title {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 0.94;
+  letter-spacing: -0.028em;
+  margin: 0;
+}
+
+.title em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--vermillion);
+}
+
+.lede {
+  max-width: 46ch;
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.mastheadActions {
+  grid-column: 9 / span 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.drawnAt {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+@media (max-width: 1080px) {
+  .mastheadCopy,
+  .mastheadActions {
+    grid-column: 1 / -1;
+  }
+  .mastheadActions {
+    align-items: flex-start;
+  }
+}
+
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1.1rem;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule-strong);
+  transition: border-color 0.25s, color 0.25s, background 0.25s;
+}
+
+.btnOutline:hover:not(:disabled) {
+  color: var(--vermillion);
+  border-color: var(--vermillion);
+  background: rgba(206, 59, 30, 0.05);
+}
+
+.btnOutline:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.btnOutline svg {
+  width: 14px;
+  height: 14px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================
+   HEADLINE LEDGER — the four counts
+   ============================================================ */
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 0 clamp(1.75rem, 3.5vw, 2.5rem);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledgerCell {
+  padding: 1.1rem 1.25rem 1.15rem;
+  border-left: 1px solid var(--rule);
+}
+
+.ledgerCell:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.ledgerLabel {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.55rem;
+}
+
+.ledgerValue {
+  margin: 0;
+  font-family: var(--code);
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledgerValueHot {
+  color: var(--vermillion);
+}
+
+@media (max-width: 760px) {
+  .ledger {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ledgerCell:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .ledgerCell:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* ============================================================
+   FIGURES — every block is a numbered plate
+   ============================================================ */
+.grid {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.grid2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1080px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--rule-strong);
+  background: rgba(251, 247, 239, 0.6);
+}
+
+.figureHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.figureNo {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.figureTitle {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+.figureBody {
+  padding: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.figureNote {
+  margin: 0.75rem 0 0;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ============================================================
+   HERO FIGURES — distance and time
+   ============================================================ */
+.hero {
+  font-family: var(--code);
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.heroUnit {
+  font-family: var(--code);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-left: 0.5rem;
+  vertical-align: 0.55em;
+}
+
+.heroGloss {
+  margin: 0.85rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* a hairline meter, ruled rather than filled */
+.meter {
+  position: relative;
+  height: 6px;
+  margin-top: 1rem;
+  border: 1px solid var(--rule-strong);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(23, 19, 14, 0.16) 0 1px,
+    transparent 1px 8px
+  );
+}
+
+.meterFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--vermillion);
+}
+
+.meterScale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.45rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* the days / hours split */
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 1.1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.splitCell {
+  padding: 0.75rem 0.9rem 0;
+  border-left: 1px solid var(--rule);
+}
+
+.splitCell:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.splitLabel {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.4rem;
+}
+
+.splitValue {
+  font-family: var(--code);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   RANK ROWS — airports, airline spend
+   ============================================================ */
+.ranks {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.rank {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.rankHead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.rankNo {
+  flex: none;
+  width: 1.1rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankCode {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--rule-strong);
+  background: #fbf7ef;
+}
+
+.rankName {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankValue {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rankSub {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rankBarTrack {
+  height: 4px;
+  margin-left: 1.65rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.rankBar {
+  height: 4px;
+  background: var(--vermillion);
+  min-width: 2px;
+}
+
+/* ============================================================
+   PAIR INDEX — most flown routes
+   ============================================================ */
+.pairs {
+  display: grid;
+}
+
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.pair:last-child {
+  border-bottom: 0;
+}
+
+.pairNo {
+  flex: none;
+  width: 1.1rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pairCodes {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--code);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pairArrow {
+  color: var(--vermillion);
+}
+
+.pairCount {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   LEGEND — identity is never colour alone
+   ============================================================ */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--rule);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.legendSwatch {
+  width: 14px;
+  height: 3px;
+  flex: none;
+}
+
+.legendCount {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   MONEY — the spending abstract
+   ============================================================ */
+.money {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 1.25rem;
+}
+
+.moneyCell {
+  padding: 0.95rem 1rem;
+  border-left: 1px solid var(--rule);
+}
+
+.moneyCell:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.moneyLabel {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 0.5rem;
+}
+
+.moneyValue {
+  margin: 0;
+  font-family: var(--code);
+  font-size: clamp(1.125rem, 2.1vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+.moneyNote {
+  margin: 0.45rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+@media (max-width: 900px) {
+  .money {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .moneyCell:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .moneyCell:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+}
+
+/* ============================================================
+   COUNTRY TALLY
+   ============================================================ */
+.tally {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--rule);
+  /* the last row rarely fills every column, so the container carries the
+     closing rule and the line runs the full measure either way */
+  border-bottom: 1px solid var(--rule);
+}
+
+.tallyCell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem 0.7rem 0;
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+}
+
+.tallyName {
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tallyCount {
+  flex: none;
+  font-family: var(--code);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   CHART SURFACE — recharts lives inside these
+   ============================================================ */
+.chart {
+  width: 100%;
+  height: 17rem;
+}
+
+.chartShort {
+  height: 14rem;
+}
+
+/* the tooltip, reprinted on paper */
+.tip {
+  padding: 0.55rem 0.7rem;
+  background: #fbf7ef;
+  border: 1px solid var(--rule-strong);
+  box-shadow: 3px 3px 0 rgba(23, 19, 14, 0.14);
+}
+
+.tipLabel {
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.3rem;
+}
+
+.tipValue {
+  font-family: var(--code);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tipNote {
+  margin-top: 0.3rem;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   STATES
+   ============================================================ */
+.state {
+  padding: clamp(3rem, 8vw, 5rem) 0;
+  text-align: center;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.stateTitle {
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 3.4vw, 2.25rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.6rem;
+}
+
+.stateNote {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   COLOPHON
+   ============================================================ */
+.colophon {
+  margin-top: clamp(2rem, 4vw, 3rem);
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule-strong);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+}
+
+.colophonNote {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  max-width: 64ch;
+}
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .spin {
+    animation-duration: 3s;
+  }
+  .page *,
+  .page *::before,
+  .page *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell {
+    width: min(1440px, 100% - 2rem);
+  }
+}

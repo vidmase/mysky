@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
+
 import "./globals.css"
 import { ClerkProvider } from '@clerk/nextjs'
 import { AuthProvider } from '@/contexts/auth-context'
@@ -27,6 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
+
       <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`} suppressHydrationWarning style={{ colorScheme: 'dark' }}>
         <head>
           {/* Add this to ensure proper mobile viewport */}
@@ -57,6 +59,7 @@ export default function RootLayout({
           </Heartbeat>
         </body>
       </html>
+
     </ClerkProvider>
   )
 }

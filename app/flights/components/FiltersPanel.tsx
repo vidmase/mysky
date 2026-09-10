@@ -79,7 +79,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
       <CardContent className="pt-4">
         <Collapsible open={open} onOpenChange={setOpen}>
           <div className="flex items-center justify-between mb-3">
-            <div className="font-medium text-sm text-muted-foreground">Filters</div>
+            <div className="paper-tag">Refine the page</div>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-1">
                 {open ? "Hide" : "Show"}
@@ -130,7 +130,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="z-50 w-[95vw] max-w-[720px] max-h-[85vh] p-0 overflow-auto rounded-2xl shadow-2xl ring-1 ring-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur"
+                      className="paper-surface z-50 w-[95vw] max-w-[720px] max-h-[85vh] p-0 overflow-auto shadow-2xl ring-1 ring-black/10"
                       align="start"
                       side="bottom"
                       sideOffset={8}
@@ -147,18 +147,16 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           fromYear={2000}
                           toYear={2100}
                           locale={enUS as any}
-                          className="rounded-xl border border-white/5 bg-transparent"
+                          className="border border-border bg-transparent"
                           captionLayout="buttons"
                           showOutsideDays
                           classNames={{
                             caption_label: "text-base font-semibold",
-                            nav_button: "h-8 w-8 rounded-full hover:bg-white/10 ring-1 ring-white/10",
-                            day: "h-9 w-9 p-0 font-medium rounded-full hover:bg-white/10",
-                            day_selected: "bg-flight text-white hover:bg-flight",
+                            nav_button: "h-8 w-8 hover:bg-accent ring-1 ring-border",
+                            day: "h-9 w-9 p-0 font-medium hover:bg-accent",
+                            day_selected: "bg-flight text-primary-foreground hover:bg-flight",
                             day_today: "ring-2 ring-flight/50",
-                            day_range_start: "rounded-l-full",
-                            day_range_end: "rounded-r-full",
-                            day_range_middle: "bg-flight/20 text-white",
+                            day_range_middle: "bg-flight/20 text-foreground",
                             head_cell: "text-xs text-muted-foreground",
                             table: "w-full",
                           }}
@@ -167,7 +165,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="rounded-full"
+                            className=""
                             onClick={() => {
                               const end = new Date()
                               const start = subDays(end, 6)
@@ -179,7 +177,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="rounded-full"
+                            className=""
                             onClick={() => {
                               const end = new Date()
                               const start = subDays(end, 29)
@@ -191,7 +189,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="rounded-full"
+                            className=""
                             onClick={() => {
                               const end = new Date()
                               const start = subDays(end, 89)
@@ -203,7 +201,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="rounded-full"
+                            className=""
                             onClick={() => {
                               const now = new Date()
                               setDateRange({ from: startOfMonth(now), to: endOfMonth(now) })
@@ -214,7 +212,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="rounded-full"
+                            className=""
                             onClick={() => setDateRange(undefined)}
                           >
                             Clear
@@ -248,7 +246,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                     <Building className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <SelectValue placeholder="All airlines" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="paper-surface">
                     <SelectItem value="all">All airlines</SelectItem>
                     {airlines.map((a) => (
                       <SelectItem key={`airline-${a.toLowerCase()}`} value={a}>
@@ -271,7 +269,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                   <CreditCard className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="All prices" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="paper-surface">
                   <SelectItem value="all">All prices</SelectItem>
                   <SelectItem value="under100">{getPriceRangeLabel("under100")}</SelectItem>
                   <SelectItem value="100to500">{getPriceRangeLabel("100to500")}</SelectItem>
@@ -283,7 +281,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                 <SelectTrigger className="w-[100px]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="paper-surface">
                   {currencies.map((currency) => (
                     <SelectItem key={currency} value={currency}>
                       {currency}
@@ -305,7 +303,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                 <Plane className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="All trips" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="paper-surface">
                 <SelectItem value="all">All trips</SelectItem>
                 <SelectItem value="oneway">One-way</SelectItem>
                 <SelectItem value="roundtrip">Round-trip</SelectItem>
@@ -324,7 +322,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                 <ArrowUpDown className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="paper-surface">
                 <SelectItem value="date">Date</SelectItem>
                 <SelectItem value="price">Price</SelectItem>
                 <SelectItem value="airline">Airline</SelectItem>
@@ -343,7 +341,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                 <ArrowDownUp className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="Sort order" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="paper-surface">
                 <SelectItem value="desc">Descending</SelectItem>
                 <SelectItem value="asc">Ascending</SelectItem>
               </SelectContent>

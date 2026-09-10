@@ -14,6 +14,15 @@ export function createSupabaseServer() {
         throw new Error('Missing Supabase environment variables')
     }
 
+    // A malformed URL (e.g. a truncated SUPABASE_URL) otherwise fails silently at
+    // request time, which reads downstream as "no data" rather than "misconfigured".
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(supabaseUrl.replace(/\/+$/, ''))) {
+        throw new Error(
+            `Invalid Supabase URL: "${supabaseUrl}". Expected https://<project-ref>.supabase.co ` +
+            `(check SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL in .env.local).`
+        )
+    }
+
     return createClient(supabaseUrl, supabaseServiceKey)
 }
 
@@ -32,11 +41,18 @@ export async function resolveSupabaseUserId(): Promise<string | null> {
     if (!email) return null
 
     const supabase = createSupabaseServer()
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
         .from('profiles')
         .select('id')
         .eq('email', email)
-        .single()
+        .maybeSingle()
+
+    // Only "no such profile" may resolve to null. A failed query (bad URL, network,
+    // bad key) must not be swallowed: callers read null as "not signed in", which
+    // sends an authenticated user back to /auth and straight into a redirect loop.
+    if (error) {
+        throw new Error(`Failed to resolve Supabase profile for ${email}: ${error.message}`)
+    }
 
     return profile?.id ?? null
 }

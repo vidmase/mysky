@@ -1,0 +1,208 @@
+/* ============================================================
+   PAPER STOCK — shared design tokens for the print-aesthetic
+   surfaces (landing page, flight logbook).
+
+   Adding `paper-stock` to a container does two things:
+     1. exposes the palette + type stack as --paper/--ink/etc.
+     2. remaps the app's shadcn HSL tokens to paper values, so
+        Buttons, Selects, Badges and Inputs rendered inside
+        adopt the aesthetic without being rewritten.
+
+   Radix portals (dialogs, dropdown menus) mount on <body> and
+   therefore keep the app's dark theme by design.
+   ============================================================ */
+
+.paper-stock,
+.paper-surface {
+  /* ---- palette ---- */
+  --paper: #f2ece1;
+  --paper-2: #e8dfcd;
+  --paper-3: #ded2ba;
+  --ink: #17130e;
+  --ink-2: #5b5142;
+  --ink-3: #8c8071;
+  --vermillion: #ce3b1e;
+  --vermillion-dk: #a32c14;
+  --navy: #0e2033;
+  --brass: #c9942f;
+  --jade: #2f6b53;
+
+  --rule: rgba(23, 19, 14, 0.16);
+  --rule-strong: rgba(23, 19, 14, 0.38);
+
+  /* ---- type ---- */
+  --display: var(--font-display), "Bodoni MT", Didot, "Times New Roman", serif;
+  --body: var(--font-body), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --code: var(--font-code), ui-monospace, "SF Mono", Consolas, monospace;
+
+  /* ---- shadcn token remap (HSL triplets) ---- */
+  --background: 39 39% 92%;
+  --foreground: 33 24% 7%;
+  --card: 39 42% 95%;
+  --card-foreground: 33 24% 7%;
+  --popover: 39 42% 95%;
+  --popover-foreground: 33 24% 7%;
+  --primary: 10 75% 46%;
+  --primary-foreground: 39 45% 96%;
+  --secondary: 40 37% 86%;
+  --secondary-foreground: 33 24% 7%;
+  --muted: 40 30% 88%;
+  --muted-foreground: 33 12% 42%;
+  --accent: 40 37% 86%;
+  --accent-foreground: 33 24% 7%;
+  --destructive: 10 75% 42%;
+  --destructive-foreground: 39 45% 96%;
+  --border: 35 18% 74%;
+  --input: 35 18% 74%;
+  --ring: 10 75% 46%;
+
+  /* app-specific accents used by shared components */
+  --color-flight: 10 75% 46%;
+  --color-airport: 210 45% 24%;
+  --color-airline: 39 62% 42%;
+  --color-stats: 158 39% 30%;
+
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Only the page wrapper takes a stacking context — portalled surfaces are
+   positioned by Radix (`fixed` for dialogs) and must keep their own. */
+.paper-stock {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Radix mounts dropdowns, selects and dialogs on <body>, outside the page's
+   `paper-stock` wrapper, so they would otherwise keep the app's dark theme.
+   Add `paper-surface` to that portalled content to carry the palette across —
+   it is the same token block minus the page-level grain, which is fixed to the
+   viewport and would tint the whole screen once per open portal. */
+.paper-surface {
+  border-radius: 0;
+}
+
+.paper-surface :is(button, input, [role="option"], [role="menuitem"]) {
+  border-radius: 0;
+}
+
+/* paper grain */
+.paper-stock::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.38'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   MASTHEAD — shared by <PaperNav />, so every paper page carries
+   the same nav as the landing poster.
+   ============================================================ */
+.paper-nav {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem 0 0.75rem;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.paper-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.paper-brandmark {
+  font-family: var(--display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.paper-brandmark em {
+  font-style: italic;
+  color: var(--vermillion);
+}
+
+.paper-navlinks {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.paper-navlink {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.25s, border-color 0.25s;
+}
+
+.paper-navlink:hover {
+  color: var(--vermillion);
+  border-bottom-color: var(--vermillion);
+}
+
+/* the page you are on */
+.paper-navlink-active {
+  color: var(--ink);
+  border-bottom-color: var(--vermillion);
+}
+
+.paper-navcta {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  text-decoration: none;
+  padding: 0.55rem 0.9rem;
+  transition: background 0.25s, transform 0.25s;
+}
+
+.paper-navcta:hover {
+  background: var(--vermillion);
+  transform: translateY(-1px);
+}
+
+/* the app's user menu, shrunk to fit the hairline nav */
+.paper-navuser {
+  display: flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
+@media (max-width: 1000px) {
+  .paper-navlinks .paper-navlink {
+    display: none;
+  }
+}
+
+/* The all-caps letterpress micro label, shared across surfaces. */
+.paper-tag {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}

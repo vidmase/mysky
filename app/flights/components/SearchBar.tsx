@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { X, Search as SearchIcon } from "lucide-react"
 import { parse } from "date-fns"
 import { useDebounce } from "@/hooks/use-debounce"
+import s from "@/app/flights/flights.module.css"
 
 export type SearchBarProps = {
   setSearchTerm: (v: string) => void
@@ -70,21 +69,22 @@ export function SearchBar({ setSearchTerm, setDateRange }: SearchBarProps) {
   }
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Type a reservation number or a date. Results update automatically"
-            className="pl-9"
-            aria-label="Search by reservation number or date"
-          />
-          <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        </div>
-        <Button variant="ghost" onClick={clearAll} title="Clear" aria-label="Clear search" size="icon">
-          <X className="h-4 w-4" />
-        </Button>
+    <div className={s.filingHead}>
+      <div className={s.search}>
+        <SearchIcon className={s.searchIcon} />
+        <input
+          className={s.searchInput}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="A reservation number, an airport, a date — the page filters as you type"
+          aria-label="Search by reservation number or date"
+        />
+        {value && (
+          <button type="button" className={s.searchClear} onClick={clearAll} title="Clear" aria-label="Clear search">
+            Clear
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   )

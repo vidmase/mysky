@@ -599,7 +599,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="text-center md:text-left space-y-2">
                 <div className="text-5xl font-bold tracking-tight text-flight">
-                  {flight.departure_iata || flight.departure_airport.substring(0, 3)}
+                  {(flight.departure_iata && flight.departure_iata !== "None") ? flight.departure_iata : flight.departure_airport.substring(0, 3).toUpperCase()}
                 </div>
                 <div className="space-y-1">
                   <div className="text-sm font-medium">{flight.departure_airport}</div>
@@ -664,7 +664,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
               <div className="text-center md:text-right space-y-2">
                 <div className="text-5xl font-bold tracking-tight text-airport">
-                  {flight.arrival_iata || flight.arrival_airport.substring(0, 3)}
+                  {(flight.arrival_iata && flight.arrival_iata !== "None") ? flight.arrival_iata : flight.arrival_airport.substring(0, 3).toUpperCase()}
                 </div>
                 <div className="space-y-1">
                   <div className="text-sm font-medium">
