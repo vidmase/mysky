@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import {
+  AlertTriangle,
   ArrowLeftRight,
   ChevronDown,
   ExternalLink,
@@ -34,16 +36,17 @@ import {
   Plane,
   Plus,
   Search,
+  SlidersHorizontal,
   Users,
 } from "lucide-react"
 import { useNotification } from "@/contexts/notification-context"
 import type {
+  BackendStatus,
   FlightOffer,
   LiveSearchResponse,
   SeatType,
   Segment,
   SortKey,
-  StopsFilter,
   TripType,
 } from "./types"
 import {
@@ -101,6 +104,13 @@ export function LiveSearchDrawer({
   const [children, setChildren] = useState(0)
   const [infantsInSeat, setInfantsInSeat] = useState(0)
   const [infantsOnLap, setInfantsOnLap] = useState(0)
+  const [maxStops, setMaxStops] = useState("any")
+  const [maxPrice, setMaxPrice] = useState("")
+  const [carryOnBags, setCarryOnBags] = useState(0)
+  const [checkedBags, setCheckedBags] = useState(0)
+  const [excludeBasicEconomy, setExcludeBasicEconomy] = useState(false)
+  const [hideSelfTransfer, setHideSelfTransfer] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -112,8 +122,9 @@ export function LiveSearchDrawer({
   const [searched, setSearched] = useState(false)
 
   const [sortBy, setSortBy] = useState<SortKey>("best")
-  const [stopsFilter, setStopsFilter] = useState<StopsFilter>("any")
   const [airlineFilter, setAirlineFilter] = useState("all")
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>("unknown")
+  const [resultNotice, setResultNotice] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
@@ -131,10 +142,28 @@ export function LiveSearchDrawer({
     setGoogleUrl(null)
     setSearched(false)
     setExpanded(null)
-    setStopsFilter("any")
     setAirlineFilter("all")
     setSortBy("best")
+    setResultNotice(null)
   }, [open, initialFrom, initialTo, initialDate])
+
+  // Probe the scraper backend on open: it runs behind a tunnel that is often
+  // down, and a 503 at search time is otherwise indistinguishable from a bug.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setBackendStatus("unknown")
+    fetch("/api/live-search/health", { cache: "no-store" })
+      .then((res) => {
+        if (!cancelled) setBackendStatus(res.ok ? "online" : "offline")
+      })
+      .catch(() => {
+        if (!cancelled) setBackendStatus("offline")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   // Drop any in-flight search when the drawer closes
   useEffect(() => {
@@ -186,6 +215,7 @@ export function LiveSearchDrawer({
         legs.push({ date: returnDate, from_airport: toCode, to_airport: fromCode })
       }
 
+      const priceCap = Number(maxPrice)
       const body = {
         trip,
         seat,
@@ -198,6 +228,12 @@ export function LiveSearchDrawer({
         currency,
         language,
         flights: legs,
+        max_stops: maxStops === "any" ? null : Number(maxStops),
+        max_price: maxPrice && Number.isFinite(priceCap) && priceCap > 0 ? Math.round(priceCap) : null,
+        carry_on_bags: Math.max(0, carryOnBags),
+        checked_bags: Math.max(0, checkedBags),
+        exclude_basic_economy: excludeBasicEconomy,
+        hide_separate_and_self_transfer: hideSelfTransfer,
       }
 
       const res = await fetch("/api/live-search", {
@@ -213,6 +249,9 @@ export function LiveSearchDrawer({
       }
 
       if (!res.ok) {
+        if ([502, 503, 504].includes(data.upstream_status ?? res.status)) {
+          setBackendStatus("offline")
+        }
         throw new Error(data.message || data.error || `Search failed (${res.status})`)
       }
 
@@ -220,6 +259,15 @@ export function LiveSearchDrawer({
       setGoogleUrl(data.google_flights_url || null)
       setResultCurrency(data.currency || currency)
       setResultTrip(trip)
+      setBackendStatus("online")
+
+      // The backend serves fixture data when a live scrape fails, so anything
+      // other than "success" must not be presented as a real price.
+      setResultNotice(
+        data.current_status === "success"
+          ? null
+          : data.message || "These are sample prices, not a live Google Flights result."
+      )
 
       if (data.current_status === "empty" || !data.flights?.length) {
         setError(data.message || "No flights found for this route and date.")
@@ -311,12 +359,9 @@ export function LiveSearchDrawer({
   }, [results])
 
   const visibleResults = useMemo(() => {
-    const filtered = results.filter((offer) => {
-      if (stopsFilter === "nonstop" && (offer.stops ?? 0) !== 0) return false
-      if (stopsFilter === "one-stop" && (offer.stops ?? 0) > 1) return false
-      if (airlineFilter !== "all" && !(offer.airlines || []).includes(airlineFilter)) return false
-      return true
-    })
+    const filtered = results.filter(
+      (offer) => airlineFilter === "all" || (offer.airlines || []).includes(airlineFilter)
+    )
 
     const departureMinutes = (offer: FlightOffer) => {
       const t = offer.flights?.[0]?.departure?.time
@@ -329,7 +374,7 @@ export function LiveSearchDrawer({
     if (sortBy === "duration") sorted.sort((a, b) => a.duration_minutes - b.duration_minutes)
     if (sortBy === "departure") sorted.sort((a, b) => departureMinutes(a) - departureMinutes(b))
     return sorted
-  }, [results, stopsFilter, airlineFilter, sortBy])
+  }, [results, airlineFilter, sortBy])
 
   const cheapest = useMemo(
     () => visibleResults.reduce((min, o) => (min === null || o.price < min ? o.price : min), null as number | null),
@@ -395,6 +440,16 @@ export function LiveSearchDrawer({
             Search Google Flights live, then add an offer as a planned upcoming trip.
           </SheetDescription>
         </SheetHeader>
+
+        {backendStatus === "offline" && (
+          <div className="flex items-start gap-2 border-b border-red-500/30 bg-red-500/10 px-6 py-3 text-xs text-red-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              The flight scraper backend is not responding, so live searches will fail. It runs
+              behind a tunnel that has to be up for prices to load.
+            </span>
+          </div>
+        )}
 
         <div className="space-y-4 border-b border-zinc-800 px-6 py-4">
           <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900 p-0.5">
@@ -517,6 +572,107 @@ export function LiveSearchDrawer({
             </div>
           </div>
 
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filters
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-zinc-400">Max stops</Label>
+                    <Select value={maxStops} onValueChange={setMaxStops}>
+                      <SelectTrigger className="h-9 border-zinc-700 bg-zinc-900 text-zinc-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="0">Direct only</SelectItem>
+                        <SelectItem value="1">Up to 1 stop</SelectItem>
+                        <SelectItem value="2">Up to 2 stops</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="live-max-price" className="text-xs text-zinc-400">
+                      Max price
+                    </Label>
+                    <Input
+                      id="live-max-price"
+                      type="number"
+                      min={0}
+                      placeholder="Any"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      className="h-9 border-zinc-700 bg-zinc-900 text-zinc-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="live-carry-on" className="text-xs text-zinc-400">
+                      Carry-on bags
+                    </Label>
+                    <Input
+                      id="live-carry-on"
+                      type="number"
+                      min={0}
+                      max={9}
+                      value={carryOnBags}
+                      onChange={(e) => setCarryOnBags(Math.max(0, Number(e.target.value) || 0))}
+                      className="h-9 border-zinc-700 bg-zinc-900 text-zinc-100"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="live-checked" className="text-xs text-zinc-400">
+                      Checked bags
+                    </Label>
+                    <Input
+                      id="live-checked"
+                      type="number"
+                      min={0}
+                      max={9}
+                      value={checkedBags}
+                      onChange={(e) => setCheckedBags(Math.max(0, Number(e.target.value) || 0))}
+                      className="h-9 border-zinc-700 bg-zinc-900 text-zinc-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="live-no-basic" className="text-xs text-zinc-400">
+                    Exclude basic economy
+                  </Label>
+                  <Switch
+                    id="live-no-basic"
+                    checked={excludeBasicEconomy}
+                    onCheckedChange={setExcludeBasicEconomy}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="live-no-self-transfer" className="text-xs text-zinc-400">
+                    Hide self-transfer itineraries
+                  </Label>
+                  <Switch
+                    id="live-no-self-transfer"
+                    checked={hideSelfTransfer}
+                    onCheckedChange={setHideSelfTransfer}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-end gap-3">
             <div className="flex-1 space-y-1.5">
               <Label className="text-zinc-300">Passengers</Label>
@@ -600,17 +756,6 @@ export function LiveSearchDrawer({
               </SelectContent>
             </Select>
 
-            <Select value={stopsFilter} onValueChange={(v) => setStopsFilter(v as StopsFilter)}>
-              <SelectTrigger className="h-8 w-[120px] border-zinc-700 bg-zinc-900 text-xs text-zinc-100">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any stops</SelectItem>
-                <SelectItem value="nonstop">Direct only</SelectItem>
-                <SelectItem value="one-stop">Up to 1 stop</SelectItem>
-              </SelectContent>
-            </Select>
-
             {airlineOptions.length > 1 && (
               <Select value={airlineFilter} onValueChange={setAirlineFilter}>
                 <SelectTrigger className="h-8 w-[150px] border-zinc-700 bg-zinc-900 text-xs text-zinc-100">
@@ -638,6 +783,13 @@ export function LiveSearchDrawer({
           {error && (
             <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
               {error}
+            </div>
+          )}
+
+          {resultNotice && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{resultNotice}</span>
             </div>
           )}
 
