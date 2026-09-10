@@ -20,6 +20,7 @@ import {
   Save,
   Edit2,
   X,
+  RotateCcw,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Image from "next/image"
@@ -32,6 +33,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
+import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { DateTime } from 'luxon'
@@ -295,6 +298,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
     aircraftRegistration: string | null
   } | null>(null)
   const [isEditingNotes, setIsEditingNotes] = useState(false)
+  const [liveSearchOpen, setLiveSearchOpen] = useState(false)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -518,7 +522,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
@@ -538,6 +542,13 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               </p>
             </div>
           </div>
+          <Button
+            className="gap-2 bg-sky-600 text-white hover:bg-sky-500"
+            onClick={() => setLiveSearchOpen(true)}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Fly it again
+          </Button>
         </div>
 
         <div
@@ -963,6 +974,14 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             </Card>
           </TabsContent>
         </Tabs>
+      <LiveSearchDrawer
+        open={liveSearchOpen}
+        onOpenChange={setLiveSearchOpen}
+        initialFrom={(flight.departure_iata || flight.departure_airport || "").trim()}
+        initialTo={(flight.arrival_iata || flight.arrival_airport || "").trim()}
+        initialDate={defaultSearchDate()}
+      />
+
       </div>
     </div>
   )

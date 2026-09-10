@@ -9,7 +9,7 @@ import { enUS } from "date-fns/locale"
 import { useNotification } from "@/contexts/notification-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown, Search, RotateCcw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -24,6 +24,8 @@ import { ImportProgressIndicator } from "@/app/flights/components/ImportProgress
 import { PreviewProgressIndicator } from "@/app/flights/components/PreviewProgressIndicator"
 import { ModernSpinner } from "@/app/flights/components/ModernSpinner"
 import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
+import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
+import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import { format } from "date-fns"
 import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { SearchBar } from "@/app/flights/components/SearchBar"
@@ -94,6 +96,24 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
   const [isFlightradar24ExportDialogOpen, setIsFlightradar24ExportDialogOpen] = useState(false)
+  const [liveSearchOpen, setLiveSearchOpen] = useState(false)
+  const [liveSearchInitial, setLiveSearchInitial] = useState<{ from?: string; to?: string; date?: string }>({})
+
+  const openLiveSearch = (opts?: { from?: string; to?: string; date?: string }) => {
+    setLiveSearchInitial({
+      from: opts?.from || "",
+      to: opts?.to || "",
+      date: opts?.date || defaultSearchDate(),
+    })
+    setLiveSearchOpen(true)
+  }
+
+  const openFlyItAgain = (flight: Flight) => {
+    const from = (flight.departure_iata || flight.departure_airport || "").trim()
+    const to = (flight.arrival_iata || flight.arrival_airport || "").trim()
+    openLiveSearch({ from, to, date: defaultSearchDate() })
+  }
+
 
   // Enhanced loading states
   const [importProgress, setImportProgress] = useState<{
@@ -540,8 +560,15 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
               number. Filed legs are printed below in reverse order of departure.
             </p>
           </div>
-
           <div className={`${s.mastheadActions} ${s.rise}`} style={{ animationDelay: "280ms" }}>
+            <button
+              type="button"
+              className={s.btnOutline}
+              onClick={() => openLiveSearch()}
+            >
+              <Search className="h-3.5 w-3.5" />
+              Search flights
+            </button>
             <a href="/add-flight" className={s.btnPrimary}>
               File a flight
               <Arrow />
@@ -655,6 +682,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
               onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
               onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
               onDeleteRequest={(f) => setFlightToDelete(f)}
+              onFlyAgain={openFlyItAgain}
               isUpcoming={isUpcoming}
             />
           ))}
@@ -666,6 +694,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
           flights={currentFlights}
           onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
           onDeleteRequest={(f) => setFlightToDelete(f)}
+          onFlyAgain={openFlyItAgain}
           onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
         />
 
@@ -1025,6 +1054,15 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       )}
 
       {/* Import Progress Indicator */}
+
+      <LiveSearchDrawer
+        open={liveSearchOpen}
+        onOpenChange={setLiveSearchOpen}
+        initialFrom={liveSearchInitial.from}
+        initialTo={liveSearchInitial.to}
+        initialDate={liveSearchInitial.date}
+        onPlannedAdded={async () => { await originalRefetch() }}
+      />
       <ImportProgressIndicator
         progress={importProgress}
         isVisible={isImportingSelected}
@@ -1038,10 +1076,11 @@ interface FlightCardProps {
   onRowClick: (flight: Flight) => void;
   onEdit: (flight: Flight) => void;
   onDeleteRequest: (flight: Flight) => void;
+  onFlyAgain: (flight: Flight) => void;
   isUpcoming: (date: string) => boolean;
 }
 
-const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, isUpcoming }) => (
+const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, onFlyAgain, isUpcoming }) => (
   <article className={s.card} onClick={() => onRowClick(flight)}>
     <div className={s.cardMain}>
       <div className={s.cardHead}>
@@ -1099,6 +1138,17 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onD
       <div className={s.cardFoot}>
         <span className={s.ref}>{flight.reservation_number}</span>
         <div className={s.actions}>
+          {onFlyAgain && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              aria-label="Fly it again"
+              title="Fly it again"
+              onClick={(e) => { e.stopPropagation(); onFlyAgain(flight) }}
+            >
+              <RotateCcw />
+            </button>
+          )}
           <button
             type="button"
             className={s.iconBtn}

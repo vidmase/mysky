@@ -4,7 +4,7 @@ import Image from "next/image"
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
-import { ArrowRight, Pencil, Trash2, Building, Loader2 } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Building, Loader2, RotateCcw } from "lucide-react"
 import { calculateDuration, formatTimeToHHMM, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { DateTime } from "luxon"
 import { AIRPORT_TIMEZONES } from "@/lib/airport-timezones"
@@ -16,6 +16,7 @@ export interface FlightsTableProps {
   flights: Flight[]
   onEdit: (flight: Flight) => void
   onDeleteRequest: (flight: Flight) => void
+  onFlyAgain?: (flight: Flight) => void
   onRowClick: (flight: Flight) => void
 }
 
@@ -158,7 +159,7 @@ function iataOf(iata: string | null | undefined, airportName: string) {
   return iata && iata !== "None" ? iata : airportName.slice(0, 3).toUpperCase()
 }
 
-export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onRowClick }: FlightsTableProps) {
+export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onFlyAgain, onRowClick }: FlightsTableProps) {
   return (
     <div className={s.tableWrap}>
       <table className={s.table}>
@@ -313,6 +314,17 @@ export function FlightsTable({ loading, flights, onEdit, onDeleteRequest, onRowC
 
                 <td>
                   <div className={s.actions}>
+                    {onFlyAgain && (
+                      <button
+                        type="button"
+                        className={s.iconBtn}
+                        aria-label="Fly it again"
+                        title="Fly it again"
+                        onClick={(e) => { e.stopPropagation(); onFlyAgain(flight) }}
+                      >
+                        <RotateCcw />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={s.iconBtn}
