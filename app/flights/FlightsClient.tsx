@@ -9,7 +9,7 @@ import { enUS } from "date-fns/locale"
 import { useNotification } from "@/contexts/notification-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown, Search, RotateCcw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -24,6 +24,8 @@ import { ImportProgressIndicator } from "@/app/flights/components/ImportProgress
 import { PreviewProgressIndicator } from "@/app/flights/components/PreviewProgressIndicator"
 import { ModernSpinner } from "@/app/flights/components/ModernSpinner"
 import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
+import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
+import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import { format } from "date-fns"
 import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
 import { SearchBar } from "@/app/flights/components/SearchBar"
@@ -82,6 +84,24 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
   const [isFlightradar24ExportDialogOpen, setIsFlightradar24ExportDialogOpen] = useState(false)
+  const [liveSearchOpen, setLiveSearchOpen] = useState(false)
+  const [liveSearchInitial, setLiveSearchInitial] = useState<{ from?: string; to?: string; date?: string }>({})
+
+  const openLiveSearch = (opts?: { from?: string; to?: string; date?: string }) => {
+    setLiveSearchInitial({
+      from: opts?.from || "",
+      to: opts?.to || "",
+      date: opts?.date || defaultSearchDate(),
+    })
+    setLiveSearchOpen(true)
+  }
+
+  const openFlyItAgain = (flight: Flight) => {
+    const from = (flight.departure_iata || flight.departure_airport || "").trim()
+    const to = (flight.arrival_iata || flight.arrival_airport || "").trim()
+    openLiveSearch({ from, to, date: defaultSearchDate() })
+  }
+
 
   // Enhanced loading states
   const [importProgress, setImportProgress] = useState<{
@@ -518,7 +538,16 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
             </h1>
             <p className="text-muted-foreground">Manage, track, and analyze your flight history.</p>
           </div>
-          <DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              className="gap-2 bg-sky-600 text-white hover:bg-sky-500"
+              onClick={() => openLiveSearch()}
+            >
+              <Search className="h-4 w-4" />
+              Search flights
+            </Button>
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Settings className="h-4 w-4" />
@@ -559,7 +588,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 Enhanced Gmail Import ✨
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -614,6 +644,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
             onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
             onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
             onDeleteRequest={(f) => setFlightToDelete(f)}
+            onFlyAgain={openFlyItAgain}
             isUpcoming={isUpcoming}
           />
         ))}
@@ -625,6 +656,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         flights={currentFlights}
         onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
         onDeleteRequest={(f) => setFlightToDelete(f)}
+        onFlyAgain={openFlyItAgain}
         onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
       />
 
@@ -975,6 +1007,15 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
       )}
 
       {/* Import Progress Indicator */}
+
+      <LiveSearchDrawer
+        open={liveSearchOpen}
+        onOpenChange={setLiveSearchOpen}
+        initialFrom={liveSearchInitial.from}
+        initialTo={liveSearchInitial.to}
+        initialDate={liveSearchInitial.date}
+        onPlannedAdded={async () => { await originalRefetch() }}
+      />
       <ImportProgressIndicator
         progress={importProgress}
         isVisible={isImportingSelected}
@@ -1001,10 +1042,11 @@ interface FlightCardProps {
   onRowClick: (flight: Flight) => void;
   onEdit: (flight: Flight) => void;
   onDeleteRequest: (flight: Flight) => void;
+  onFlyAgain: (flight: Flight) => void;
   isUpcoming: (date: string) => boolean;
 }
 
-const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, isUpcoming }) => (
+const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, onFlyAgain, isUpcoming }) => (
   <div
     className="relative rounded-xl border border-zinc-800 bg-zinc-950/30 backdrop-blur-sm p-4 transition-all duration-300 hover:border-zinc-700 cursor-pointer"
     onClick={() => onRowClick(flight)}
@@ -1058,6 +1100,7 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onD
     <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
       <p className="text-xs text-zinc-500">Confirmation: {flight.reservation_number}</p>
       <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" title="Fly it again" className="h-8 w-8 rounded-full bg-zinc-800/50 hover:bg-sky-500/20 text-zinc-300 hover:text-sky-300" onClick={(e) => { e.stopPropagation(); onFlyAgain(flight); }}><RotateCcw className="h-4 w-4" /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 hover:text-white" onClick={(e) => { e.stopPropagation(); onEdit(flight); }}><Pencil className="h-4 w-4" /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-zinc-800/50 hover:bg-destructive/10 text-zinc-300 hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight); }}><Trash2 className="h-4 w-4" /></Button>
       </div>
