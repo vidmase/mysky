@@ -18,6 +18,7 @@ import {
   Area,
 } from "recharts"
 import { PaperNav } from "@/app/components/paper-nav"
+import { allAirports } from "@/lib/airports"
 import s from "./stats.module.css"
 
 type Flight = {
@@ -37,6 +38,51 @@ type Flight = {
   departure_time?: string | null
   arrival_time?: string | null
   total_receipt?: string | null
+  calculated_duration?: string | null
+  flight_duration?: string | null
+}
+
+const AIRPORT_BY_IATA = new Map(
+  allAirports.map((a) => [a.iata.toUpperCase(), a])
+)
+
+function countryForIata(iata?: string | null, fallback?: string | null): string | null {
+  const code = (iata || "").toUpperCase().trim()
+  if (fallback && fallback.trim() && fallback.trim().toLowerCase() !== "none") {
+    return fallback.trim()
+  }
+  if (!code) return null
+  return AIRPORT_BY_IATA.get(code)?.country || null
+}
+
+function parseDurationHours(raw?: string | null): number | null {
+  if (!raw) return null
+  const s = String(raw).trim()
+  const hm = s.match(/(\d+)\s*h(?:ours?)?\s*(\d+)?\s*m?/i)
+  if (hm) {
+    const h = Number(hm[1]) || 0
+    const m = Number(hm[2]) || 0
+    return h + m / 60
+  }
+  const mins = s.match(/^(\d+)\s*m(?:in(?:utes?)?)?$/i)
+  if (mins) return (Number(mins[1]) || 0) / 60
+  const colon = s.match(/^(\d+):(\d{2})$/)
+  if (colon) return (Number(colon[1]) || 0) + (Number(colon[2]) || 0) / 60
+  return null
+}
+
+function detectMoneyPrefix(receipts: Array<string | null | undefined>): string {
+  let gbp = 0, eur = 0, usd = 0
+  for (const r of receipts) {
+    if (!r) continue
+    if (r.includes("£") || /gbp/i.test(r)) gbp++
+    else if (r.includes("€") || /eur/i.test(r)) eur++
+    else if (r.includes("$") || /usd/i.test(r)) usd++
+  }
+  if (gbp >= eur && gbp >= usd && gbp > 0) return "£"
+  if (eur >= usd && eur > 0) return "€"
+  if (usd > 0) return "$"
+  return "£" // MySky default
 }
 
 /* ------------------------------------------------------------------
@@ -174,24 +220,36 @@ export default function StatsPage() {
       if (Array.isArray(vidmaFlights)) {
         console.log(`[Stats] Loaded ${vidmaFlights.length} flights`)
         // Transform the data to ensure all fields are properly typed
-        const transformedFlights: Flight[] = vidmaFlights.map((f: any) => ({
-          id: f.id,
-          departure_country: f.departure_country || null,
-          arrival_country: f.arrival_country || null,
-          departure_date: f.departure_date || null,
-          airline: f.airline || null,
-          departure_iata: f.departure_iata || null,
-          arrival_iata: f.arrival_iata || null,
-          departure_airport: f.departure_airport || null,
-          arrival_airport: f.arrival_airport || null,
-          departure_latitude: f.departure_latitude ? Number(f.departure_latitude) : null,
-          departure_longitude: f.departure_longitude ? Number(f.departure_longitude) : null,
-          arrival_latitude: f.arrival_latitude ? Number(f.arrival_latitude) : null,
-          arrival_longitude: f.arrival_longitude ? Number(f.arrival_longitude) : null,
-          departure_time: f.departure_time || null,
-          arrival_time: f.arrival_time || null,
-          total_receipt: f.total_receipt || null,
-        }))
+        const transformedFlights: Flight[] = vidmaFlights.map((f: any) => {
+          const depIata = (f.departure_iata || "").toUpperCase() || null
+          const arrIata = (f.arrival_iata || "").toUpperCase() || null
+          const depMeta = depIata ? AIRPORT_BY_IATA.get(depIata) : undefined
+          const arrMeta = arrIata ? AIRPORT_BY_IATA.get(arrIata) : undefined
+          const depLat = f.departure_latitude != null ? Number(f.departure_latitude) : (depMeta?.coordinates?.[1] ?? null)
+          const depLon = f.departure_longitude != null ? Number(f.departure_longitude) : (depMeta?.coordinates?.[0] ?? null)
+          const arrLat = f.arrival_latitude != null ? Number(f.arrival_latitude) : (arrMeta?.coordinates?.[1] ?? null)
+          const arrLon = f.arrival_longitude != null ? Number(f.arrival_longitude) : (arrMeta?.coordinates?.[0] ?? null)
+          return {
+            id: f.id,
+            departure_country: countryForIata(depIata, f.departure_country),
+            arrival_country: countryForIata(arrIata, f.arrival_country),
+            departure_date: f.departure_date || null,
+            airline: f.airline || null,
+            departure_iata: depIata,
+            arrival_iata: arrIata,
+            departure_airport: f.departure_airport || depMeta?.name || null,
+            arrival_airport: f.arrival_airport || arrMeta?.name || null,
+            departure_latitude: depLat != null && !Number.isNaN(depLat) ? depLat : null,
+            departure_longitude: depLon != null && !Number.isNaN(depLon) ? depLon : null,
+            arrival_latitude: arrLat != null && !Number.isNaN(arrLat) ? arrLat : null,
+            arrival_longitude: arrLon != null && !Number.isNaN(arrLon) ? arrLon : null,
+            departure_time: f.departure_time || null,
+            arrival_time: f.arrival_time || null,
+            total_receipt: f.total_receipt || null,
+            calculated_duration: f.calculated_duration || null,
+            flight_duration: f.flight_duration || null,
+          }
+        })
         setFlights(transformedFlights)
         console.log(`[Stats] Transformed ${transformedFlights.length} flights`)
       } else {
@@ -435,10 +493,17 @@ export default function StatsPage() {
       const depLon = num(f.departure_longitude)
       const arrLat = num(f.arrival_latitude)
       const arrLon = num(f.arrival_longitude)
+      let dist: number | null = null
       if (depLat != null && depLon != null && arrLat != null && arrLon != null &&
         !Number.isNaN(depLat) && !Number.isNaN(depLon) && !Number.isNaN(arrLat) && !Number.isNaN(arrLon)) {
-        const dist = haversine(depLat, depLon, arrLat, arrLon)
+        dist = haversine(depLat, depLon, arrLat, arrLon)
         totalKm += dist
+      }
+      const recordedHours =
+        parseDurationHours(f.flight_duration) ?? parseDurationHours(f.calculated_duration)
+      if (recordedHours != null) {
+        totalHours += recordedHours
+      } else if (dist != null) {
         totalHours += deriveDurationHours(dist)
       }
     }
@@ -484,8 +549,13 @@ export default function StatsPage() {
     return `${h}h ago`
   }
 
+  const moneyPrefix = useMemo(
+    () => detectMoneyPrefix(flights.map((f) => f.total_receipt)),
+    [flights]
+  )
+
   const money = (v: number) =>
-    `€${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    `${moneyPrefix}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   // Every figure hands its hover state to the same printed card.
   const LegTooltip = ({ active, payload, label }: any) => {
@@ -536,8 +606,8 @@ export default function StatsPage() {
             </h1>
             <p className={`${s.lede} ${s.rise}`} style={{ animationDelay: '200ms' }}>
               {viewStats?.yearsFlying || 0} years of flying, {flights.length} legs filed.
-              Distance and hours are derived from the great-circle distance between
-              the airports on record.
+              Distance uses great-circle airport coordinates. Hours prefer recorded
+              flight duration when available, otherwise a distance-based estimate.
             </p>
           </div>
 
