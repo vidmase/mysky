@@ -37,6 +37,8 @@ import {
   shiftDate,
 } from "./mapOfferToFlight"
 import { AirportCodeField } from "./AirportCodeField"
+import { PriceMonthPanel } from "./PriceMonthPanel"
+import { setCachedDayPrice } from "./priceCache"
 
 type TripType = "one-way" | "round-trip"
 type SortMode = "best" | "cheapest" | "fastest"
@@ -103,6 +105,7 @@ export function LiveSearchDrawer({
   const [addingKey, setAddingKey] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [dayPrices, setDayPrices] = useState<DayPrice[]>([])
+  const [showMonthCalendar, setShowMonthCalendar] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -252,6 +255,7 @@ export function LiveSearchDrawer({
             return
           }
           const cheapest = Math.min(...data.flights.map((f) => f.price))
+          setCachedDayPrice(fromCode, toCode, seat, d, cheapest, data.currency || "GBP")
           setDayPrices((prev) =>
             prev.map((x) =>
               x.date === d ? { date: d, price: cheapest, loading: false } : x
@@ -332,6 +336,26 @@ export function LiveSearchDrawer({
         setReturnResults(retFlights)
         setGoogleUrl(rtData?.google_flights_url || outData.google_flights_url || null)
         setCurrency(outData.currency || retData.currency || "GBP")
+        if (outFlights.length) {
+          setCachedDayPrice(
+            fromCode,
+            toCode,
+            seat,
+            outbound,
+            Math.min(...outFlights.map((f) => f.price)),
+            outData.currency || "GBP"
+          )
+        }
+        if (retFlights.length) {
+          setCachedDayPrice(
+            toCode,
+            fromCode,
+            seat,
+            returnDate,
+            Math.min(...retFlights.map((f) => f.price)),
+            retData.currency || "GBP"
+          )
+        }
 
         if (!outFlights.length && !retFlights.length) {
           setError(
@@ -353,6 +377,16 @@ export function LiveSearchDrawer({
         setReturnResults([])
         setGoogleUrl(data.google_flights_url || null)
         setCurrency(data.currency || "GBP")
+        if (flights.length) {
+          setCachedDayPrice(
+            fromCode,
+            toCode,
+            seat,
+            outbound,
+            Math.min(...flights.map((f) => f.price)),
+            data.currency || "GBP"
+          )
+        }
 
         if (data.current_status === "empty" || !flights.length) {
           setError(data.message || "No flights found for this route and date.")
@@ -688,6 +722,31 @@ export function LiveSearchDrawer({
                 className="border-zinc-700 bg-zinc-900 text-zinc-100"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+              onClick={() => setShowMonthCalendar((v) => !v)}
+            >
+              {showMonthCalendar ? "Hide month prices" : "Month price grid & graph"}
+            </Button>
+            {showMonthCalendar && (
+              <PriceMonthPanel
+                from={from}
+                to={to}
+                seat={seat}
+                selectedDate={date}
+                currency={currency}
+                buildOneWayBody={(d) => buildBody(d, { forFlexible: true, leg: "outbound" })}
+                onSelectDate={(d) => {
+                  setDate(d)
+                  void handleSearch(d)
+                }}
+              />
+            )}
           </div>
 
           {googleUrl && (
