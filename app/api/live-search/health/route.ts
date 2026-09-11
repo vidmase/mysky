@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 function getFlightsApiBase(): string {
-  const raw = process.env.FLIGHTS_API_URL?.trim() || 'https://gfscrape-git-main-vidmases-projects.vercel.app'
+  const raw = process.env.FLIGHTS_API_URL?.trim() || 'http://72.62.212.33:8000'
   return raw.replace(/\/+$/, '')
 }
 
@@ -11,7 +11,8 @@ function upstreamHeaders(base: string): HeadersInit {
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
-  if (base.includes('loca.lt')) {
+  // Ephemeral tunnels used for smoke tests only — do not use in production.
+  if (base.includes('loca.lt') || base.includes('cloudflare') || base.includes('trycloudflare')) {
     headers['bypass-tunnel-reminder'] = 'true'
     headers['User-Agent'] = 'Mozilla/5.0'
   }
