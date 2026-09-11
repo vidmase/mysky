@@ -38,7 +38,7 @@ export interface FlightOffer {
 }
 
 export interface LiveSearchResponse {
-  current_status: 'success' | 'mock' | 'empty' | string
+  current_status: 'success' | 'mock' | 'empty' | 'error' | string
   google_flights_url?: string | null
   currency: string
   flights: FlightOffer[]
