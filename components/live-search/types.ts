@@ -48,4 +48,13 @@ export interface LiveSearchResponse {
   }
   message?: string | null
   error?: string
+  /** Set by /api/live-search when a hop below it failed */
+  upstream_status?: number
 }
+
+export type TripType = 'one-way' | 'round-trip'
+
+export type SortKey = 'best' | 'price' | 'duration' | 'departure'
+
+/** Backend health as reported by /api/live-search/health */
+export type BackendStatus = 'unknown' | 'online' | 'offline'
