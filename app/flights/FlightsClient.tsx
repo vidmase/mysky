@@ -526,6 +526,20 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const canGoPrevious = currentPage > 1
   const canGoNext = currentPage < totalPages
 
+  /* Narrowing the list re-cuts it, and the page you were on rarely exists in the
+     new cut: filtering to an airline with one page while sitting on page three
+     used to slice past the end and report "nothing filed" for a filter that
+     matches perfectly well. Every filter change starts again at the first page. */
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, airline, dateRange, priceRange, tripType, sortBy, sortOrder])
+
+  // A page can also fall off the end without the filters moving — a deletion, or
+  // a refetch that returns fewer flights — so the current page is kept in range.
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(Math.max(1, totalPages))
+  }, [currentPage, totalPages])
+
   const goToPage = (page: number) => setCurrentPage(Math.min(Math.max(1, page), totalPages))
 
   const isUpcoming = (date: string) => {
