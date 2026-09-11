@@ -18,6 +18,7 @@ import {
   Area,
 } from "recharts"
 import { PaperNav } from "@/app/components/paper-nav"
+import { groupFlightsIntoBookings } from "@/lib/statistics/booking-spend"
 import { allAirports } from "@/lib/airports"
 import s from "./stats.module.css"
 
@@ -37,6 +38,7 @@ type Flight = {
   arrival_longitude?: number | string | null
   departure_time?: string | null
   arrival_time?: string | null
+  reservation_number?: string | null
   total_receipt?: string | null
   calculated_duration?: string | null
   flight_duration?: string | null
@@ -245,6 +247,7 @@ export default function StatsPage() {
             arrival_longitude: arrLon != null && !Number.isNaN(arrLon) ? arrLon : null,
             departure_time: f.departure_time || null,
             arrival_time: f.arrival_time || null,
+            reservation_number: f.reservation_number || null,
             total_receipt: f.total_receipt || null,
             calculated_duration: f.calculated_duration || null,
             flight_duration: f.flight_duration || null,
@@ -381,22 +384,19 @@ export default function StatsPage() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
 
+    // Spending is counted per booking reference, not per leg: a return trip repeats
+    // the same total fare on both of its rows.
+    const bookings = groupFlightsIntoBookings(flights)
+
     // Spending by year
     const spendingByYear = new Map<string, { total: number; count: number }>()
-    for (const f of flights) {
-      if (!f.departure_date || !f.total_receipt) continue
-      try {
-        const date = new Date(f.departure_date)
-        if (isNaN(date.getTime())) continue
-        const y = date.getFullYear().toString()
-        const receipt = parseFloat(String(f.total_receipt).replace(/[^0-9.-]/g, ''))
-        if (!isNaN(receipt) && receipt > 0) {
-          const existing = spendingByYear.get(y) || { total: 0, count: 0 }
-          spendingByYear.set(y, { total: existing.total + receipt, count: existing.count + 1 })
-        }
-      } catch {
-        continue
-      }
+    for (const b of bookings) {
+      if (!b.departure_date) continue
+      const date = new Date(b.departure_date)
+      if (isNaN(date.getTime())) continue
+      const y = date.getFullYear().toString()
+      const existing = spendingByYear.get(y) || { total: 0, count: 0 }
+      spendingByYear.set(y, { total: existing.total + b.total, count: existing.count + 1 })
     }
     const spendingByYearData = Array.from(spendingByYear.entries())
       .map(([year, data]) => ({ year, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
@@ -404,14 +404,11 @@ export default function StatsPage() {
 
     // Spending by airline
     const spendingByAirline = new Map<string, { total: number; count: number }>()
-    for (const f of flights) {
-      if (!f.airline || !f.total_receipt) continue
-      const receipt = parseFloat(String(f.total_receipt).replace(/[^0-9.-]/g, ''))
-      if (!isNaN(receipt) && receipt > 0) {
-        const airline = f.airline || 'Unknown'
-        const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
-        spendingByAirline.set(airline, { total: existing.total + receipt, count: existing.count + 1 })
-      }
+    for (const b of bookings) {
+      const airline = b.airline
+      if (!airline) continue
+      const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
+      spendingByAirline.set(airline, { total: existing.total + b.total, count: existing.count + 1 })
     }
     const spendingByAirlineData = Array.from(spendingByAirline.entries())
       .map(([airline, data]) => ({ airline, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
@@ -420,27 +417,20 @@ export default function StatsPage() {
 
     // Calculate total spending
     let totalSpent = 0
-    let flightsWithPrice = 0
     let minPrice = Infinity
     let maxPrice = 0
-    const prices: number[] = []
 
-    for (const f of flights) {
-      if (!f.total_receipt) continue
-      const receipt = parseFloat(String(f.total_receipt).replace(/[^0-9.-]/g, ''))
-      if (!isNaN(receipt) && receipt > 0) {
-        totalSpent += receipt
-        flightsWithPrice++
-        prices.push(receipt)
-        minPrice = Math.min(minPrice, receipt)
-        maxPrice = Math.max(maxPrice, receipt)
-      }
+    for (const b of bookings) {
+      totalSpent += b.total
+      minPrice = Math.min(minPrice, b.total)
+      maxPrice = Math.max(maxPrice, b.total)
     }
+    const bookingsWithPrice = bookings.length
 
     const spendingStats = {
       totalSpent: Math.round(totalSpent * 100) / 100,
-      flightsWithPrice,
-      avgPerFlight: flightsWithPrice > 0 ? Math.round((totalSpent / flightsWithPrice) * 100) / 100 : 0,
+      bookingsWithPrice,
+      avgPerBooking: bookingsWithPrice > 0 ? Math.round((totalSpent / bookingsWithPrice) * 100) / 100 : 0,
       minPrice: minPrice === Infinity ? 0 : Math.round(minPrice * 100) / 100,
       maxPrice: Math.round(maxPrice * 100) / 100,
       spendingByYear: spendingByYearData,
@@ -577,7 +567,7 @@ export default function StatsPage() {
         <div className={s.tipLabel}>{d.year}</div>
         <div className={s.tipValue}>{money(d.total)}</div>
         <div className={s.tipNote}>
-          {d.count} legs · {money(d.avg)} each
+          {d.count} {d.count === 1 ? 'booking' : 'bookings'} · {money(d.avg)} each
         </div>
       </div>
     )
@@ -839,20 +829,20 @@ export default function StatsPage() {
             </div>
 
             {/* ── SPENDING ────────────────────────────────── */}
-            {spend.flightsWithPrice > 0 && (
+            {spend.bookingsWithPrice > 0 && (
               <>
                 <dl className={s.money}>
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Total spent</dt>
                     <dd className={s.moneyValue}>{money(spend.totalSpent)}</dd>
                     <dd className={s.moneyNote}>
-                      across {spend.flightsWithPrice} legs with a fare on record
+                      across {spend.bookingsWithPrice} {spend.bookingsWithPrice === 1 ? 'booking' : 'bookings'} with a fare on record
                     </dd>
                   </div>
                   <div className={s.moneyCell}>
-                    <dt className={s.moneyLabel}>Average leg</dt>
-                    <dd className={s.moneyValue}>{money(spend.avgPerFlight)}</dd>
-                    <dd className={s.moneyNote}>mean of every priced leg</dd>
+                    <dt className={s.moneyLabel}>Average booking</dt>
+                    <dd className={s.moneyValue}>{money(spend.avgPerBooking)}</dd>
+                    <dd className={s.moneyNote}>mean of every priced booking</dd>
                   </div>
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Cheapest</dt>
@@ -862,7 +852,7 @@ export default function StatsPage() {
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Dearest</dt>
                     <dd className={s.moneyValue}>{money(spend.maxPrice)}</dd>
-                    <dd className={s.moneyNote}>single highest fare filed</dd>
+                    <dd className={s.moneyNote}>single highest booking filed</dd>
                   </div>
                 </dl>
 
@@ -904,7 +894,7 @@ export default function StatsPage() {
                               <span className={s.rankNo}>{idx + 1}</span>
                               <span className={s.rankName}>{item.airline}</span>
                               <span className={s.rankSub}>
-                                {item.count} {item.count === 1 ? 'leg' : 'legs'}
+                                {item.count} {item.count === 1 ? 'booking' : 'bookings'}
                               </span>
                               <span className={s.rankValue}>{money(item.total)}</span>
                             </div>
