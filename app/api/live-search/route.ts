@@ -12,7 +12,8 @@ function upstreamHeaders(base: string): HeadersInit {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   }
-  if (base.includes('loca.lt')) {
+  // Ephemeral tunnels used for smoke tests only — do not use in production.
+  if (base.includes('loca.lt') || base.includes('cloudflare') || base.includes('trycloudflare')) {
     headers['bypass-tunnel-reminder'] = 'true'
     headers['User-Agent'] = 'Mozilla/5.0'
   }
