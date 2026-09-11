@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeftRight,
@@ -336,9 +335,12 @@ export function LiveSearchDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 border-zinc-800 bg-zinc-950 p-0 sm:max-w-lg"
+        className="flex h-full w-full flex-col gap-0 overflow-hidden border-zinc-800 bg-zinc-950 p-0 sm:max-w-lg"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <SheetHeader className="border-b border-zinc-800 px-6 py-4 text-left">
+        <SheetHeader className="shrink-0 border-b border-zinc-800 px-6 py-4 pr-12 text-left">
           <SheetTitle className="flex items-center gap-2 text-zinc-50">
             <Search className="h-5 w-5 text-sky-400" />
             Live flight search
@@ -348,6 +350,7 @@ export function LiveSearchDrawer({
           </SheetDescription>
         </SheetHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="space-y-3 border-b border-zinc-800 px-6 py-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
@@ -502,24 +505,6 @@ export function LiveSearchDrawer({
             </div>
           </div>
 
-          <Button
-            className="w-full gap-2 bg-sky-600 text-white hover:bg-sky-500"
-            onClick={() => void handleSearch()}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Searching…
-              </>
-            ) : (
-              <>
-                <Search className="h-4 w-4" />
-                Search
-              </>
-            )}
-          </Button>
-
           {googleUrl && (
             <a
               href={googleUrl}
@@ -584,7 +569,7 @@ export function LiveSearchDrawer({
           </Select>
         </div>
 
-        <ScrollArea className="flex-1 px-6 py-4">
+        <div className="px-6 py-4">
           {error && (
             <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
               {error}
@@ -688,7 +673,28 @@ export function LiveSearchDrawer({
               )
             })}
           </div>
-        </ScrollArea>
+        </div>
+        </div>
+
+        <div className="shrink-0 border-t border-zinc-800 bg-zinc-950 px-6 py-3">
+          <Button
+            className="w-full gap-2 bg-sky-600 text-white hover:bg-sky-500"
+            onClick={() => void handleSearch()}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Searching…
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4" />
+                Search flights
+              </>
+            )}
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   )
