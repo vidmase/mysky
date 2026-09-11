@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
-import { europeanAirports } from '@/lib/airports'
+import { allAirports } from '@/lib/airports'
 
 interface AirportCoords {
     iata: string
@@ -11,7 +11,7 @@ interface AirportCoords {
 
 // Build a lookup map from the local airport data for fallback
 const airportCoordinatesMap = new Map<string, { iata: string; lat: number; lon: number }>()
-europeanAirports.forEach(airport => {
+allAirports.forEach(airport => {
     if (airport.coordinates) {
         const [lon, lat] = airport.coordinates
         airportCoordinatesMap.set(airport.iata.toUpperCase(), {
@@ -100,7 +100,7 @@ async function findAirportCoordinates(
     // Try 6: Last resort - try to find any airport that starts with the same letters
     // This handles cases where we have "Bristol" but not "BRI"
     const first4Letters = searchName.slice(0, 4)
-    for (const airport of europeanAirports) {
+    for (const airport of allAirports) {
         if (airport.coordinates && 
             (airport.name.toUpperCase().startsWith(first4Letters) ||
              airport.city.toUpperCase().startsWith(first4Letters))) {

@@ -1,6 +1,6 @@
 import { AIRLINE_NAME_TO_CODE, LOCAL_AIRLINE_LOGOS } from '@/lib/airlines'
 import { AIRPORT_TIMEZONES } from '@/lib/airport-timezones'
-import { europeanAirports } from '@/lib/airports'
+import { allAirports } from '@/lib/airports'
 import { DateTime } from 'luxon'
 
 // Time formatting utility
@@ -53,7 +53,7 @@ export function calculateDuration(
       const m = n.match(/\(([A-Za-z]{3})\)/)
       if (m) return m[1].toUpperCase()
       // Find best match by city or name includes
-      const found = europeanAirports.find(a =>
+      const found = allAirports.find(a =>
         a.name.toLowerCase().includes(n) ||
         n.includes(a.name.toLowerCase()) ||
         a.city.toLowerCase().includes(n) ||

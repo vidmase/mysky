@@ -23,10 +23,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { AirportSelector } from "@/components/airport-selector"
 import { PassengerSelector } from "@/components/passenger-selector"
-import { Airport } from "@/lib/airports"
 import { Passenger } from "@/lib/passengers"
 import { BoardingPassScanner } from "../components/boarding-pass-scanner"
-import { europeanAirports } from "@/lib/airports"
+import { allAirports, type Airport } from "@/lib/airports"
 
 interface FormState {
   passenger_name: string
@@ -399,14 +398,14 @@ export default function AddFlightPage() {
     const departureDateObj = data.departure_date ? new Date(data.departure_date) : new Date()
     const arrivalDateObj = data.arrival_date ? new Date(data.arrival_date) : departureDateObj
 
-    // Find departure airport in europeanAirports
-    const departureAirport = europeanAirports.find(
+    // Find departure airport in allAirports
+    const departureAirport = allAirports.find(
       (airport: Airport) => airport.iata === data.departure_iata ||
         airport.name.toLowerCase().includes(data.departure_airport.toLowerCase())
     )
 
-    // Find arrival airport in europeanAirports
-    const arrivalAirport = europeanAirports.find(
+    // Find arrival airport in allAirports
+    const arrivalAirport = allAirports.find(
       (airport: Airport) => airport.iata === data.arrival_iata ||
         airport.name.toLowerCase().includes(data.arrival_airport.toLowerCase())
     )

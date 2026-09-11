@@ -41,7 +41,7 @@ export function AirportCodeField({
   const [suggestions, setSuggestions] = React.useState<Airport[]>([])
 
   React.useEffect(() => {
-    setSuggestions(searchAirports(debounced || value).slice(0, 12))
+    setSuggestions(searchAirports(debounced || value).slice(0, 20))
   }, [debounced, value])
 
   const selected =

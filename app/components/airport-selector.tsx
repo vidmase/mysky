@@ -14,7 +14,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { Airport, europeanAirports } from '@/lib/airports'
+import { allAirports, type Airport } from '@/lib/airports'
 import { getCachedAirports, setCachedAirports } from '@/lib/cache'
 
 interface AirportSelectorProps {
@@ -41,13 +41,13 @@ export function AirportSelector({ value, onChange, label = "Select airport", req
                 }
 
                 // If not in cache, use the imported airports data
-                setAirports(europeanAirports)
+                setAirports(allAirports)
                 // Cache the airports for future use
-                setCachedAirports(europeanAirports)
+                setCachedAirports(allAirports)
             } catch (error) {
                 console.error('Error loading airports:', error)
                 // Fallback to imported data if cache fails
-                setAirports(europeanAirports)
+                setAirports(allAirports)
             } finally {
                 setLoading(false)
             }

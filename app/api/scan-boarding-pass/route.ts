@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI, Part, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
-import { europeanAirports, Airport } from '@/lib/airports'
+import { allAirports, Airport } from '@/lib/airports'
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 // Create a map of IATA codes to airport data for faster lookups
-const airportMap = new Map(europeanAirports.map(airport => [airport.iata, airport]))
+const airportMap = new Map(allAirports.map(airport => [airport.iata, airport]))
 
 function getFlagEmoji(countryName: string): string {
     const countryToCode: { [key: string]: string } = {
