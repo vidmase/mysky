@@ -96,10 +96,11 @@ export function LiveSearchDrawer({
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [results, setResults] = useState<FlightOffer[]>([])
+  const [outboundResults, setOutboundResults] = useState<FlightOffer[]>([])
+  const [returnResults, setReturnResults] = useState<FlightOffer[]>([])
   const [googleUrl, setGoogleUrl] = useState<string | null>(null)
   const [currency, setCurrency] = useState("GBP")
-  const [addingIndex, setAddingIndex] = useState<number | null>(null)
+  const [addingKey, setAddingKey] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [dayPrices, setDayPrices] = useState<DayPrice[]>([])
 
@@ -111,66 +112,115 @@ export function LiveSearchDrawer({
     setDate(outbound)
     setReturnDate(shiftDate(outbound, 7))
     setError(null)
-    setResults([])
+    setOutboundResults([])
+    setReturnResults([])
     setGoogleUrl(null)
     setSearched(false)
     setDayPrices([])
   }, [open, initialFrom, initialTo, initialDate])
 
-  const sortedResults = useMemo(() => {
-    const list = [...results]
+  const sortOffers = (list: FlightOffer[]) => {
+    const next = [...list]
     if (sort === "cheapest") {
-      list.sort((a, b) => a.price - b.price || a.duration_minutes - b.duration_minutes)
+      next.sort((a, b) => a.price - b.price || a.duration_minutes - b.duration_minutes)
     } else if (sort === "fastest") {
-      list.sort((a, b) => a.duration_minutes - b.duration_minutes || a.price - b.price)
+      next.sort((a, b) => a.duration_minutes - b.duration_minutes || a.price - b.price)
     } else {
-      list.sort((a, b) => {
+      next.sort((a, b) => {
         const ab = a.is_best ? 0 : 1
         const bb = b.is_best ? 0 : 1
         if (ab !== bb) return ab - bb
         return a.price - b.price || a.duration_minutes - b.duration_minutes
       })
     }
-    return list
-  }, [results, sort])
+    return next
+  }
 
-  const buildBody = (outboundDate: string, opts?: { forFlexible?: boolean }) => {
+  const sortedOutbound = useMemo(() => sortOffers(outboundResults), [outboundResults, sort])
+  const sortedReturn = useMemo(() => sortOffers(returnResults), [returnResults, sort])
+
+  const cheapestCombo = useMemo(() => {
+    if (!sortedOutbound.length || !sortedReturn.length) return null
+    const o = Math.min(...sortedOutbound.map((f) => f.price))
+    const r = Math.min(...sortedReturn.map((f) => f.price))
+    return { outbound: o, ret: r, total: o + r }
+  }, [sortedOutbound, sortedReturn])
+
+  const buildBody = (
+    outboundDate: string,
+    opts?: { forFlexible?: boolean; leg?: "outbound" | "return" | "round-trip" }
+  ) => {
     const fromCode = from.trim().toUpperCase()
     const toCode = to.trim().toUpperCase()
-    const stops =
-      maxStops === "any" ? undefined : Number(maxStops)
-    const useRoundTrip = trip === "round-trip" && !opts?.forFlexible
-    const flights = [
-      {
-        date: outboundDate,
-        from_airport: fromCode,
-        to_airport: toCode,
-        ...(stops === undefined ? {} : { max_stops: stops }),
-      },
-    ]
-    if (useRoundTrip) {
-      flights.push({
-        date: returnDate,
-        from_airport: toCode,
-        to_airport: fromCode,
-        ...(stops === undefined ? {} : { max_stops: stops }),
-      })
+    const stops = maxStops === "any" ? undefined : Number(maxStops)
+    const leg = opts?.leg || "outbound"
+    const passengers = {
+      adults: Math.max(1, adults),
+      children: Math.max(0, children),
+      infants_in_seat: Math.max(0, infantsInSeat),
+      infants_on_lap: Math.max(0, infantsOnLap),
     }
-    return {
-      trip: useRoundTrip ? ("round-trip" as const) : ("one-way" as const),
-      seat,
-      passengers: {
-        adults: Math.max(1, adults),
-        children: Math.max(0, children),
-        infants_in_seat: Math.max(0, infantsInSeat),
-        infants_on_lap: Math.max(0, infantsOnLap),
-      },
+    const bags = {
       currency: "GBP",
       language: "en-GB",
       carry_on_bags: Math.max(0, carryOn),
       checked_bags: Math.max(0, checkedBags),
       ...(stops === undefined ? {} : { max_stops: stops }),
-      flights,
+    }
+
+    if (leg === "round-trip" && trip === "round-trip" && !opts?.forFlexible) {
+      return {
+        trip: "round-trip" as const,
+        seat,
+        passengers,
+        ...bags,
+        flights: [
+          {
+            date: outboundDate,
+            from_airport: fromCode,
+            to_airport: toCode,
+            ...(stops === undefined ? {} : { max_stops: stops }),
+          },
+          {
+            date: returnDate,
+            from_airport: toCode,
+            to_airport: fromCode,
+            ...(stops === undefined ? {} : { max_stops: stops }),
+          },
+        ],
+      }
+    }
+
+    if (leg === "return") {
+      return {
+        trip: "one-way" as const,
+        seat,
+        passengers,
+        ...bags,
+        flights: [
+          {
+            date: returnDate,
+            from_airport: toCode,
+            to_airport: fromCode,
+            ...(stops === undefined ? {} : { max_stops: stops }),
+          },
+        ],
+      }
+    }
+
+    return {
+      trip: "one-way" as const,
+      seat,
+      passengers,
+      ...bags,
+      flights: [
+        {
+          date: outboundDate,
+          from_airport: fromCode,
+          to_airport: toCode,
+          ...(stops === undefined ? {} : { max_stops: stops }),
+        },
+      ],
     }
   }
 
@@ -245,36 +295,70 @@ export function LiveSearchDrawer({
 
     setLoading(true)
     setError(null)
-    setResults([])
+    setOutboundResults([])
+    setReturnResults([])
     setGoogleUrl(null)
     setSearched(true)
 
-    try {
-      const body = buildBody(outbound)
+    const postSearch = async (body: ReturnType<typeof buildBody>) => {
       const res = await fetch("/api/live-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-
       const data = (await res.json()) as LiveSearchResponse & {
         message?: string
         error?: string
       }
-
       if (!res.ok) {
         throw new Error(data.message || data.error || `Search failed (${res.status})`)
       }
+      return data
+    }
 
-      setResults(Array.isArray(data.flights) ? data.flights : [])
-      setGoogleUrl(data.google_flights_url || null)
-      setCurrency(data.currency || "GBP")
+    try {
+      if (trip === "round-trip") {
+        // Google RT HTML only lists outbound first — fetch both legs as one-way
+        // for real prices, plus a RT call for the combined Google Flights URL.
+        const [outData, retData, rtData] = await Promise.all([
+          postSearch(buildBody(outbound, { leg: "outbound" })),
+          postSearch(buildBody(outbound, { leg: "return" })),
+          postSearch(buildBody(outbound, { leg: "round-trip" })).catch(() => null),
+        ])
 
-      if (data.current_status === "empty" || !data.flights?.length) {
-        setError(data.message || "No flights found for this route and date.")
+        const outFlights = Array.isArray(outData.flights) ? outData.flights : []
+        const retFlights = Array.isArray(retData.flights) ? retData.flights : []
+        setOutboundResults(outFlights)
+        setReturnResults(retFlights)
+        setGoogleUrl(rtData?.google_flights_url || outData.google_flights_url || null)
+        setCurrency(outData.currency || retData.currency || "GBP")
+
+        if (!outFlights.length && !retFlights.length) {
+          setError(
+            outData.message ||
+              retData.message ||
+              "No flights found for this route and dates."
+          )
+        } else if (!outFlights.length) {
+          setError("No outbound flights found — return options still shown below.")
+        } else if (!retFlights.length) {
+          setError("No return flights found — outbound options still shown below.")
+        } else {
+          void loadFlexibleStrip(outbound)
+        }
       } else {
-        // Kick flexible strip for outbound date (one-way probes keep load lighter)
-        void loadFlexibleStrip(outbound)
+        const data = await postSearch(buildBody(outbound, { leg: "outbound" }))
+        const flights = Array.isArray(data.flights) ? data.flights : []
+        setOutboundResults(flights)
+        setReturnResults([])
+        setGoogleUrl(data.google_flights_url || null)
+        setCurrency(data.currency || "GBP")
+
+        if (data.current_status === "empty" || !flights.length) {
+          setError(data.message || "No flights found for this route and date.")
+        } else {
+          void loadFlexibleStrip(outbound)
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Search failed"
@@ -285,19 +369,26 @@ export function LiveSearchDrawer({
     }
   }
 
-  const handleAddPlanned = async (offer: FlightOffer, index: number) => {
-    setAddingIndex(index)
+  const handleAddPlanned = async (
+    offer: FlightOffer,
+    key: string,
+    leg: "outbound" | "return"
+  ) => {
+    setAddingKey(key)
     try {
+      const fromIata = leg === "outbound" ? from.trim().toUpperCase() : to.trim().toUpperCase()
+      const toIata = leg === "outbound" ? to.trim().toUpperCase() : from.trim().toUpperCase()
+      const searchDate = leg === "outbound" ? date : returnDate
       const payload = mapOfferToPlannedFlight({
         offer,
-        fromIata: from.trim().toUpperCase(),
-        toIata: to.trim().toUpperCase(),
-        searchDate: date,
+        fromIata,
+        toIata,
+        searchDate,
         seat,
         currency,
       })
       if (trip === "round-trip") {
-        payload.notes = `${payload.notes} · round-trip return ${returnDate}`
+        payload.notes = `${payload.notes} · ${leg} · RT ${date} / ${returnDate}`
       }
 
       const res = await fetch("/api/flights", {
@@ -322,7 +413,7 @@ export function LiveSearchDrawer({
       const msg = err instanceof Error ? err.message : "Failed to add planned flight"
       showError(msg)
     } finally {
-      setAddingIndex(null)
+      setAddingKey(null)
     }
   }
 
@@ -330,6 +421,100 @@ export function LiveSearchDrawer({
     setFrom(to)
     setTo(from)
   }
+
+  const renderOfferCards = (
+    offers: FlightOffer[],
+    leg: "outbound" | "return",
+    fromCode: string,
+    toCode: string
+  ) => (
+    <div className="space-y-3">
+      {offers.map((offer, index) => {
+        const first = offer.flights?.[0]
+        const last = offer.flights?.[offer.flights.length - 1]
+        const depTime = formatSegmentTime(first?.departure?.time, "—")
+        const arrTime = formatSegmentTime(last?.arrival?.time, "—")
+        const airlines = (offer.airlines || []).join(", ") || "Airline TBD"
+        const key = `${leg}-${offer.price}-${index}-${offer.duration_minutes}`
+
+        return (
+          <div
+            key={key}
+            className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 shadow-sm"
+          >
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-lg font-semibold text-zinc-50">
+                  {priceLabel(currency, offer.price)}
+                </p>
+                <p className="text-xs text-zinc-400">{airlines}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                {offer.is_best && (
+                  <Badge
+                    className="border-sky-500/30 bg-sky-500/15 text-sky-300"
+                    variant="outline"
+                  >
+                    Best
+                  </Badge>
+                )}
+                {typeof offer.carbon?.emission === "number" && offer.carbon.emission > 0 && (
+                  <span className="text-[10px] text-emerald-400/90">
+                    ~{offer.carbon.emission} kg CO₂
+                  </span>
+                )}
+                <span className="text-xs text-zinc-400">
+                  {offer.stops === 0
+                    ? "Direct"
+                    : `${offer.stops} stop${offer.stops === 1 ? "" : "s"}`}
+                  {" · "}
+                  {formatDuration(offer.duration_minutes)}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-3 flex items-center gap-2 text-sm text-zinc-200">
+              <span className="font-medium tabular-nums">{depTime}</span>
+              <span className="text-zinc-500">→</span>
+              <span className="font-medium tabular-nums">{arrTime}</span>
+              <span className="ml-auto text-xs text-zinc-500">
+                {fromCode || first?.from_airport?.code} → {toCode || last?.to_airport?.code}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="gap-1.5 bg-sky-600 text-white hover:bg-sky-500"
+                disabled={addingKey === key}
+                onClick={() => void handleAddPlanned(offer, key, leg)}
+              >
+                {addingKey === key ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+                Add as planned
+              </Button>
+              {googleUrl && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 border-zinc-700 text-zinc-200"
+                  asChild
+                >
+                  <a href={googleUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View on Google Flights
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -555,7 +740,11 @@ export function LiveSearchDrawer({
 
         <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-2">
           <p className="text-xs text-zinc-500">
-            {searched && !loading ? `${sortedResults.length} offers` : "Results"}
+            {searched && !loading
+              ? trip === "round-trip"
+                ? `${sortedOutbound.length} out · ${sortedReturn.length} return`
+                : `${sortedOutbound.length} offers`
+              : "Results"}
           </p>
           <Select value={sort} onValueChange={(v) => setSort(v as SortMode)}>
             <SelectTrigger className="h-8 w-[140px] border-zinc-700 bg-zinc-900 text-xs text-zinc-100">
@@ -576,9 +765,13 @@ export function LiveSearchDrawer({
             </div>
           )}
 
-          {!loading && searched && sortedResults.length === 0 && !error && (
-            <p className="text-sm text-zinc-500">No results yet. Try another date or route.</p>
-          )}
+          {!loading &&
+            searched &&
+            sortedOutbound.length === 0 &&
+            sortedReturn.length === 0 &&
+            !error && (
+              <p className="text-sm text-zinc-500">No results yet. Try another date or route.</p>
+            )}
 
           {!searched && !loading && (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-zinc-500">
@@ -587,91 +780,68 @@ export function LiveSearchDrawer({
             </div>
           )}
 
-          <div className="space-y-3 pb-8">
-            {sortedResults.map((offer, index) => {
-              const first = offer.flights?.[0]
-              const last = offer.flights?.[offer.flights.length - 1]
-              const depTime = formatSegmentTime(first?.departure?.time, "—")
-              const arrTime = formatSegmentTime(last?.arrival?.time, "—")
-              const airlines = (offer.airlines || []).join(", ") || "Airline TBD"
+          {searched && trip === "round-trip" && cheapestCombo && (
+            <div className="mb-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+              Cheapest combo (one-way + one-way):{" "}
+              <span className="font-semibold tabular-nums">
+                {priceLabel(currency, cheapestCombo.outbound)} +{" "}
+                {priceLabel(currency, cheapestCombo.ret)} ={" "}
+                {priceLabel(currency, cheapestCombo.total)}
+              </span>
+              <span className="mt-0.5 block text-xs text-sky-200/80">
+                Separate tickets estimate — Google Flights link is the true round-trip fare.
+              </span>
+            </div>
+          )}
 
-              return (
-                <div
-                  key={`${offer.price}-${index}-${offer.duration_minutes}`}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 shadow-sm"
-                >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-lg font-semibold text-zinc-50">
-                        {priceLabel(currency, offer.price)}
-                      </p>
-                      <p className="text-xs text-zinc-400">{airlines}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      {offer.is_best && (
-                        <Badge
-                          className="border-sky-500/30 bg-sky-500/15 text-sky-300"
-                          variant="outline"
-                        >
-                          Best
-                        </Badge>
-                      )}
-                      {typeof offer.carbon?.emission === "number" && offer.carbon.emission > 0 && (
-                        <span className="text-[10px] text-emerald-400/90">
-                          ~{offer.carbon.emission} kg CO₂
-                        </span>
-                      )}
-                      <span className="text-xs text-zinc-400">
-                        {offer.stops === 0
-                          ? "Direct"
-                          : `${offer.stops} stop${offer.stops === 1 ? "" : "s"}`}
-                        {" · "}
-                        {formatDuration(offer.duration_minutes)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mb-3 flex items-center gap-2 text-sm text-zinc-200">
-                    <span className="font-medium tabular-nums">{depTime}</span>
-                    <span className="text-zinc-500">→</span>
-                    <span className="font-medium tabular-nums">{arrTime}</span>
-                    <span className="ml-auto text-xs text-zinc-500">
-                      {from.trim().toUpperCase() || first?.from_airport?.code} →{" "}
-                      {to.trim().toUpperCase() || last?.to_airport?.code}
+          <div className="space-y-6 pb-8">
+            {searched && (trip === "round-trip" || sortedOutbound.length > 0) && (
+              <section className="space-y-3">
+                {trip === "round-trip" && (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-zinc-100">
+                      Outbound · {formatChipDate(date)}
+                    </h3>
+                    <span className="text-xs text-zinc-500">
+                      {from.trim().toUpperCase()} → {to.trim().toUpperCase()}
                     </span>
                   </div>
+                )}
+                {sortedOutbound.length === 0 && searched && !loading ? (
+                  <p className="text-sm text-zinc-500">No outbound flights.</p>
+                ) : (
+                  renderOfferCards(
+                    sortedOutbound,
+                    "outbound",
+                    from.trim().toUpperCase(),
+                    to.trim().toUpperCase()
+                  )
+                )}
+              </section>
+            )}
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      className="gap-1.5 bg-sky-600 text-white hover:bg-sky-500"
-                      disabled={addingIndex === index}
-                      onClick={() => void handleAddPlanned(offer, index)}
-                    >
-                      {addingIndex === index ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Plus className="h-3.5 w-3.5" />
-                      )}
-                      Add as planned
-                    </Button>
-                    {googleUrl && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 border-zinc-700 text-zinc-200"
-                        asChild
-                      >
-                        <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          View on Google Flights
-                        </a>
-                      </Button>
-                    )}
-                  </div>
+            {searched && trip === "round-trip" && (
+              <section className="space-y-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-zinc-100">
+                    Return · {formatChipDate(returnDate)}
+                  </h3>
+                  <span className="text-xs text-zinc-500">
+                    {to.trim().toUpperCase()} → {from.trim().toUpperCase()}
+                  </span>
                 </div>
-              )
-            })}
+                {sortedReturn.length === 0 && !loading ? (
+                  <p className="text-sm text-zinc-500">No return flights.</p>
+                ) : (
+                  renderOfferCards(
+                    sortedReturn,
+                    "return",
+                    to.trim().toUpperCase(),
+                    from.trim().toUpperCase()
+                  )
+                )}
+              </section>
+            )}
           </div>
         </div>
         </div>
