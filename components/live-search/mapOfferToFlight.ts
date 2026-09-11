@@ -122,3 +122,11 @@ export function defaultSearchDate(daysAhead = 21): string {
   d.setDate(d.getDate() + daysAhead)
   return d.toISOString().slice(0, 10)
 }
+
+/** Shift YYYY-MM-DD by delta days */
+export function shiftDate(isoDate: string, deltaDays: number): string {
+  const d = new Date(`${isoDate}T12:00:00Z`)
+  if (Number.isNaN(d.getTime())) return isoDate
+  d.setUTCDate(d.getUTCDate() + deltaDays)
+  return d.toISOString().slice(0, 10)
+}
