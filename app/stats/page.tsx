@@ -464,6 +464,14 @@ export default function StatsPage() {
     }
     const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
 
+    /* A leg's recorded duration is worked out from its dates, so a single
+       mistyped arrival date — an arrival filed years after the departure —
+       produces a duration that dwarfs every real flight put together. No
+       scheduled service runs past twenty hours nonstop, so anything longer is
+       a filing error and falls back to the distance estimate. */
+    const MAX_LEG_HOURS = 20
+    const implausible: string[] = []
+
     const airportSet = new Set<string>()
     const countrySet = new Set<string>()
     const routeSet = new Set<string>()
@@ -489,13 +497,26 @@ export default function StatsPage() {
         dist = haversine(depLat, depLon, arrLat, arrLon)
         totalKm += dist
       }
-      const recordedHours =
+      const recorded =
         parseDurationHours(f.flight_duration) ?? parseDurationHours(f.calculated_duration)
+      const recordedHours =
+        recorded != null && recorded > 0 && recorded <= MAX_LEG_HOURS ? recorded : null
+      if (recorded != null && recordedHours == null) {
+        implausible.push(`${f.departure_iata || '???'}-${f.arrival_iata || '???'} ${f.departure_date || ''} (${recorded.toFixed(1)}h)`)
+      }
       if (recordedHours != null) {
         totalHours += recordedHours
       } else if (dist != null) {
         totalHours += deriveDurationHours(dist)
       }
+    }
+
+    // Silently dropping a bad row would hide the mistake in the record itself.
+    if (implausible.length) {
+      console.warn(
+        `[Stats] ${implausible.length} leg(s) have an impossible recorded duration and were estimated from distance instead:`,
+        implausible
+      )
     }
 
     // Calculate years of flying
@@ -670,7 +691,7 @@ export default function StatsPage() {
                   <span className={s.heroUnit}>hours</span>
                 </p>
                 <p className={s.heroGloss}>
-                  Roughly {Math.round((viewStats?.hoursInAir || 0) / 24)} whole days
+                  Roughly {Math.floor((viewStats?.hoursInAir || 0) / 24)} whole days
                   spent in the air.
                 </p>
                 <div className={s.split}>
