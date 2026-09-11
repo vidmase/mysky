@@ -12,7 +12,6 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { MainNav } from "@/components/main-nav"
 import { Heartbeat } from "./components/heartbeat"
 import 'leaflet/dist/leaflet.css'
-import "mapbox-gl/dist/mapbox-gl.css"
 import { ReactQueryProvider } from "./providers"
 
 export const metadata: Metadata = {

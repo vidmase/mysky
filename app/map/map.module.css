@@ -251,6 +251,11 @@
   gap: 0.5rem;
 }
 
+.basemaps {
+  display: flex;
+  gap: 0.3rem;
+}
+
 .source {
   display: inline-flex;
   align-items: center;
