@@ -28,7 +28,7 @@ import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
 import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
 import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import { format } from "date-fns"
-import { formatTimeToHHMM, calculateDuration, getAirlineLogo } from "@/app/flights/lib/flight-utils"
+import { formatTimeToHHMM, calculateDuration, getAirlineLogo, resolveAirlineName } from "@/app/flights/lib/flight-utils"
 import { SearchBar } from "@/app/flights/components/SearchBar"
 import { PaperNav } from "@/app/components/paper-nav"
 import { Plane } from "lucide-react"
@@ -406,10 +406,12 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const airlines = useMemo(() => {
     const set = new Set<string>()
     for (const f of flights) {
-      if (f.airline && f.airline.trim() !== "") set.add(f.airline)
+      // Read the carrier the same way the list prints it, so a row whose airline
+      // was never filled in files under Ryanair rather than under Unknown.
+      const name = resolveAirlineName(f.airline, f.flight_number)
+      if (name) set.add(name)
     }
-    // If any flight has missing airline, add an explicit 'Unknown' option
-    const hasUnknown = flights.some((f) => !f.airline || f.airline.trim() === "")
+    const hasUnknown = flights.some((f) => !resolveAirlineName(f.airline, f.flight_number))
     // Remove any literal 'Unknown' already present (case-insensitive) to avoid duplicates
     const list = (Array.from(set) as string[]).filter(
       (a) => a.trim().toLowerCase() !== "unknown"
@@ -434,10 +436,11 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         flight.passenger_name.toLowerCase().includes(term) ||
         flight.reservation_number.toLowerCase().includes(term)
 
+      const carrier = resolveAirlineName(flight.airline, flight.flight_number)
       const matchesAirline = (
         airline === "all" ||
         airline === "" ||
-        (airline === "Unknown" ? (!flight.airline || flight.airline.trim() === "") : flight.airline === airline)
+        (airline === "Unknown" ? !carrier : carrier === airline)
       )
 
       let matchesDateRange = true
@@ -1121,7 +1124,7 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, otherLegs = 0, onRowCli
             </span>
           </span>
           <span className={s.flightNo}>{flight.flight_number}</span>
-          <span className={s.cardAirline}>{flight.airline || "Unknown"}</span>
+          <span className={s.cardAirline}>{resolveAirlineName(flight.airline, flight.flight_number) || "Unknown"}</span>
         </div>
         {isUpcoming(flight.departure_date) && <span className={s.cardFlag}>Upcoming</span>}
       </div>

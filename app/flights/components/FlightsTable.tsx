@@ -5,7 +5,7 @@ import { Fragment, useEffect, useState } from "react"
 import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
 import { ArrowRight, Pencil, Trash2, Building, Loader2, RotateCcw, ChevronDown } from "lucide-react"
-import { calculateDuration, formatTimeToHHMM, getAirlineLogo } from "@/app/flights/lib/flight-utils"
+import { calculateDuration, formatTimeToHHMM, getAirlineLogo, resolveAirlineName } from "@/app/flights/lib/flight-utils"
 import { DateTime } from "luxon"
 import { AIRPORT_TIMEZONES } from "@/lib/airport-timezones"
 import type { Flight } from "@/types/flight"
@@ -371,7 +371,9 @@ function LegRow({
           </span>
           <span>
             <span className={s.flightNo}>{flight.flight_number}</span>
-            <span className={s.airline}>{flight.airline || "Unknown airline"}</span>
+            <span className={s.airline}>
+                {resolveAirlineName(flight.airline, flight.flight_number) || "Unknown airline"}
+              </span>
             {flight.seat && <span className={s.seat}>Seat {flight.seat}</span>}
           </span>
         </div>

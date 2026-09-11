@@ -1,4 +1,4 @@
-import { AIRLINE_NAME_TO_CODE, LOCAL_AIRLINE_LOGOS } from '@/lib/airlines'
+import { AIRLINE_CODE_TO_NAME, AIRLINE_NAME_TO_CODE, LOCAL_AIRLINE_LOGOS } from '@/lib/airlines'
 import { AIRPORT_TIMEZONES } from '@/lib/airport-timezones'
 import { allAirports } from '@/lib/airports'
 import { DateTime } from 'luxon'
@@ -137,6 +137,40 @@ const logoCache = new Map<string, string>()
 
 function norm(s: string) {
   return s.trim().toLowerCase()
+}
+
+/** Values that were filed where an airline name should be, but name nothing. */
+const NO_AIRLINE = new Set(['', 'unknown', 'unknown airline', 'none', 'n/a', 'na', '-'])
+
+/** The code at the head of a flight number: FR4121 -> FR, W6 1902 -> W6. */
+export function airlineCodeFromFlightNumber(flightNumber?: string | null): string | null {
+  if (!flightNumber) return null
+  const m = flightNumber.trim().toUpperCase().match(/^([A-Z]{2,3}|[A-Z]\d)\s?-?\d+/)
+  return m ? m[1] : null
+}
+
+/**
+ * The carrier to print for a flight. A row whose airline was never filled in
+ * still names its carrier in the flight number — which is how the logo has been
+ * resolved all along — so the name is read from there rather than shown as
+ * "Unknown" beside a Ryanair logo. Returns null when nothing identifies it.
+ */
+export function resolveAirlineName(
+  airline?: string | null,
+  flightNumber?: string | null
+): string | null {
+  const filed = (airline ?? '').trim()
+  if (filed && !NO_AIRLINE.has(filed.toLowerCase())) {
+    // A row filed as a bare code ("FR") reads better as the airline's name, and
+    // one filed under a known spelling ("EasyJet") is printed under the canonical
+    // one, so the same carrier stops appearing twice in the filter.
+    const asCode = AIRLINE_CODE_TO_NAME[filed.toUpperCase()]
+    if (asCode) return asCode
+    const knownCode = AIRLINE_NAME_TO_CODE[norm(filed)]
+    return (knownCode && AIRLINE_CODE_TO_NAME[knownCode]) || filed
+  }
+  const code = airlineCodeFromFlightNumber(flightNumber)
+  return code ? AIRLINE_CODE_TO_NAME[code] ?? null : null
 }
 
 // Robust airline logo resolver supporting codes and names
