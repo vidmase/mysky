@@ -14,29 +14,34 @@ export type Basemap = {
 }
 
 /**
- * Free tile services, no API key and no signup: CARTO's basemaps are served
- * from basemaps.cartocdn.com, Esri's imagery from arcgisonline.com. Both only
- * ask for the attribution kept below, which Leaflet prints in the corner.
+ * Tile services that serve without an API key or a signup.
+ *
+ * OpenStreetMap's own tiles carry Paper and Midnight — the same tiles, tinted
+ * and inverted in CSS — because every vendor-hosted basemap now gates on a key
+ * (CARTO stamps keyless tiles with "API KEY REQUIRED"; Stadia and MapTiler
+ * refuse them outright). OSM's tile policy asks for the attribution kept below
+ * and rules out heavy or bulk use, which a personal flight log is not. Retina
+ * doubling is left off for the same reason: it would quadruple tile requests.
  */
 export const BASEMAPS: Basemap[] = [
   {
     id: 'paper',
     label: 'Paper',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
-    maxZoom: 20,
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: '',
+    maxZoom: 19,
     attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &middot; &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     dark: false,
   },
   {
     id: 'midnight',
     label: 'Midnight',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
-    maxZoom: 20,
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    subdomains: '',
+    maxZoom: 19,
     attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &middot; &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     dark: true,
   },
   {

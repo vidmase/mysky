@@ -213,16 +213,25 @@ export default function MapPage() {
           background: var(--paper-2);
           font-family: var(--body);
         }
-
-        /* A stock basemap, tinted onto paper stock. Positron is near-neutral,
-           so flattening it to grey first makes the warm tint predictable. */
-        .atlas-canvas[data-basemap='paper'] .leaflet-tile-pane {
-          filter: grayscale(1) sepia(0.45) saturate(1.5) hue-rotate(-8deg)
-            brightness(1.04) contrast(0.9);
-          mix-blend-mode: multiply;
+        .atlas-canvas[data-basemap='midnight'].leaflet-container,
+        .atlas-canvas[data-basemap='satellite'].leaflet-container {
+          background: #0b0d11;
         }
+
+        /* Paper and Midnight are the same OpenStreetMap tiles, printed two ways.
+           OSM's stock style is far more colourful than a plate wants, so it is
+           flattened to grey before the warm tint lands, which keeps the result
+           predictable whatever colour the source happened to be. */
+        .atlas-canvas[data-basemap='paper'] .leaflet-tile-pane {
+          filter: grayscale(1) sepia(0.55) saturate(1.35) hue-rotate(-10deg)
+            brightness(1.08) contrast(0.82);
+          mix-blend-mode: multiply;
+          opacity: 0.92;
+        }
+        /* Inverting the same sheet gives a night plate with no second provider */
         .atlas-canvas[data-basemap='midnight'] .leaflet-tile-pane {
-          filter: saturate(0.85) brightness(0.95);
+          filter: invert(1) hue-rotate(180deg) grayscale(0.7) brightness(0.82)
+            contrast(1.05);
         }
         .atlas-canvas[data-basemap='satellite'] .leaflet-tile-pane {
           filter: saturate(0.8) contrast(1.06) brightness(0.98);

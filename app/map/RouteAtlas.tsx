@@ -152,7 +152,6 @@ export default function RouteAtlas({
       subdomains: spec.subdomains,
       maxZoom: spec.maxZoom,
       attribution: spec.attribution,
-      detectRetina: true,
     }).addTo(map)
     // The tint that turns a stock basemap into paper stock lives in CSS.
     containerRef.current?.setAttribute('data-basemap', spec.id)
