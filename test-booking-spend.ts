@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { groupFlightsIntoBookings } from './lib/statistics/booking-spend'
 
-const total = (fs: any[]) => groupFlightsIntoBookings(fs).reduce((s, b) => s + b.total, 0)
+const total = (fs: any[]) =>
+  groupFlightsIntoBookings(fs).reduce((s, b) => s + (b.total ?? 0), 0)
 
 // The reported bug: MLA↔BRS return, one 283.00 fare filed on both legs under ref 37CSCF.
 // Spend must be the booking's fare, not the fare times the number of legs.
@@ -33,9 +34,20 @@ assert.equal(total([
   { id: 3, reservation_number: 'N/A', total_receipt: '50.00', departure_date: '2026-05-01', airline: 'Jet2' },
 ]), 150)
 
-// Legs with no fare on record contribute nothing and create no booking.
-assert.equal(groupFlightsIntoBookings([
+// A leg with no fare on record is still a booking — the flights list has to show
+// it — but it carries no total, so it cannot be spent against.
+const unpriced = groupFlightsIntoBookings([
   { id: 1, reservation_number: 'ZZZ999', total_receipt: null, departure_date: '2026-01-01', airline: 'Jet2' },
-]).length, 0)
+])
+assert.equal(unpriced.length, 1)
+assert.equal(unpriced[0].total, null)
+
+// Legs come back earliest first, so the list can anchor a booking on its outbound
+// leg no matter what order the rows arrived in.
+const outboundFirst = groupFlightsIntoBookings(returnTrip.slice().reverse())[0]
+assert.equal(outboundFirst.legs.length, 2)
+assert.equal(outboundFirst.legs[0].departure_date, '2026-08-27')
+assert.equal(outboundFirst.legs[1].departure_date, '2026-08-31')
+assert.equal(outboundFirst.key, 'ref:37CSCF')
 
 console.log('booking-spend: all assertions passed')

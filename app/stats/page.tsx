@@ -386,11 +386,15 @@ export default function StatsPage() {
 
     // Spending is counted per booking reference, not per leg: a return trip repeats
     // the same total fare on both of its rows.
-    const bookings = groupFlightsIntoBookings(flights)
+    // A booking with no fare on any leg is still a booking; it just cannot be
+    // spent against, so the priced ones are what the money figures work from.
+    const pricedBookings = groupFlightsIntoBookings(flights).filter(
+      (b): b is typeof b & { total: number } => b.total != null
+    )
 
     // Spending by year
     const spendingByYear = new Map<string, { total: number; count: number }>()
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       if (!b.departure_date) continue
       const date = new Date(b.departure_date)
       if (isNaN(date.getTime())) continue
@@ -404,7 +408,7 @@ export default function StatsPage() {
 
     // Spending by airline
     const spendingByAirline = new Map<string, { total: number; count: number }>()
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       const airline = b.airline
       if (!airline) continue
       const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
@@ -420,12 +424,12 @@ export default function StatsPage() {
     let minPrice = Infinity
     let maxPrice = 0
 
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       totalSpent += b.total
       minPrice = Math.min(minPrice, b.total)
       maxPrice = Math.max(maxPrice, b.total)
     }
-    const bookingsWithPrice = bookings.length
+    const bookingsWithPrice = pricedBookings.length
 
     const spendingStats = {
       totalSpent: Math.round(totalSpent * 100) / 100,

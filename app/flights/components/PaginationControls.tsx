@@ -13,6 +13,8 @@ export interface PaginationControlsProps {
   startIndex: number
   endIndex: number
   totalItems: number
+  /** what a page counts; the list pages by booking, not by leg */
+  itemLabel?: string
   loading?: boolean
 }
 
@@ -25,6 +27,7 @@ export function PaginationControls({
   startIndex,
   endIndex,
   totalItems,
+  itemLabel = "Legs",
   loading,
 }: PaginationControlsProps) {
   if (loading || totalItems === 0) return null
@@ -32,7 +35,7 @@ export function PaginationControls({
   return (
     <div className={s.pagination}>
       <span className={s.paginationNote}>
-        Legs {startIndex + 1}–{Math.min(endIndex, totalItems)} of {totalItems}
+        {itemLabel} {startIndex + 1}–{Math.min(endIndex, totalItems)} of {totalItems}
       </span>
 
       <div className={s.pager}>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useCallback, useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { DateRange } from "react-day-picker"
@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { PaginationControls } from "@/app/flights/components/PaginationControls"
 import { FiltersPanel } from "@/app/flights/components/FiltersPanel"
 import { FlightsTable } from "@/app/flights/components/FlightsTable"
+import { groupFlightsIntoBookings } from "@/lib/statistics/booking-spend"
 import { DeleteFlightDialog } from "@/app/flights/components/DeleteFlightDialog"
 import { CsvImportDialog } from "@/app/flights/components/CsvImportDialog"
 import { CsvExportDialog } from "@/app/flights/components/CsvExportDialog"
@@ -416,17 +417,22 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
     return hasUnknown ? ["Unknown", ...list] : list
   }, [flights])
 
-  const filteredFlights = useMemo(() => {
-    return flights.filter((flight) => {
+  /* A reservation is what was paid for; a leg is what was flown. The list is
+     filed by reservation so one fare is printed once, with its other legs folded
+     underneath it. A booking stays on the page when ANY of its legs matches the
+     filters — searching for the return leg's airport still finds the booking. */
+  const matchesLeg = useCallback(
+    (flight: Flight) => {
+      const term = searchTerm.toLowerCase()
       const matchesSearch =
-        flight.departure_airport.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.arrival_airport.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.departure_iata?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.arrival_iata?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (flight.airline || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.flight_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.passenger_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flight.reservation_number.toLowerCase().includes(searchTerm.toLowerCase())
+        flight.departure_airport.toLowerCase().includes(term) ||
+        flight.arrival_airport.toLowerCase().includes(term) ||
+        flight.departure_iata?.toLowerCase().includes(term) ||
+        flight.arrival_iata?.toLowerCase().includes(term) ||
+        (flight.airline || "").toLowerCase().includes(term) ||
+        flight.flight_number.toLowerCase().includes(term) ||
+        flight.passenger_name.toLowerCase().includes(term) ||
+        flight.reservation_number.toLowerCase().includes(term)
 
       const matchesAirline = (
         airline === "all" ||
@@ -444,25 +450,6 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         }
       }
 
-      let matchesPriceRange = true
-      if (priceRange !== "all") {
-        const price = parseFloat(flight.total_receipt.replace(/[^0-9.]/g, ""))
-        switch (priceRange) {
-          case "under100":
-            matchesPriceRange = price < 100
-            break
-          case "100to500":
-            matchesPriceRange = price >= 100 && price <= 500
-            break
-          case "500to1000":
-            matchesPriceRange = price >= 500 && price <= 1000
-            break
-          case "over1000":
-            matchesPriceRange = price > 1000
-            break
-        }
-      }
-
       let matchesTripType = true
       if (tripType !== "all") {
         const isRoundTrip = flights.some(
@@ -474,35 +461,64 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         matchesTripType = tripType === "roundtrip" ? isRoundTrip : !isRoundTrip
       }
 
-      return matchesSearch && matchesAirline && matchesDateRange && matchesPriceRange && matchesTripType
-    })
-  }, [flights, searchTerm, airline, dateRange, priceRange, tripType])
+      return matchesSearch && matchesAirline && matchesDateRange && matchesTripType
+    },
+    [flights, searchTerm, airline, dateRange, tripType]
+  )
 
-  const sortedFlights = useMemo(() => {
-    return [...filteredFlights].sort((a, b) => {
+  const filteredBookings = useMemo(() => {
+    return groupFlightsIntoBookings(flights).filter((booking) => {
+      if (!booking.legs.some(matchesLeg)) return false
+      if (priceRange === "all") return true
+      // The price filter reads the booking's total, which is what was actually
+      // paid — not a fare repeated across its legs.
+      const price = booking.total
+      if (price == null) return false
+      switch (priceRange) {
+        case "under100":
+          return price < 100
+        case "100to500":
+          return price >= 100 && price <= 500
+        case "500to1000":
+          return price >= 500 && price <= 1000
+        case "over1000":
+          return price > 1000
+        default:
+          return true
+      }
+    })
+  }, [flights, matchesLeg, priceRange])
+
+  const sortedBookings = useMemo(() => {
+    return [...filteredBookings].sort((a, b) => {
+      const outboundA = a.legs[0]
+      const outboundB = b.legs[0]
       switch (sortBy) {
-        case "date":
-          const dateA = new Date(a.departure_date)
-          const dateB = new Date(b.departure_date)
-          return sortOrder === "desc" ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime()
-        case "price":
-          const priceA = parseFloat(a.total_receipt.replace(/[^0-9.]/g, ""))
-          const priceB = parseFloat(b.total_receipt.replace(/[^0-9.]/g, ""))
+        case "date": {
+          const dateA = new Date(outboundA.departure_date).getTime()
+          const dateB = new Date(outboundB.departure_date).getTime()
+          return sortOrder === "desc" ? dateB - dateA : dateA - dateB
+        }
+        case "price": {
+          const priceA = a.total ?? 0
+          const priceB = b.total ?? 0
           return sortOrder === "desc" ? priceB - priceA : priceA - priceB
-        case "airline":
-          const airlineA = a.airline || ""
-          const airlineB = b.airline || ""
+        }
+        case "airline": {
+          const airlineA = outboundA.airline || ""
+          const airlineB = outboundB.airline || ""
           return sortOrder === "desc" ? airlineB.localeCompare(airlineA) : airlineA.localeCompare(airlineB)
+        }
         default:
           return 0
       }
     })
-  }, [filteredFlights, sortBy, sortOrder])
+  }, [filteredBookings, sortBy, sortOrder])
 
-  const totalPages = Math.ceil(sortedFlights.length / itemsPerPage)
+  const totalPages = Math.ceil(sortedBookings.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const currentFlights = sortedFlights.slice(startIndex, endIndex)
+  const currentBookings = sortedBookings.slice(startIndex, endIndex)
 
   const canGoPrevious = currentPage > 1
   const canGoNext = currentPage < totalPages
@@ -675,10 +691,11 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
 
         {/* Narrow screens: each leg as a torn boarding-pass stub */}
         <div className={s.cards}>
-          {currentFlights.map((flight) => (
+          {currentBookings.map((booking) => (
             <FlightCard
-              key={flight.id}
-              flight={flight}
+              key={booking.key}
+              flight={booking.legs[0]}
+              otherLegs={booking.legs.length - 1}
               onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
               onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
               onDeleteRequest={(f) => setFlightToDelete(f)}
@@ -691,7 +708,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         {/* Desktop table */}
         <FlightsTable
           loading={isFetching}
-          flights={currentFlights}
+          bookings={currentBookings}
           onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
           onDeleteRequest={(f) => setFlightToDelete(f)}
           onFlyAgain={openFlyItAgain}
@@ -707,7 +724,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
           goToPage={goToPage}
           startIndex={startIndex}
           endIndex={endIndex}
-          totalItems={sortedFlights.length}
+          totalItems={sortedBookings.length}
+          itemLabel="Bookings"
         />
 
         <div className={s.colophon}>
@@ -1073,6 +1091,8 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
 
 interface FlightCardProps {
   flight: Flight;
+  /** legs of the same reservation not shown on this card */
+  otherLegs?: number;
   onRowClick: (flight: Flight) => void;
   onEdit: (flight: Flight) => void;
   onDeleteRequest: (flight: Flight) => void;
@@ -1080,7 +1100,7 @@ interface FlightCardProps {
   isUpcoming: (date: string) => boolean;
 }
 
-const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onDeleteRequest, onFlyAgain, isUpcoming }) => (
+const FlightCard: React.FC<FlightCardProps> = ({ flight, otherLegs = 0, onRowClick, onEdit, onDeleteRequest, onFlyAgain, isUpcoming }) => (
   <article className={s.card} onClick={() => onRowClick(flight)}>
     <div className={s.cardMain}>
       <div className={s.cardHead}>
@@ -1136,7 +1156,12 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onRowClick, onEdit, onD
       </dl>
 
       <div className={s.cardFoot}>
-        <span className={s.ref}>{flight.reservation_number}</span>
+        <span className={s.ref}>
+          {flight.reservation_number}
+          {otherLegs > 0 && (
+            <span className={s.cardLegs}>+{otherLegs} leg{otherLegs > 1 ? "s" : ""}</span>
+          )}
+        </span>
         <div className={s.actions}>
           {onFlyAgain && (
             <button

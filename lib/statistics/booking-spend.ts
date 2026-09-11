@@ -10,10 +10,15 @@ export type BookingFlight = {
   airline?: string | null
 }
 
-export type Booking = {
-  total: number
+export type Booking<T extends BookingFlight = BookingFlight> = {
+  /** stable identity of the booking: its reference, or the lone flight's id */
+  key: string
+  /** what the booking cost, or null when no leg carries a fare */
+  total: number | null
   departure_date: string | null
   airline: string | null
+  /** every leg of the booking, earliest departure first; legs[0] is the outbound */
+  legs: T[]
 }
 
 export function parseReceiptAmount(raw?: string | null): number | null {
@@ -37,8 +42,8 @@ function bookingKey(f: BookingFlight): string {
  * reference and repeating the fare for the whole booking. Summing the legs charges
  * that fare twice, so the fare is counted once per reference instead.
  */
-export function groupFlightsIntoBookings(flights: BookingFlight[]): Booking[] {
-  const groups = new Map<string, BookingFlight[]>()
+export function groupFlightsIntoBookings<T extends BookingFlight>(flights: T[]): Booking<T>[] {
+  const groups = new Map<string, T[]>()
   for (const f of flights) {
     const key = bookingKey(f)
     const group = groups.get(key)
@@ -46,29 +51,38 @@ export function groupFlightsIntoBookings(flights: BookingFlight[]): Booking[] {
     else groups.set(key, [f])
   }
 
-  const bookings: Booking[] = []
-  for (const legs of groups.values()) {
-    const amounts = legs
+  const bookings: Booking<T>[] = []
+  for (const [key, group] of groups) {
+    const amounts = group
       .map((leg) => parseReceiptAmount(leg.total_receipt))
       .filter((amount): amount is number => amount !== null)
-    if (amounts.length === 0) continue
 
     // Identical amounts across the legs are one fare repeated; amounts that differ
     // were priced per leg and do add up.
-    const repeatedFare = amounts.every((amount) => Math.abs(amount - amounts[0]) < 0.01)
-    const total = repeatedFare ? amounts[0] : amounts.reduce((sum, amount) => sum + amount, 0)
+    const repeatedFare =
+      amounts.length > 0 && amounts.every((amount) => Math.abs(amount - amounts[0]) < 0.01)
+    const total =
+      amounts.length === 0
+        ? null
+        : repeatedFare
+          ? amounts[0]
+          : amounts.reduce((sum, amount) => sum + amount, 0)
 
-    // The booking is attributed to its first leg, so a return trip lands in the year
-    // and with the carrier it was flown out on.
-    const dated = legs
-      .filter((leg) => leg.departure_date && !isNaN(new Date(leg.departure_date).getTime()))
-      .sort((a, b) => new Date(a.departure_date!).getTime() - new Date(b.departure_date!).getTime())
-    const first = dated[0] || legs[0]
+    // Legs run earliest first, so legs[0] is the outbound: the booking is shown
+    // and attributed there, whatever order the list happens to be sorted in.
+    const time = (leg: T) => {
+      const t = leg.departure_date ? new Date(leg.departure_date).getTime() : NaN
+      return isNaN(t) ? Number.POSITIVE_INFINITY : t
+    }
+    const legs = [...group].sort((a, b) => time(a) - time(b))
+    const outbound = legs[0]
 
     bookings.push({
+      key,
       total,
-      departure_date: dated[0]?.departure_date || null,
-      airline: first?.airline || null,
+      departure_date: isFinite(time(outbound)) ? outbound.departure_date ?? null : null,
+      airline: outbound?.airline || null,
+      legs,
     })
   }
   return bookings
