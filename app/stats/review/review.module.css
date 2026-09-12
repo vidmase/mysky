@@ -1,0 +1,1095 @@
+/* ============================================================
+   YEAR IN REVIEW — /stats/review
+   A full-bleed story set in the paper press. Each slide takes one
+   of four stocks; every colour below is read from the tone's local
+   tokens so a slide never hard-codes its own ink.
+   ============================================================ */
+
+.screen {
+  --bg: var(--paper);
+  --fg: var(--ink);
+  --fg-2: var(--ink-2);
+  --fg-3: var(--ink-3);
+  --accent: var(--vermillion);
+  --line: var(--rule);
+  --line-strong: var(--rule-strong);
+  --plate: var(--paper-2);
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  transition: background-color 0.6s ease, color 0.6s ease;
+}
+
+.tonepaper {
+  --bg: var(--paper);
+}
+
+.toneink {
+  --bg: #17130e;
+  --fg: #f2ece1;
+  --fg-2: rgba(242, 236, 225, 0.74);
+  --fg-3: rgba(242, 236, 225, 0.5);
+  --accent: #e8583a;
+  --line: rgba(242, 236, 225, 0.16);
+  --line-strong: rgba(242, 236, 225, 0.4);
+  --plate: rgba(242, 236, 225, 0.06);
+}
+
+.tonenavy {
+  --bg: #0e2033;
+  --fg: #f2ece1;
+  --fg-2: rgba(242, 236, 225, 0.76);
+  --fg-3: rgba(242, 236, 225, 0.52);
+  --accent: #f0a23a;
+  --line: rgba(242, 236, 225, 0.18);
+  --line-strong: rgba(242, 236, 225, 0.42);
+  --plate: rgba(242, 236, 225, 0.06);
+}
+
+.tonevermillion {
+  --bg: #ce3b1e;
+  --fg: #fbf3e6;
+  --fg-2: rgba(251, 243, 230, 0.86);
+  --fg-3: rgba(251, 243, 230, 0.64);
+  --accent: #17130e;
+  --line: rgba(251, 243, 230, 0.26);
+  --line-strong: rgba(251, 243, 230, 0.55);
+  --plate: rgba(23, 19, 14, 0.1);
+}
+
+/* ============================================================
+   CHROME — progress, brand, controls
+   ============================================================ */
+.chrome {
+  position: relative;
+  z-index: 2;
+  width: min(1320px, 100% - 2.5rem);
+  margin-inline: auto;
+  padding-top: max(0.9rem, env(safe-area-inset-top));
+}
+
+.progress {
+  display: flex;
+  gap: 4px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--fg);
+  transform-origin: left center;
+}
+
+.chromeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.9rem;
+}
+
+.brand {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.brand em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.brandYear {
+  margin-left: 0.4rem;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--fg-3);
+  vertical-align: middle;
+}
+
+.chromeActions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.iconBtn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.iconBtn:hover {
+  border-color: var(--fg);
+  background: var(--plate);
+}
+
+.iconBtn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.iconBtn:focus-visible,
+.btnSolid:focus-visible,
+.btnOutline:focus-visible,
+.yearChip:focus-visible,
+.backLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.counter {
+  position: absolute;
+  right: max(1.25rem, calc((100% - 1320px) / 2));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  margin: 0;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--fg-3);
+}
+
+.pausedFlag {
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   STAGE
+   ============================================================ */
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  /* centred like a story, but a tall slide scrolls from its top rather than clipping */
+  align-items: safe center;
+  width: min(1320px, 100% - 2.5rem);
+  margin-inline: auto;
+  padding: clamp(1rem, 3vh, 2.5rem) 0 clamp(2.5rem, 6vh, 4rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.stage > * {
+  width: 100%;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 62rem;
+}
+
+.state {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+/* ============================================================
+   TYPE
+   ============================================================ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 clamp(1rem, 2.5vh, 1.75rem);
+  font-family: var(--code);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+.tagRule {
+  display: inline-block;
+  width: 28px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.label {
+  display: block;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(1.75rem, 4.2vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.headline em,
+.bigWord em,
+.coverTitle em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.giant {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 clamp(0.75rem, 2vw, 1.5rem);
+  margin: clamp(0.5rem, 2vh, 1.25rem) 0 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(5rem, 17vw, 13.5rem);
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.giantMoney {
+  font-size: clamp(3.5rem, 12vw, 10rem);
+}
+
+.giantUnit {
+  font-family: var(--code);
+  font-size: clamp(0.75rem, 1.4vw, 1rem);
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.bigWord {
+  margin: clamp(0.5rem, 2vh, 1rem) 0 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(3.25rem, 11vw, 9rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.code {
+  margin: clamp(0.5rem, 2vh, 1rem) 0 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(5rem, 18vw, 14rem);
+  line-height: 0.86;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.gloss {
+  max-width: 44ch;
+  margin: clamp(1rem, 3vh, 1.75rem) 0 0;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.gloss strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.lede {
+  max-width: 40ch;
+  margin: 1rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+
+.note {
+  margin: 1.25rem 0 0;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.delta {
+  display: inline-block;
+  margin: 1.25rem 0 0;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  font-family: var(--code);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+.deltaUp {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================================
+   COVER
+   ============================================================ */
+.coverWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+}
+
+.coverMap {
+  opacity: 0.9;
+}
+
+.coverMap .map {
+  max-height: 58vh;
+}
+
+@media (max-width: 860px) {
+  .coverWrap {
+    grid-template-columns: 1fr;
+  }
+  .coverMap {
+    display: none;
+  }
+}
+
+.cover {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.coverYear {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(7rem, 30vw, 22rem);
+  line-height: 0.8;
+  letter-spacing: -0.06em;
+  margin-left: -0.04em;
+}
+
+.coverTitle {
+  margin: clamp(0.75rem, 2vh, 1.25rem) 0 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.coverActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  margin-top: clamp(1.5rem, 4vh, 2.5rem);
+}
+
+.hint {
+  margin: 1.5rem 0 0;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.years {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.cover .years {
+  margin-top: 0;
+}
+
+.yearChip {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--fg-2);
+  font-family: var(--code);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.yearChip:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+.yearChipOn {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+}
+
+.yearChipOn:hover {
+  color: var(--bg);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btnSolid,
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1.35rem;
+  font-family: var(--code);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.25s;
+}
+
+.btnSolid {
+  background: var(--accent);
+  color: #fbf3e6;
+  border: 1px solid var(--accent);
+}
+
+.btnSolid:hover {
+  transform: translateY(-1px);
+}
+
+.btnOutline {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line-strong);
+}
+
+.btnOutline:hover {
+  border-color: var(--fg);
+}
+
+.btnSolid:disabled,
+.btnOutline:disabled {
+  opacity: 0.5;
+  cursor: progress;
+  transform: none;
+}
+
+.btnSolid svg,
+.btnOutline svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 0.25rem;
+}
+
+.backLink svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* ============================================================
+   DISTANCE / TIME
+   ============================================================ */
+.meterWrap {
+  width: min(36rem, 100%);
+  margin-top: 1.75rem;
+}
+
+.meter {
+  height: 6px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  width: var(--to);
+  background: var(--accent);
+  transform-origin: left;
+  animation: grow 1.6s cubic-bezier(0.2, 0.7, 0.1, 1) 0.9s both;
+}
+
+.meterScale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: clamp(1.25rem, 3vh, 2rem);
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.splitCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 2rem 1rem 0;
+  margin-right: 2rem;
+}
+
+.splitCell + .splitCell {
+  padding-left: 2rem;
+  margin-right: 0;
+  border-left: 1px solid var(--line);
+}
+
+.splitValue {
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   MAP
+   ============================================================ */
+.mapSlide {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+}
+
+.mapPlate {
+  background: var(--plate);
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  border: 1px solid var(--line);
+}
+
+.map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 62vh;
+  overflow: visible;
+}
+
+.mapGrid {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 7;
+  vector-effect: non-scaling-stroke;
+}
+
+.mapArc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.88;
+  animation: draw 1.3s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+.mapDot {
+  fill: var(--fg);
+  animation: fadeIn 0.5s ease both;
+}
+
+.mapDotHalo {
+  fill: var(--plate);
+  stroke: var(--bg);
+  stroke-width: 3;
+}
+
+.mapLabel {
+  font-family: var(--code);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  fill: var(--fg);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+}
+
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: clamp(1.25rem, 3vh, 2rem) 0 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+.ledger > div {
+  padding: 1rem 0.75rem 0 0;
+}
+
+.ledger > div + div {
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--line);
+}
+
+.ledger dd {
+  margin: 0.5rem 0 0;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* ============================================================
+   COUNTRIES
+   ============================================================ */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  max-width: 60rem;
+  margin: clamp(1.5rem, 4vh, 2.5rem) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line-strong);
+  font-family: var(--display);
+  font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.chipNew {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #17130e;
+}
+
+.chipFlag {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   MONTHS
+   ============================================================ */
+.bars {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(4px, 1vw, 12px);
+  align-items: end;
+  width: min(44rem, 100%);
+  height: clamp(7rem, 22vh, 12rem);
+  margin-top: clamp(1.5rem, 4vh, 2.5rem);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.barCol {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar {
+  width: 100%;
+  height: max(var(--h), 2px);
+  background: var(--line-strong);
+  transform-origin: bottom;
+  animation: rise-bar 0.9s cubic-bezier(0.2, 0.7, 0.1, 1) both;
+}
+
+.barHot {
+  background: var(--accent);
+}
+
+.barLabel {
+  position: absolute;
+  left: 50%;
+  bottom: -1.5rem;
+  transform: translateX(-50%);
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.bars {
+  margin-bottom: 1.75rem;
+}
+
+/* ============================================================
+   CARRIER / BASE / EXTREMES / HOURS
+   ============================================================ */
+.runners {
+  width: min(32rem, 100%);
+  margin-top: 1.75rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+.runner {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  align-items: baseline;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.runnerNo,
+.runnerCount {
+  font-family: var(--code);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.runnerName {
+  font-family: var(--display);
+  font-size: 1.35rem;
+}
+
+.pairBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+.pairValue {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: var(--display);
+  font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+  font-weight: 500;
+}
+
+.pairCount {
+  font-family: var(--code);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.legLine {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5em;
+  white-space: nowrap;
+}
+
+.legArrow {
+  color: var(--accent);
+  font-family: var(--body);
+}
+
+.extremes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.5rem, 4vw, 4rem);
+  width: 100%;
+}
+
+.extreme {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+.extreme .legLine {
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 7vw, 5.5rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.extremeKm {
+  font-family: var(--code);
+  font-size: clamp(0.875rem, 1.6vw, 1.125rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.extremeWhen {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--fg-2);
+}
+
+.bookends {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 14rem));
+  gap: clamp(1rem, 4vw, 2rem);
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+.bookends > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.bookendValue {
+  font-family: var(--display);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  font-weight: 500;
+}
+
+/* ============================================================
+   PERSONA
+   ============================================================ */
+.persona {
+  margin: clamp(0.75rem, 2vh, 1.25rem) 0 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(3.5rem, 12vw, 10rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+/* ============================================================
+   SHARE
+   ============================================================ */
+.shareSlide {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  gap: clamp(1.5rem, 5vw, 5rem);
+  align-items: center;
+}
+
+.shareCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.shareCopy .label {
+  margin-top: 1.75rem;
+}
+
+.shareActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.75rem;
+}
+
+.cardFrame {
+  justify-self: center;
+  width: min(100%, calc(64vh * 0.8));
+}
+
+.cardImg,
+.cardPlaceholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  box-shadow:
+    0 1px 0 rgba(23, 19, 14, 0.08),
+    0 24px 60px -24px rgba(23, 19, 14, 0.45);
+  transform: rotate(1.2deg);
+}
+
+.cardPlaceholder {
+  display: grid;
+  place-items: center;
+  background: var(--plate);
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* ============================================================
+   LOADING
+   ============================================================ */
+.loadingYear {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.loadingDot {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+.loadingDot:nth-child(2) { animation-delay: 0.15s; }
+.loadingDot:nth-child(3) { animation-delay: 0.3s; }
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+.rise {
+  animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.1, 1) both;
+}
+
+.pop {
+  animation: pop 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+.stamp {
+  transform-origin: left center;
+  animation: stamp 0.7s cubic-bezier(0.3, 1.3, 0.5, 1) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes stamp {
+  from { opacity: 0; transform: scale(1.35) rotate(-3deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes rise-bar {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pop,
+  .stamp,
+  .mapDot,
+  .meterFill,
+  .bar {
+    animation: none;
+  }
+  .mapArc {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .screen {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   SMALL SCREENS
+   ============================================================ */
+@media (max-width: 860px) {
+  .mapSlide,
+  .shareSlide,
+  .extremes {
+    grid-template-columns: 1fr;
+  }
+
+  .cardFrame {
+    width: min(100%, 22rem);
+    justify-self: start;
+  }
+
+  .splitCell {
+    padding-right: 1.25rem;
+    margin-right: 1.25rem;
+  }
+
+  .splitCell + .splitCell {
+    padding-left: 1.25rem;
+  }
+}

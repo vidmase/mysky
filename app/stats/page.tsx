@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useToast } from '@/hooks/use-toast'
-import { RefreshCcw } from "lucide-react"
+import Link from "next/link"
+import { RefreshCcw, Sparkles } from "lucide-react"
 import {
   ResponsiveContainer,
   PieChart,
@@ -542,6 +543,12 @@ export default function StatsPage() {
           </div>
 
           <div className={`${s.mastheadActions} ${s.rise}`} style={{ animationDelay: '280ms' }}>
+            {flights.length > 0 && (
+              <Link href="/stats/review" className={s.btnSolid}>
+                <Sparkles />
+                Year in review
+              </Link>
+            )}
             <button
               type="button"
               onClick={fetchFlights}

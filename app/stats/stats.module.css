@@ -120,6 +120,33 @@
   transition: border-color 0.25s, color 0.25s, background 0.25s;
 }
 
+.btnSolid {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 1.1rem;
+  background: var(--vermillion);
+  color: #fbf3e6;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--vermillion);
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.btnSolid:hover {
+  background: var(--vermillion-dk);
+  border-color: var(--vermillion-dk);
+}
+
+.btnSolid svg {
+  width: 14px;
+  height: 14px;
+}
+
 .btnOutline:hover:not(:disabled) {
   color: var(--vermillion);
   border-color: var(--vermillion);
