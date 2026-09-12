@@ -2,15 +2,24 @@
  * Year in Review — pure derivation of one calendar year of the log.
  *
  * Everything here is computed from the flight rows alone so the story page and
- * the share card read from the same numbers. Distance and hours follow the
- * /stats page exactly (great-circle km, km / 840 + 0.5 h) so the two surfaces
- * never disagree.
+ * the share card read from the same numbers. Countries, hours and currency come
+ * from lib/statistics/leg-metrics and fares from booking-spend — the same rules
+ * /stats uses — so the two surfaces never disagree about a flight.
  */
 
-import { europeanAirports } from '@/lib/airports'
+import { groupFlightsIntoBookings } from '@/lib/statistics/booking-spend'
+import {
+  AIRPORT_BY_IATA,
+  countryForIata,
+  detectMoneyPrefix,
+  legHours,
+} from '@/lib/statistics/leg-metrics'
 
 export type ReviewFlight = {
   id: string | number
+  reservation_number?: string | null
+  flight_duration?: string | null
+  calculated_duration?: string | null
   departure_date?: string | null
   departure_time?: string | null
   airline?: string | null
@@ -40,7 +49,9 @@ export type Leg = {
   toName: string
   airline: string | null
   km: number | null
-  price: number | null
+  hours: number | null
+  fromCountry: string | null
+  toCountry: string | null
   fromCoord: [number, number] | null // [lon, lat]
   toCoord: [number, number] | null
 }
@@ -75,11 +86,14 @@ export type YearReview = {
   nightLegs: number
   first: Leg | null
   last: Leg | null
+  /** currency symbol detected across the whole log, as /stats shows it */
+  currency: string
+  /** fares counted once per booking reference, attributed to the outbound's year */
   spend: {
     total: number
-    priced: number
+    bookings: number
     average: number
-    cheapest: Leg | null
+    cheapest: { amount: number; from: string; to: string } | null
     per100km: number | null
   } | null
   map: ReviewMap | null
@@ -102,26 +116,13 @@ export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 
 const EQUATOR_KM = 40075
 const MOON_KM = 384400
-const CRUISE_KMH = 840
-const TAXI_HOURS = 0.5
 
-const fallbackCoords = new Map<string, [number, number]>(
-  europeanAirports
-    .filter((a) => a.coordinates)
-    .map((a) => [a.iata, a.coordinates as [number, number]])
-)
-
-const num = (v: unknown): number | null => {
-  if (v == null || v === '') return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
-}
-
+/** Filed coordinates first, the airport catalogue for whichever is missing — as /stats resolves them. */
 const coord = (lat: unknown, lon: unknown, iata: string): [number, number] | null => {
-  const la = num(lat)
-  const lo = num(lon)
-  if (la != null && lo != null && !(la === 0 && lo === 0)) return [lo, la]
-  return fallbackCoords.get(iata) ?? null
+  const meta = AIRPORT_BY_IATA.get(iata)?.coordinates
+  const la = lat != null ? Number(lat) : (meta?.[1] ?? null)
+  const lo = lon != null ? Number(lon) : (meta?.[0] ?? null)
+  return la != null && lo != null && !Number.isNaN(la) && !Number.isNaN(lo) ? [lo, la] : null
 }
 
 export const haversineKm = ([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]) => {
@@ -151,12 +152,6 @@ const parseMinutes = (raw?: string | null): number | null => {
   return h < 24 && min < 60 ? h * 60 + min : null
 }
 
-const parsePrice = (raw?: string | null): number | null => {
-  if (!raw) return null
-  const n = parseFloat(String(raw).replace(/[^0-9.-]/g, ''))
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
 const cleanName = (name?: string | null) => (name ?? '').replace(/\s*\([^)]*\)\s*/g, '').trim()
 
 const iataOf = (iata?: string | null, airport?: string | null) => {
@@ -180,6 +175,7 @@ export function toLegs(flights: ReviewFlight[], until = todayISO()): Leg[] {
     const to = iataOf(f.arrival_iata, f.arrival_airport)
     const fromCoord = coord(f.departure_latitude, f.departure_longitude, from)
     const toCoord = coord(f.arrival_latitude, f.arrival_longitude, to)
+    const km = fromCoord && toCoord ? haversineKm(fromCoord, toCoord) : null
     const [y, m, d] = date.split('-').map(Number)
     legs.push({
       id: f.id,
@@ -192,8 +188,10 @@ export function toLegs(flights: ReviewFlight[], until = todayISO()): Leg[] {
       fromName: cleanName(f.departure_airport) || from,
       toName: cleanName(f.arrival_airport) || to,
       airline: f.airline && f.airline.trim() && f.airline !== 'Unknown' ? f.airline.trim() : null,
-      km: fromCoord && toCoord ? haversineKm(fromCoord, toCoord) : null,
-      price: parsePrice(f.total_receipt),
+      km,
+      hours: legHours(f, km).hours,
+      fromCountry: countryForIata(f.departure_iata, f.departure_country),
+      toCountry: countryForIata(f.arrival_iata, f.arrival_country),
       fromCoord,
       toCoord,
     })
@@ -220,12 +218,9 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
   const before = allLegs.filter((l) => l.date < `${prefix}-01-01`)
   const prevLegs = allLegs.filter((l) => l.date.startsWith(String(year - 1)))
 
-  // Countries come from the raw rows; legs keep no country columns.
-  const countryOf = new Map<string | number, [string | null, string | null]>()
-  for (const f of flights) countryOf.set(f.id, [f.departure_country ?? null, f.arrival_country ?? null])
   const countriesIn = (set: Leg[]) => {
     const out = new Set<string>()
-    for (const l of set) for (const c of countryOf.get(l.id) ?? []) if (c && c.trim()) out.add(c.trim())
+    for (const l of set) for (const c of [l.fromCountry, l.toCountry]) if (c) out.add(c)
     return out
   }
 
@@ -235,7 +230,7 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
   const priorAirports = new Set(before.flatMap((l) => [l.from, l.to]))
 
   const km = legs.reduce((s, l) => s + (l.km ?? 0), 0)
-  const hours = legs.reduce((s, l) => s + (l.km != null ? l.km / CRUISE_KMH + TAXI_HOURS : 0), 0)
+  const hours = legs.reduce((s, l) => s + (l.hours ?? 0), 0)
 
   const months = Array.from({ length: 12 }, (_, m) => legs.filter((l) => l.month === m).length)
   const busiest = months.reduce((best, c, m) => (c > best.count ? { month: m, count: c } : best), { month: 0, count: 0 })
@@ -260,10 +255,27 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
   const nightLegs = timed.filter((l) => (l.minutes ?? 0) >= 22 * 60 || (l.minutes ?? 0) < 5 * 60).length
   const earlyLegs = timed.filter((l) => (l.minutes ?? 0) >= 5 * 60 && (l.minutes ?? 0) < 8 * 60).length
 
-  const priced = legs.filter((l) => l.price != null)
-  const total = priced.reduce((s, l) => s + (l.price ?? 0), 0)
-  const pricedMeasured = priced.filter((l) => l.km)
-  const pricedKm = pricedMeasured.reduce((s, l) => s + (l.km ?? 0), 0)
+  // A return trip repeats one fare on every leg, so money is counted per booking and
+  // belongs to the year its outbound departed — exactly how /stats files spend by year.
+  const legById = new Map(allLegs.map((l) => [l.id, l]))
+  const bookings = groupFlightsIntoBookings(flights)
+    .map((b) => ({ ...b, date: parseDate(b.departure_date) }))
+    .filter((b): b is typeof b & { total: number; date: string } =>
+      b.total != null && !!b.date && b.date.startsWith(prefix) && b.date <= todayISO()
+    )
+  const total = bookings.reduce((s, b) => s + b.total, 0)
+  const cheapest = [...bookings].sort((a, b) => a.total - b.total)[0]
+  const cheapestLeg = cheapest ? legById.get(cheapest.legs[0].id) : undefined
+  let measuredFare = 0
+  let measuredKm = 0
+  for (const b of bookings) {
+    const km = b.legs.map((f) => legById.get(f.id)?.km)
+    // Only bookings whose every leg has a distance, so a fare is never spread over half a trip.
+    if (km.every((k) => k != null && k > 0)) {
+      measuredFare += b.total
+      measuredKm += km.reduce((s: number, k) => s + (k ?? 0), 0)
+    }
+  }
 
   const partial = `${prefix}-12-31` > todayISO()
   const prevKm = prevLegs.reduce((s, l) => s + (l.km ?? 0), 0)
@@ -300,13 +312,20 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
     nightLegs,
     first: legs[0] ?? null,
     last: legs.length > 1 ? legs[legs.length - 1] : null,
-    spend: priced.length
+    currency: detectMoneyPrefix(flights.map((f) => f.total_receipt)),
+    spend: bookings.length
       ? {
           total: Math.round(total * 100) / 100,
-          priced: priced.length,
-          average: Math.round((total / priced.length) * 100) / 100,
-          cheapest: [...priced].sort((a, b) => (a.price ?? 0) - (b.price ?? 0))[0],
-          per100km: pricedKm > 0 ? (pricedMeasured.reduce((s, l) => s + (l.price ?? 0), 0) / pricedKm) * 100 : null,
+          bookings: bookings.length,
+          average: Math.round((total / bookings.length) * 100) / 100,
+          cheapest: cheapest
+            ? {
+                amount: cheapest.total,
+                from: cheapestLeg?.from ?? iataOf(cheapest.legs[0].departure_iata, cheapest.legs[0].departure_airport),
+                to: cheapestLeg?.to ?? iataOf(cheapest.legs[0].arrival_iata, cheapest.legs[0].arrival_airport),
+              }
+            : null,
+          per100km: measuredKm > 0 ? (measuredFare / measuredKm) * 100 : null,
         }
       : null,
     map: projectMap(legs),
@@ -459,5 +478,5 @@ export const fmtDate = (iso: string, opts: Intl.DateTimeFormatOptions = { day: '
 export const fmtTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 
-export const fmtMoney = (v: number) =>
-  `€${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+export const fmtMoney = (v: number, currency: string) =>
+  `${currency}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
