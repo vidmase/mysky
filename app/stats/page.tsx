@@ -387,11 +387,15 @@ export default function StatsPage() {
 
     // Spending is counted per booking reference, not per leg: a return trip repeats
     // the same total fare on both of its rows.
-    const bookings = groupFlightsIntoBookings(flights)
+    // A booking with no fare on any leg is still a booking; it just cannot be
+    // spent against, so the priced ones are what the money figures work from.
+    const pricedBookings = groupFlightsIntoBookings(flights).filter(
+      (b): b is typeof b & { total: number } => b.total != null
+    )
 
     // Spending by year
     const spendingByYear = new Map<string, { total: number; count: number }>()
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       if (!b.departure_date) continue
       const date = new Date(b.departure_date)
       if (isNaN(date.getTime())) continue
@@ -405,7 +409,7 @@ export default function StatsPage() {
 
     // Spending by airline
     const spendingByAirline = new Map<string, { total: number; count: number }>()
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       const airline = b.airline
       if (!airline) continue
       const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
@@ -421,12 +425,12 @@ export default function StatsPage() {
     let minPrice = Infinity
     let maxPrice = 0
 
-    for (const b of bookings) {
+    for (const b of pricedBookings) {
       totalSpent += b.total
       minPrice = Math.min(minPrice, b.total)
       maxPrice = Math.max(maxPrice, b.total)
     }
-    const bookingsWithPrice = bookings.length
+    const bookingsWithPrice = pricedBookings.length
 
     const spendingStats = {
       totalSpent: Math.round(totalSpent * 100) / 100,
@@ -465,6 +469,14 @@ export default function StatsPage() {
     }
     const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
 
+    /* A leg's recorded duration is worked out from its dates, so a single
+       mistyped arrival date — an arrival filed years after the departure —
+       produces a duration that dwarfs every real flight put together. No
+       scheduled service runs past twenty hours nonstop, so anything longer is
+       a filing error and falls back to the distance estimate. */
+    const MAX_LEG_HOURS = 20
+    const implausible: string[] = []
+
     const airportSet = new Set<string>()
     const countrySet = new Set<string>()
     const routeSet = new Set<string>()
@@ -490,13 +502,26 @@ export default function StatsPage() {
         dist = haversine(depLat, depLon, arrLat, arrLon)
         totalKm += dist
       }
-      const recordedHours =
+      const recorded =
         parseDurationHours(f.flight_duration) ?? parseDurationHours(f.calculated_duration)
+      const recordedHours =
+        recorded != null && recorded > 0 && recorded <= MAX_LEG_HOURS ? recorded : null
+      if (recorded != null && recordedHours == null) {
+        implausible.push(`${f.departure_iata || '???'}-${f.arrival_iata || '???'} ${f.departure_date || ''} (${recorded.toFixed(1)}h)`)
+      }
       if (recordedHours != null) {
         totalHours += recordedHours
       } else if (dist != null) {
         totalHours += deriveDurationHours(dist)
       }
+    }
+
+    // Silently dropping a bad row would hide the mistake in the record itself.
+    if (implausible.length) {
+      console.warn(
+        `[Stats] ${implausible.length} leg(s) have an impossible recorded duration and were estimated from distance instead:`,
+        implausible
+      )
     }
 
     // Calculate years of flying
@@ -677,7 +702,7 @@ export default function StatsPage() {
                   <span className={s.heroUnit}>hours</span>
                 </p>
                 <p className={s.heroGloss}>
-                  Roughly {Math.round((viewStats?.hoursInAir || 0) / 24)} whole days
+                  Roughly {Math.floor((viewStats?.hoursInAir || 0) / 24)} whole days
                   spent in the air.
                 </p>
                 <div className={s.split}>

@@ -616,6 +616,71 @@
   white-space: nowrap;
 }
 
+/* --- a booking's other legs, folded under its outbound row --- */
+.legToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--code);
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 0.2s;
+}
+
+.legToggle:hover,
+.legToggle:focus-visible {
+  color: var(--vermillion);
+}
+
+.legChevron,
+.legChevronOpen {
+  width: 11px;
+  height: 11px;
+  transition: transform 0.2s;
+}
+
+.legChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* An included leg is subordinate to the row above it: indented, on quieter
+   stock, and carrying no fare of its own. */
+.legRow td {
+  background: var(--paper-2);
+}
+
+.legRow td:first-child {
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--rule-strong);
+}
+
+.fareIncluded {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.cardLegs {
+  margin-left: 0.4rem;
+  font-size: 0.4375rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vermillion);
+}
+
 /* --- reference --- */
 .ref {
   display: inline-block;
