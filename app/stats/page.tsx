@@ -20,7 +20,12 @@ import {
 } from "recharts"
 import { PaperNav } from "@/app/components/paper-nav"
 import { groupFlightsIntoBookings } from "@/lib/statistics/booking-spend"
-import { allAirports } from "@/lib/airports"
+import {
+  AIRPORT_BY_IATA,
+  countryForIata,
+  detectMoneyPrefix,
+  legHours,
+} from "@/lib/statistics/leg-metrics"
 import s from "./stats.module.css"
 
 type Flight = {
@@ -43,49 +48,6 @@ type Flight = {
   total_receipt?: string | null
   calculated_duration?: string | null
   flight_duration?: string | null
-}
-
-const AIRPORT_BY_IATA = new Map(
-  allAirports.map((a) => [a.iata.toUpperCase(), a])
-)
-
-function countryForIata(iata?: string | null, fallback?: string | null): string | null {
-  const code = (iata || "").toUpperCase().trim()
-  if (fallback && fallback.trim() && fallback.trim().toLowerCase() !== "none") {
-    return fallback.trim()
-  }
-  if (!code) return null
-  return AIRPORT_BY_IATA.get(code)?.country || null
-}
-
-function parseDurationHours(raw?: string | null): number | null {
-  if (!raw) return null
-  const s = String(raw).trim()
-  const hm = s.match(/(\d+)\s*h(?:ours?)?\s*(\d+)?\s*m?/i)
-  if (hm) {
-    const h = Number(hm[1]) || 0
-    const m = Number(hm[2]) || 0
-    return h + m / 60
-  }
-  const mins = s.match(/^(\d+)\s*m(?:in(?:utes?)?)?$/i)
-  if (mins) return (Number(mins[1]) || 0) / 60
-  const colon = s.match(/^(\d+):(\d{2})$/)
-  if (colon) return (Number(colon[1]) || 0) + (Number(colon[2]) || 0) / 60
-  return null
-}
-
-function detectMoneyPrefix(receipts: Array<string | null | undefined>): string {
-  let gbp = 0, eur = 0, usd = 0
-  for (const r of receipts) {
-    if (!r) continue
-    if (r.includes("£") || /gbp/i.test(r)) gbp++
-    else if (r.includes("€") || /eur/i.test(r)) eur++
-    else if (r.includes("$") || /usd/i.test(r)) usd++
-  }
-  if (gbp >= eur && gbp >= usd && gbp > 0) return "£"
-  if (eur >= usd && eur > 0) return "€"
-  if (usd > 0) return "$"
-  return "£" // MySky default
 }
 
 /* ------------------------------------------------------------------
@@ -467,14 +429,6 @@ export default function StatsPage() {
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
       return R * 2 * Math.asin(Math.sqrt(a))
     }
-    const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
-
-    /* A leg's recorded duration is worked out from its dates, so a single
-       mistyped arrival date — an arrival filed years after the departure —
-       produces a duration that dwarfs every real flight put together. No
-       scheduled service runs past twenty hours nonstop, so anything longer is
-       a filing error and falls back to the distance estimate. */
-    const MAX_LEG_HOURS = 20
     const implausible: string[] = []
 
     const airportSet = new Set<string>()
@@ -502,18 +456,12 @@ export default function StatsPage() {
         dist = haversine(depLat, depLon, arrLat, arrLon)
         totalKm += dist
       }
-      const recorded =
-        parseDurationHours(f.flight_duration) ?? parseDurationHours(f.calculated_duration)
-      const recordedHours =
-        recorded != null && recorded > 0 && recorded <= MAX_LEG_HOURS ? recorded : null
-      if (recorded != null && recordedHours == null) {
-        implausible.push(`${f.departure_iata || '???'}-${f.arrival_iata || '???'} ${f.departure_date || ''} (${recorded.toFixed(1)}h)`)
+      // Recorded duration when plausible (at most 20h), otherwise the distance estimate.
+      const leg = legHours(f, dist)
+      if (leg.implausible != null) {
+        implausible.push(`${f.departure_iata || '???'}-${f.arrival_iata || '???'} ${f.departure_date || ''} (${leg.implausible.toFixed(1)}h)`)
       }
-      if (recordedHours != null) {
-        totalHours += recordedHours
-      } else if (dist != null) {
-        totalHours += deriveDurationHours(dist)
-      }
+      if (leg.hours != null) totalHours += leg.hours
     }
 
     // Silently dropping a bad row would hide the mistake in the record itself.

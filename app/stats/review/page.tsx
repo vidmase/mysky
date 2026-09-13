@@ -287,7 +287,7 @@ function buildSlides(r: YearReview, years: number[], onYear: (y: number) => void
               <span className={s.splitValue}>{(r.hours / Math.max(1, r.legs)).toFixed(1)}h</span>
             </div>
           </Rise>
-          <Rise delay={800}><p className={s.note}>Estimated from great-circle distance, with taxi time.</p></Rise>
+          <Rise delay={800}><p className={s.note}>Recorded flight times where filed, otherwise estimated from distance.</p></Rise>
         </div>
       ),
     })
@@ -529,29 +529,30 @@ function buildSlides(r: YearReview, years: number[], onYear: (y: number) => void
           <Tag>{tag} · The bill</Tag>
           <Rise delay={120}><h2 className={s.headline}>What the sky cost you</h2></Rise>
           <p className={`${s.giant} ${s.giantMoney} ${s.rise}`} style={{ animationDelay: "200ms" }}>
-            €<CountUp value={sp.total} decimals={2} />
+            {r.currency}<CountUp value={sp.total} decimals={2} />
           </p>
           <Rise delay={600} className={s.split}>
             <div className={s.splitCell}>
-              <span className={s.label}>Average leg</span>
-              <span className={s.splitValue}>{fmtMoney(sp.average)}</span>
+              <span className={s.label}>Average booking</span>
+              <span className={s.splitValue}>{fmtMoney(sp.average, r.currency)}</span>
             </div>
             {sp.cheapest && (
               <div className={s.splitCell}>
                 <span className={s.label}>Best fare · {sp.cheapest.from}→{sp.cheapest.to}</span>
-                <span className={s.splitValue}>{fmtMoney(sp.cheapest.price ?? 0)}</span>
+                <span className={s.splitValue}>{fmtMoney(sp.cheapest.amount, r.currency)}</span>
               </div>
             )}
             {sp.per100km != null && (
               <div className={s.splitCell}>
                 <span className={s.label}>Per 100 km</span>
-                <span className={s.splitValue}>{fmtMoney(sp.per100km)}</span>
+                <span className={s.splitValue}>{fmtMoney(sp.per100km, r.currency)}</span>
               </div>
             )}
           </Rise>
           <Rise delay={800}>
             <p className={s.note}>
-              From {sp.priced} of {r.legs} legs with a fare on record. Fares shown as filed, not converted.
+              {sp.bookings} {sp.bookings === 1 ? "booking" : "bookings"} with a fare on record, each fare counted once.
+              Shown as filed, not converted.
             </p>
           </Rise>
         </div>
