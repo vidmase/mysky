@@ -9,8 +9,16 @@ const sql = fs.readFileSync(sqlFilePath, 'utf8');
 console.log('Applying SQL functions to Supabase...');
 
 // Supabase project details
-const projectId = 'kayyrfpijdeqfrmylecj';
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheXlyZnBpamRlcWZybXlsZWNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDQyMzA5NSwiZXhwIjoyMDU1OTk5MDk1fQ.IX2SIvkU3zihfTAil_G2T65kXFZjCZ5m2PxkoMT5UFA';
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env.local') });
+
+const projectId = process.env.SUPABASE_PROJECT_ID;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!projectId || !serviceRoleKey) {
+  console.error('Error: Supabase project id or service role key not found in environment variables');
+  console.error('Make sure SUPABASE_PROJECT_ID and SUPABASE_SERVICE_ROLE_KEY are set in .env.local');
+  process.exit(1);
+}
 
 // Create the request options
 const options = {

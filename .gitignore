@@ -45,3 +45,5 @@ supabase/.temp
 .vscode/
 .idea/
 *.swp
+# local editor config with credentials
+.cursor/mcp.json
