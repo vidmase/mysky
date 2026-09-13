@@ -45,5 +45,7 @@ supabase/.temp
 .vscode/
 .idea/
 *.swp
+# env backups
+.env*.bak
 # local editor config with credentials
 .cursor/mcp.json

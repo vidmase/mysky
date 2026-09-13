@@ -241,6 +241,17 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
+    // Fail fast if the AI provider key is missing, rather than sending an
+    // unauthenticated request to DeepSeek.
+    const deepseekApiKey = process.env.DEEPSEEK_API_KEY
+    if (!deepseekApiKey) {
+      console.error('Chat API error: DEEPSEEK_API_KEY is not set')
+      return NextResponse.json(
+        { error: 'Chat is not configured. Please contact support.' },
+        { status: 500 }
+      )
+    }
+
     // Get user's flight statistics for context
     const userStats = await getUserStats(supabase, userId)
 
@@ -297,7 +308,7 @@ export async function POST(request: Request) {
     const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer sk-a1e89c5fbbeb437fad037a33b8964f14',
+        'Authorization': 'Bearer ${deepseekApiKey}',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({

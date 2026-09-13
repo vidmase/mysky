@@ -36,6 +36,7 @@ Go to your Vercel dashboard and ensure these environment variables are set:
 - `GOOGLE_CLIENT_ID` = `<your-google-client-id>.apps.googleusercontent.com`
 - `GOOGLE_CLIENT_SECRET` = `<your-google-client-secret>`
 - `NEXTAUTH_URL` = `https://mysky.vercel.app`
+- `DEEPSEEK_API_KEY` = your DeepSeek API key, used by `POST /api/chat`
 
 **Optional (for debugging):**
 - `VERCEL_URL` = This is automatically set by Vercel
