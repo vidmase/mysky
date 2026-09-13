@@ -33,8 +33,8 @@ Your changes should automatically deploy to Vercel if you have auto-deployment e
 Go to your Vercel dashboard and ensure these environment variables are set:
 
 **Required Variables:**
-- `GOOGLE_CLIENT_ID` = `433759396764-6m9ki0gq14t70u1jme2jr64od6etcrms.apps.googleusercontent.com`
-- `GOOGLE_CLIENT_SECRET` = `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`
+- `GOOGLE_CLIENT_ID` = `<your-google-client-id>.apps.googleusercontent.com`
+- `GOOGLE_CLIENT_SECRET` = `<your-google-client-secret>`
 - `NEXTAUTH_URL` = `https://mysky.vercel.app`
 
 **Optional (for debugging):**
