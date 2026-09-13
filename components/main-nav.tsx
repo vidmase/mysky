@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /** Routes that render <PaperNav /> themselves. */
-const PAPER_ROUTES = ["/", "/flights", "/map", "/stats", "/stats/review"]
+const PAPER_ROUTES = ["/", "/flights", "/map", "/stats", "/stats/review", "/calendar"]
 
 /** Same, for routes with a dynamic segment. */
 const PAPER_ROUTE_PATTERNS = [/^\/flights\/[^/]+\/edit\/?$/]
