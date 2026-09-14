@@ -39,6 +39,9 @@ import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { DateTime } from 'luxon'
 import { calculateDuration as sharedCalculateDuration, formatTimeToHHMM } from '@/app/flights/lib/flight-utils'
+import { groupFlightsIntoBookings } from '@/lib/statistics/booking-spend'
+import { BoardingPass } from '@/app/flights/components/BoardingPass'
+import bp from '@/app/flights/components/boarding-pass.module.css'
 
 
 
@@ -283,11 +286,20 @@ const airlineColors: Record<string, string> = {
   // Add more as needed
 }
 
+/** What to call a leg above its pass. Two legs are a there-and-back; more are numbered. */
+function legCaption(index: number, total: number): string {
+  if (total <= 1) return 'Boarding pass'
+  if (total === 2) return index === 0 ? 'Outbound' : 'Return'
+  return `Leg ${index + 1} of ${total}`
+}
+
 export default function FlightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [flight, setFlight] = useState<Flight | null>(null)
+  /** Every leg of this booking, earliest first — the flight opened plus its siblings. */
+  const [legs, setLegs] = useState<Flight[]>([])
   const [statusLoading, setStatusLoading] = useState(false)
   const [actualTimes, setActualTimes] = useState<{
     depActual: string | null
@@ -305,6 +317,10 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { id } = React.use(params)
+
+  // Until the siblings arrive — and for a booking that has none — the flight
+  // opened is the whole booking, so it prints on its own.
+  const passLegs = legs.length > 0 ? legs : flight ? [flight] : []
 
   // Aircraft photo feature removed: no registration editor state
 
@@ -329,6 +345,39 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
     fetchFlightData()
   }, [id])
+
+  // A return is filed as one row per leg sharing a reservation reference, so the
+  // other legs come from the same list the logbook reads and are grouped by the
+  // shared rule — reproducing "what counts as one booking" here would be a
+  // second copy of it, and placeholder references would collapse the wrong rows.
+  useEffect(() => {
+    if (!flight) return
+    let alive = true
+
+    ;(async () => {
+      try {
+        const res = await fetch('/api/flights')
+        if (!res.ok) return
+        const payload = await res.json()
+        const all: Flight[] = payload.data ?? payload ?? []
+        if (!Array.isArray(all)) return
+
+        const booking = groupFlightsIntoBookings(all).find((b) =>
+          b.legs.some((leg) => String(leg.id) === String(flight.id))
+        )
+        // A single-leg booking needs no second pass; the flight itself is enough.
+        if (alive && booking && booking.legs.length > 1) setLegs(booking.legs)
+      } catch (err) {
+        // The passes are a nicer view of a flight already on screen, so a failed
+        // lookup falls back to printing the one leg rather than surfacing an error.
+        console.error('Could not load the other legs of this booking:', err)
+      }
+    })()
+
+    return () => {
+      alive = false
+    }
+  }, [flight])
 
   // Fetch real-time/historical actual times by flight number and date
   useEffect(() => {
@@ -553,190 +602,25 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
           </Button>
         </div>
 
-        <div
-          className="relative rounded-xl overflow-hidden bg-[hsl(var(--card))] shadow-lg"
-          style={{ border: `3px solid ${airlineColor}` }}
-        >
-          {/* Modernized Flight Card Visuals: glassmorphism, gradient, animated border, airline branding */}
-          <div className="absolute inset-0 z-0 animate-gradient-x bg-gradient-to-r from-flight/30 via-airport/20 to-stats/30 blur-[2px] opacity-70" />
-          <div className="absolute inset-0 z-0 bg-[color-mix(in_srgb,var(--paper)_60%,transparent)] backdrop-blur-[8px]" />
-          <div className="absolute inset-0 z-10 rounded-xl border-2 border-flight/30 animate-border-glow pointer-events-none" />
-          <div
-            className="p-4 text-[var(--ink)] relative z-20"
-            style={{
-              background: `linear-gradient(90deg, ${airlineColor} 0%, #38bdf8 100%)`,
-            }}
-          >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="relative w-8 h-8 rounded-md overflow-hidden flex items-center justify-center">
-                        {flight.airline ? (
-                          <Image
-                            src={getAirlineLogo(flight.airline, flight.flight_number)}
-                            alt={`${flight.airline} logo`}
-                            width={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
-                            height={flight.airline.toLowerCase() === 'easyjet' ? 40 : 28}
-                            className={`object-contain p-0.5 ${flight.airline.toLowerCase() === 'easyjet' ? 'scale-125' : ''}`}
-                            onError={(e) => {
-                              // On error, show the Building icon
-                              e.currentTarget.style.display = 'none'
-                              e.currentTarget.parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden')
-                            }}
-                          />
-                        ) : (
-                          <Building className="h-5 w-5 text-[var(--ink)]" />
-                        )}
-                        <Building className="h-5 w-5 text-[var(--ink)] absolute fallback-icon hidden" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="font-medium">
-                      {flight.airline || "Unknown Airline"}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <span className="text-lg font-semibold">{flight.airline}</span>
+        {/* ── THE PASSES ──────────────────────────────────────
+            One per leg of the booking, in the carrier's own colours. A return
+            prints both halves, which is the thing a single card could not show. */}
+        <div className="space-y-5">
+          {passLegs.map((leg, i) => (
+            <div key={leg.id}>
+              <div
+                className={`${bp.legLabel} ${
+                  String(leg.id) === String(flight.id) ? bp.legLabelCurrent : ''
+                }`}
+              >
+                <span>{legCaption(i, passLegs.length)}</span>
+                {String(leg.id) === String(flight.id) && passLegs.length > 1 && (
+                  <span>· this leg</span>
+                )}
               </div>
-              <Badge variant="outline" className="bg-[rgba(255,255,255,0.15)] text-[var(--paper)] border-[rgba(255,255,255,0.35)]">
-                {flight.flight_number}
-              </Badge>
+              <BoardingPass flight={leg} />
             </div>
-          </div>
-
-          <div className="p-6 relative z-20">
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-r-full"></div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-background rounded-l-full"></div>
-
-            <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="text-center md:text-left space-y-2">
-                <div className="text-5xl font-bold tracking-tight text-flight">
-                  {(flight.departure_iata && flight.departure_iata !== "None") ? flight.departure_iata : flight.departure_airport.substring(0, 3).toUpperCase()}
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium">{flight.departure_airport}</div>
-                  <div className="text-2xl font-semibold">{formatTime(flight.departure_time)}</div>
-                  <div className="text-sm text-muted-foreground">{format(new Date(flight.departure_date), "MMM d, yyyy")}</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center w-full max-w-xs md:max-w-sm">
-                <div className="relative w-full h-8 flex items-center justify-center">
-                  <div className="absolute left-0 right-0 top-1/2 h-2 bg-gradient-to-r from-flight via-[var(--brass)] to-airport rounded-full shadow-inner" style={{ transform: 'translateY(-50%)' }} />
-                  {(() => {
-                    let progress = 0;
-                    try {
-                      const depIata = flight.departure_iata;
-                      const arrIata = flight.arrival_iata;
-                      if (depIata && arrIata) {
-                        const depTz = airportTimeZones[depIata];
-                        const arrTz = airportTimeZones[arrIata];
-                        if (depTz && arrTz) {
-                          const datePart = flight.departure_date.split('T')[0];
-                          const dep = DateTime.fromISO(`${datePart}T${flight.departure_time}`, { zone: depTz });
-                          const arr = DateTime.fromISO(`${datePart}T${flight.arrival_time}`, { zone: arrTz });
-                          let arrAdjusted = arr;
-                          if (arr < dep) arrAdjusted = arr.plus({ days: 1 });
-                          const now = DateTime.now().setZone(depTz);
-                          if (now < dep) progress = 0;
-                          else if (now > arrAdjusted) progress = 1;
-                          else {
-                            const total = arrAdjusted.toUTC().toMillis() - dep.toUTC().toMillis();
-                            const elapsed = now.toUTC().toMillis() - dep.toUTC().toMillis();
-                            progress = total > 0 ? elapsed / total : 0;
-                          }
-                          progress = Math.max(0, Math.min(1, progress));
-                        }
-                      }
-                    } catch {}
-                    const left = `calc(${progress * 100}% - 16px)`;
-                    return (
-                      <div
-                        className="absolute top-1/2 animate-plane-float"
-                        style={{
-                          left,
-                          filter: 'drop-shadow(0 4px 12px rgba(56,189,248,0.25)) drop-shadow(0 0 8px #a855f7aa)',
-                          zIndex: 30,
-                          transform: 'translateY(-50%)',
-                        }}
-                      >
-                        <PlaneIcon
-                          className={`h-9 w-9 text-airline transition-all duration-700 ${progress === 0 ? 'opacity-60' : progress === 1 ? 'opacity-60' : 'opacity-100'}`}
-                        />
-                      </div>
-                    );
-                  })()}
-                  <div className="absolute left-0 top-1/2 w-4 h-4 bg-flight rounded-full border-2 border-[var(--paper)] shadow" style={{ transform: 'translateY(-50%)' }} />
-                  <div className="absolute right-0 top-1/2 w-4 h-4 bg-airport rounded-full border-2 border-[var(--paper)] shadow" style={{ transform: 'translateY(-50%)' }} />
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground font-medium text-center">
-                  {renderDuration()}
-                </div>
-              </div>
-
-              <div className="text-center md:text-right space-y-2">
-                <div className="text-5xl font-bold tracking-tight text-airport">
-                  {(flight.arrival_iata && flight.arrival_iata !== "None") ? flight.arrival_iata : flight.arrival_airport.substring(0, 3).toUpperCase()}
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium">
-                    {flight.arrival_airport}
-                    {flight.arrival_country && ` (${flight.arrival_country})`}
-                  </div>
-                  <div className="text-2xl font-semibold">{formatTime(flight.arrival_time)}</div>
-                  <div className="text-sm text-muted-foreground">{format(new Date(flight.departure_date), "MMM d, yyyy")}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-dashed">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Passenger</div>
-                  <div className="font-medium">{flight.passenger_name}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Reservation</div>
-                  <div className="font-medium">{flight.reservation_number}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Seat</div>
-                  <div className="font-medium">
-                    {flight.seat ? (
-                      <Badge variant="outline" className="bg-airline/10 text-airline border-airline/20">
-                        {flight.seat}
-                      </Badge>
-                    ) : (
-                      "Not Assigned"
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Fare</div>
-                  <div className="font-medium tabular-nums">
-                    {flight.total_receipt || "Not recorded"}
-                  </div>
-                  {/* The extras came out of that fare, so they are shown as a share of
-                      it. Absent means "not known", which is not the same as nothing
-                      bought — so nothing is printed rather than a misleading zero. */}
-                  {flight.extras_receipt && (
-                    <div className="text-xs text-muted-foreground">
-                      incl. <span className="font-medium text-foreground tabular-nums">{flight.extras_receipt}</span> on extras
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-sm text-muted-foreground flex justify-between items-center">
-              <div>Purchased: {format(new Date(flight.purchased_date), "MMM d, yyyy")} {flight.purchase_time}</div>
-              <div className="flex items-center space-x-2">
-                <Wifi className="h-4 w-4" />
-                <Utensils className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
         <Tabs defaultValue="details" className="w-full">

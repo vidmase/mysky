@@ -1,4 +1,11 @@
-import { AIRLINE_CODE_TO_NAME, AIRLINE_NAME_TO_CODE, LOCAL_AIRLINE_LOGOS } from '@/lib/airlines'
+import {
+  AIRLINE_BRANDS,
+  AIRLINE_CODE_TO_NAME,
+  AIRLINE_NAME_TO_CODE,
+  DEFAULT_AIRLINE_BRAND,
+  LOCAL_AIRLINE_LOGOS,
+  type AirlineBrand,
+} from '@/lib/airlines'
 import { AIRPORT_TIMEZONES } from '@/lib/airport-timezones'
 import { allAirports } from '@/lib/airports'
 import { DateTime } from 'luxon'
@@ -173,31 +180,40 @@ export function resolveAirlineName(
   return code ? AIRLINE_CODE_TO_NAME[code] ?? null : null
 }
 
+/**
+ * The carrier's IATA code, from the airline field if it names one and from the
+ * flight number otherwise. The logo, the printed name and the boarding-pass
+ * colours all read from this, so a row resolves the same way everywhere.
+ */
+export function resolveAirlineCode(
+  airline?: string | null,
+  flightNumber?: string | null
+): string | null {
+  if (airline) {
+    const a = airline.trim()
+    if (/^[A-Z0-9]{2,3}$/i.test(a)) return a.toUpperCase()
+    const code = AIRLINE_NAME_TO_CODE[norm(a)]
+    if (code) return code
+  }
+  return airlineCodeFromFlightNumber(flightNumber)
+}
+
+/** How this carrier's boarding pass is printed. Unknown carriers use the app's stock. */
+export function airlineBrand(
+  airline?: string | null,
+  flightNumber?: string | null
+): AirlineBrand {
+  const code = resolveAirlineCode(airline, flightNumber)
+  return (code && AIRLINE_BRANDS[code]) || DEFAULT_AIRLINE_BRAND
+}
+
 // Robust airline logo resolver supporting codes and names
 export function getAirlineLogo(airline: string | null, flightNumber?: string | null): string {
   const cacheKey = `${airline ?? ''}|${flightNumber ?? ''}`
   const cached = logoCache.get(cacheKey)
   if (cached !== undefined) return cached
 
-  // Try to determine IATA/ICAO code
-  let code: string | null = null
-
-  if (airline) {
-    const a = airline.trim()
-    if (/^[A-Z0-9]{2,3}$/.test(a) || /^[A-Z0-9]{2,3}$/.test(a.toUpperCase())) {
-      code = a.toUpperCase()
-    } else {
-      const name = norm(a)
-      if (AIRLINE_NAME_TO_CODE[name]) {
-        code = AIRLINE_NAME_TO_CODE[name]
-      }
-    }
-  }
-
-  if (!code && flightNumber) {
-    const m = flightNumber.trim().toUpperCase().match(/^([A-Z]{2,3}|[A-Z]\d)\s?-?\d+/)
-    if (m) code = m[1]
-  }
+  const code = resolveAirlineCode(airline, flightNumber)
 
   let result = ''
 
