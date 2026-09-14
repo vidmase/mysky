@@ -811,3 +811,33 @@
     width: min(1440px, 100% - 2rem);
   }
 }
+
+/* The extras share of the total. It sits between the figure and its note because
+   it qualifies the figure — it is a slice of it, not a number of its own. */
+.moneyOfWhich {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.moneyOfWhich strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-1);
+}
+
+.moneyShare {
+  padding: 0.05rem 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--vermillion) 45%, transparent);
+  border-radius: 2px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: var(--vermillion-dk);
+  font-variant-numeric: tabular-nums;
+}

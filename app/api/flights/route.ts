@@ -131,6 +131,9 @@ export async function POST(request: Request) {
         arrival_time: data.arrival_time || data.arrivalTime,
         seat: data.seat,
         total_receipt: data.total_receipt || data.totalReceipt,
+        // Filed like the fare — it is part of the fare. Blank means "not known",
+        // so it is stored as null rather than "".
+        extras_receipt: data.extras_receipt?.trim() || null,
         purchased_date: data.purchased_date || data.purchasedDate,
         purchase_time: data.purchase_time || data.purchaseTime,
         passenger_name: data.passenger_name || data.passengerName,
@@ -149,6 +152,9 @@ export async function POST(request: Request) {
         arrival_time: data.return_arrival_time,
         seat: data.return_seat,
         total_receipt: data.total_receipt || data.totalReceipt,
+        // Filed like the fare — it is part of the fare. Blank means "not known",
+        // so it is stored as null rather than "".
+        extras_receipt: data.extras_receipt?.trim() || null,
         purchased_date: data.purchased_date || data.purchasedDate,
         purchase_time: data.purchase_time || data.purchaseTime,
         passenger_name: data.passenger_name || data.passengerName,
@@ -212,6 +218,9 @@ export async function POST(request: Request) {
         arrival_time: data.arrival_time || data.arrivalTime,
         seat: data.seat,
         total_receipt: data.total_receipt || data.totalReceipt,
+        // Filed like the fare — it is part of the fare. Blank means "not known",
+        // so it is stored as null rather than "".
+        extras_receipt: data.extras_receipt?.trim() || null,
         purchased_date: data.purchased_date || data.purchasedDate,
         purchase_time: data.purchase_time || data.purchaseTime,
         passenger_name: data.passenger_name || data.passengerName,

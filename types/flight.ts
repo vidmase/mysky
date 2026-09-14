@@ -30,6 +30,8 @@ export type Flight = {
   return_is_direct: boolean | null
   /** Booking was cancelled: kept in the log, watermarked, and left out of spend. */
   cancelled: boolean | null
+  /** Part of total_receipt that went on extras — seats, bags, priority. Not an addition to it. */
+  extras_receipt: string | null
 }
 
 export type Airport = {

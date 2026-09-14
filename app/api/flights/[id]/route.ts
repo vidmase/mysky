@@ -73,6 +73,7 @@ export async function PUT(
       departure_time,
       arrival_time,
       total_receipt,
+      extras_receipt,
       purchased_date,
       purchase_time,
       airline,
@@ -107,6 +108,9 @@ export async function PUT(
         departure_time,
         arrival_time,
         total_receipt,
+        // A blank field means "not known", which is null — storing "" would later
+        // read as a filed figure of nothing.
+        extras_receipt: extras_receipt?.trim() || null,
         purchased_date,
         purchase_time,
         airline,

@@ -46,6 +46,8 @@ type Flight = {
   arrival_time?: string | null
   reservation_number?: string | null
   total_receipt?: string | null
+  extras_receipt?: string | null
+  cancelled?: boolean | null
   calculated_duration?: string | null
   flight_duration?: string | null
 }
@@ -212,6 +214,8 @@ export default function StatsPage() {
             arrival_time: f.arrival_time || null,
             reservation_number: f.reservation_number || null,
             total_receipt: f.total_receipt || null,
+            extras_receipt: f.extras_receipt || null,
+            cancelled: f.cancelled ?? null,
             calculated_duration: f.calculated_duration || null,
             flight_duration: f.flight_duration || null,
           }
@@ -388,16 +392,27 @@ export default function StatsPage() {
     let totalSpent = 0
     let minPrice = Infinity
     let maxPrice = 0
+    // Extras are a slice of totalSpent, not a sum alongside it: the fare on the
+    // confirmation already includes the seats and bags. So this is counted to be
+    // reported as "of which", and never added to the total.
+    let totalExtras = 0
+    let bookingsWithExtras = 0
 
     for (const b of pricedBookings) {
       totalSpent += b.total
       minPrice = Math.min(minPrice, b.total)
       maxPrice = Math.max(maxPrice, b.total)
+      if (b.extras != null) {
+        totalExtras += b.extras
+        bookingsWithExtras++
+      }
     }
     const bookingsWithPrice = pricedBookings.length
 
     const spendingStats = {
       totalSpent: Math.round(totalSpent * 100) / 100,
+      totalExtras: Math.round(totalExtras * 100) / 100,
+      bookingsWithExtras,
       bookingsWithPrice,
       avgPerBooking: bookingsWithPrice > 0 ? Math.round((totalSpent / bookingsWithPrice) * 100) / 100 : 0,
       minPrice: minPrice === Infinity ? 0 : Math.round(minPrice * 100) / 100,
@@ -817,8 +832,20 @@ export default function StatsPage() {
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Total spent</dt>
                     <dd className={s.moneyValue}>{money(spend.totalSpent)}</dd>
+                    {/* Extras come out of this figure, not on top of it, so they read
+                        as a share of it rather than as a fifth column of their own. */}
+                    {spend.totalExtras > 0 && (
+                      <dd className={s.moneyOfWhich}>
+                        of which <strong>{money(spend.totalExtras)}</strong> on extras
+                        <span className={s.moneyShare}>
+                          {((spend.totalExtras / spend.totalSpent) * 100).toFixed(1)}%
+                        </span>
+                      </dd>
+                    )}
                     <dd className={s.moneyNote}>
                       across {spend.bookingsWithPrice} {spend.bookingsWithPrice === 1 ? 'booking' : 'bookings'} with a fare on record
+                      {spend.bookingsWithExtras > 0 &&
+                        `; extras filed on ${spend.bookingsWithExtras} of them`}
                     </dd>
                   </div>
                   <div className={s.moneyCell}>
