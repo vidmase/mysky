@@ -4,7 +4,6 @@ import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, type DeepSeekModelId } from '@
 import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { NextResponse } from 'next/server'
 import { getUserStats } from "../../../src/lib/services/stats"
-import fs from 'fs'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,100 +70,38 @@ const iataToCountry: { [key: string]: string } = {
   'PFO': 'Cyprus'
 }
 
-// --- Dynamic flight filter ---
-function filterFlightsByQuestion(flights: any[], question: string): { matches: any[], explanation: string } {
-  const q = question.toLowerCase();
-  let matches: any[] = [];
-  let explanation = '';
+// Counting is the model's weakest move and the one most often asked for
+// ("how many in 2026?", "which month do I fly most?"). Count in code and hand
+// over the answer, so a miscount is not possible. Computed over every flight,
+// even when the detail list below is trimmed.
+function summariseByPeriod(flights: any[]): string {
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const byYear = new Map<string, number[]>()
 
-  // Reservation number (case-insensitive, partial)
-  const reservationMatch = q.match(/([a-z0-9]{5,})/i);
-  if (reservationMatch) {
-    matches = flights.filter(f => (f.reservation_number || '').toLowerCase().includes(reservationMatch[1].toLowerCase()));
-    if (matches.length > 0) return { matches, explanation: `Matched reservation number: ${reservationMatch[1]}` };
+  for (const f of flights) {
+    // Trimmed: at least one row is stored as ' 2014-03-16', and an untrimmed
+    // slice drops it from the counts entirely.
+    const date = String(f.departure_date ?? '').trim()
+    const [year, month] = [date.slice(0, 4), Number(date.slice(5, 7))]
+    if (!/^\d{4}$/.test(year) || !(month >= 1 && month <= 12)) continue
+    if (!byYear.has(year)) byYear.set(year, new Array(12).fill(0))
+    byYear.get(year)![month - 1] += 1
   }
 
-  // Flight number (case-insensitive, partial)
-  const flightNumMatch = q.match(/([a-zA-Z]{2,}\d{2,})/);
-  if (flightNumMatch) {
-    matches = flights.filter(f => (f.flight_number || '').toLowerCase().includes(flightNumMatch[1].toLowerCase()));
-    if (matches.length > 0) return { matches, explanation: `Matched flight number: ${flightNumMatch[1]}` };
-  }
+  const years = [...byYear.keys()].sort().reverse()
+  if (years.length === 0) return 'No dated flights on record.'
 
-  // Seat (case-insensitive, partial)
-  const seatMatch = q.match(/seat\s*([a-z0-9]+)/i);
-  if (seatMatch) {
-    matches = flights.filter(f => (f.seat || '').toLowerCase().includes(seatMatch[1].toLowerCase()));
-    if (matches.length > 0) return { matches, explanation: `Matched seat: ${seatMatch[1]}` };
-  }
-
-  // Airline/company/booking agent/operator (case-insensitive, partial)
-  const companyMatch = q.match(/(tez tour|british airways|airline|operator|company|agent|[a-z0-9 ]{3,})/i);
-  if (companyMatch) {
-    matches = flights.filter(f =>
-      (f.airline || '').toLowerCase().includes(companyMatch[1].toLowerCase()) ||
-      (f.operator || '').toLowerCase().includes(companyMatch[1].toLowerCase()) ||
-      (f.booking_agent || '').toLowerCase().includes(companyMatch[1].toLowerCase()) ||
-      (f.notes || '').toLowerCase().includes(companyMatch[1].toLowerCase())
-    );
-    if (matches.length > 0) return { matches, explanation: `Matched company/airline/operator: ${companyMatch[1]}` };
-  }
-
-  // Airport code, city, or airport name (case-insensitive, partial)
-  const iataMatch = q.match(/\b([A-Z]{3})\b/);
-  if (iataMatch) {
-    matches = flights.filter(f =>
-      (f.departure_iata || '').toLowerCase().includes(iataMatch[1].toLowerCase()) ||
-      (f.arrival_iata || '').toLowerCase().includes(iataMatch[1].toLowerCase())
-    );
-    if (matches.length > 0) return { matches, explanation: `Matched airport code: ${iataMatch[1]}` };
-  }
-  // City or airport name
-  const cityOrAirportMatch = q.match(/([a-zA-Z ]{3,})/);
-  if (cityOrAirportMatch) {
-    matches = flights.filter(f =>
-      (f.departure_airport || '').toLowerCase().includes(cityOrAirportMatch[1].toLowerCase()) ||
-      (f.arrival_airport || '').toLowerCase().includes(cityOrAirportMatch[1].toLowerCase()) ||
-      (f.departure_city || '').toLowerCase().includes(cityOrAirportMatch[1].toLowerCase()) ||
-      (f.arrival_city || '').toLowerCase().includes(cityOrAirportMatch[1].toLowerCase())
-    );
-    if (matches.length > 0) return { matches, explanation: `Matched city or airport: ${cityOrAirportMatch[1]}` };
-  }
-
-  // Date (YYYY-MM-DD or month/year)
-  const dateMatch = q.match(/(\d{4}-\d{2}-\d{2})/);
-  if (dateMatch) {
-    matches = flights.filter(f => f.departure_date === dateMatch[1] || f.arrival_date === dateMatch[1]);
-    if (matches.length > 0) return { matches, explanation: `Matched date: ${dateMatch[1]}` };
-  }
-  // Month (e.g., 'april', 'may')
-  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-  for (const month of monthNames) {
-    if (q.includes(month)) {
-      matches = flights.filter(f => {
-        const depMonth = f.departure_date ? monthNames[new Date(f.departure_date).getMonth()] : '';
-        const arrMonth = f.arrival_date ? monthNames[new Date(f.arrival_date).getMonth()] : '';
-        return depMonth === month || arrMonth === month;
-      });
-      if (matches.length > 0) return { matches, explanation: `Matched month: ${month}` };
-    }
-  }
-
-  // Fuzzy/partial match on all fields
-  matches = flights.filter(f => {
-    const fields = [
-      f.reservation_number, f.flight_number, f.seat, f.airline,
-      f.departure_iata, f.arrival_iata, f.departure_airport, f.arrival_airport,
-      f.departure_city, f.arrival_city, f.departure_date, f.arrival_date
-    ];
-    return fields.some(val => (val || '').toLowerCase().includes(q));
-  });
-  if (matches.length > 0) return { matches, explanation: 'Fuzzy/partial match on multiple fields.' };
-
-  // Fallback: top 5 recent flights
-  matches = flights.slice().sort((a, b) => new Date(b.departure_date).getTime() - new Date(a.departure_date).getTime()).slice(0, 5);
-  explanation = 'No direct match found. Showing your 5 most recent flights.';
-  return { matches, explanation };
+  return years
+    .map((year) => {
+      const months = byYear.get(year)!
+      const total = months.reduce((a, b) => a + b, 0)
+      const breakdown = months
+        .map((n, i) => (n > 0 ? `${MONTHS[i]} ${n}` : null))
+        .filter(Boolean)
+        .join(', ')
+      return `  ${year}: ${total} flight${total === 1 ? '' : 's'} (${breakdown})`
+    })
+    .join('\n')
 }
 
 // Helper to calculate duration string from dates and times
@@ -190,18 +127,6 @@ function getErrorMessage(error: any): string {
     return "There's an issue with my configuration. Please contact support."
   }
   return "I encountered an error while processing your request. Please try again with a shorter message."
-}
-
-// Helper to read and sample the CSV file
-function getSampledCSV(filePath: string, maxLines: number = 100): string {
-  try {
-    const csv = fs.readFileSync(filePath, 'utf8');
-    const lines = csv.split('\n');
-    if (lines.length <= maxLines) return csv;
-    return [lines[0], ...lines.slice(1, maxLines)].join('\n'); // header + first N rows
-  } catch (e) {
-    return '';
-  }
 }
 
 export async function POST(request: Request) {
@@ -250,42 +175,85 @@ export async function POST(request: Request) {
     // Get user's flight statistics for context
     const userStats = await getUserStats(supabase, userId)
 
-    // Dynamic context: filter flights based on user question
-    const { data: allFlights } = await supabase
+    // Every flight the user owns, newest first. Selecting a "relevant" handful
+    // and then telling the model to use only that is what made counting
+    // questions wrong: "how many flights in 2026" was answered from the five
+    // most recent, so a year spread over six months came back as two.
+    const { data: allFlightsRaw, error: flightsError } = await supabase
       .from('vidmaflights')
       .select('*')
       .eq('owner_id', userId)
-    const filterResult = filterFlightsByQuestion(allFlights || [], message)
-    let relevantFlights = filterResult.matches
-    let filterExplanation = filterResult.explanation
-    // Fallback: if no relevant flights, use recent flights
-    if (!relevantFlights || relevantFlights.length === 0) {
-      relevantFlights = (allFlights || []).sort((a, b) => new Date(b.departure_date).getTime() - new Date(a.departure_date).getTime()).slice(0, 10)
+      .order('departure_date', { ascending: false })
+
+    // Answering from a partial record is worse than not answering: it reads as
+    // fact and is wrong. Say so instead.
+    if (flightsError) {
+      console.error('Chat: could not load flights:', flightsError.message)
+      return NextResponse.json(
+        { error: 'Could not read your flights just now. Please try again.' },
+        { status: 503 }
+      )
     }
 
-    // Add calculated_duration to each flight if not present
-    const relevantFlightsWithDuration = relevantFlights.map(flight => {
-      let calculated_duration = flight.flight_duration;
-      if (!calculated_duration && flight.departure_date && flight.departure_time && flight.arrival_date && flight.arrival_time) {
-        calculated_duration = calculateDurationString(flight.departure_date, flight.departure_time, flight.arrival_date, flight.arrival_time);
-      }
-      return { ...flight, calculated_duration };
-    });
+    const allFlights = (allFlightsRaw ?? []).map((flight) => ({
+      ...flight,
+      calculated_duration:
+        flight.flight_duration ||
+        calculateDurationString(
+          flight.departure_date,
+          flight.departure_time,
+          flight.arrival_date,
+          flight.arrival_time
+        ),
+    }))
 
-    // Build flights text for context
-    const flightsText = relevantFlightsWithDuration.map(f =>
-      `- ${f.departure_date}: ${f.departure_airport || ''} (${f.departure_iata || ''}) → ${f.arrival_airport || ''} (${f.arrival_iata || ''}), ${f.departure_time || ''}–${f.arrival_time || ''}, Airline: ${f.airline || ''} (${f.flight_number || ''}), Seat: ${f.seat || 'N/A'}, Reservation: ${f.reservation_number || 'N/A'}, Duration: ${f.calculated_duration || ''}, Distance: ${f.distance_km || ''} km`
-    ).join('\n')
+    // Counted over everything, so the totals stay exact even if the per-flight
+    // list below is trimmed for a very large logbook.
+    const periodSummary = summariseByPeriod(allFlights)
 
-    // Pass full JSON of relevant flights
-    const flightsJson = JSON.stringify(relevantFlightsWithDuration, null, 2)
+    // One line per flight. A generous ceiling rather than none: 2000 lines is
+    // roughly 150k characters, past what the model can hold. The summary above
+    // still covers every flight when this trims.
+    const MAX_FLIGHT_LINES = 2000
+    const listedFlights = allFlights.slice(0, MAX_FLIGHT_LINES)
+    const flightsText = listedFlights
+      .map((f) =>
+        `${f.departure_date || '????-??-??'} ${f.departure_iata || '???'}->${f.arrival_iata || '???'} ` +
+        `${f.departure_airport || ''} to ${f.arrival_airport || ''}, ` +
+        `${f.airline || 'unknown airline'} ${f.flight_number || ''}, ` +
+        `${f.departure_time || '??'}-${f.arrival_time || '??'}, ` +
+        `duration ${f.calculated_duration || 'unknown'}, seat ${f.seat || 'n/a'}, ` +
+        `fare ${f.total_receipt || 'n/a'}, ref ${f.reservation_number || 'n/a'}`
+      )
+      .join('\n')
+
+    const trimmedNote =
+      allFlights.length > listedFlights.length
+        ? `\n(Showing the ${listedFlights.length} most recent of ${allFlights.length}. The per-year counts above cover all ${allFlights.length}.)`
+        : ''
+
     const now = new Date().toISOString()
-    // Read CSV and include in prompt
-    const csvData = getSampledCSV('data/flights.csv', 100);
     // The data belongs in the system message, not in every user turn: repeating
     // it made each question read as a fresh data dump rather than the next line
     // of a conversation.
-    const systemPrompt = `You are a helpful AI assistant for a flight tracking application.\n\nCurrent timestamp: ${now}\n\nHere are the user's current travel statistics:\n${JSON.stringify(userStats, null, 2)}\n\n${filterExplanation ? 'Flight search explanation: ' + filterExplanation + '\n' : ''}Relevant Flights (summary):\n${flightsText || 'No relevant flights found.'}\n\nRelevant Flights (JSON):\n${flightsJson}\n\nHere is your flight database in CSV format:\n${csvData}\n\nUse ONLY the above data to answer questions about the user's flights. Do not make up or interpret data.\n\nThe messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.`
+    const systemPrompt = `You are a helpful AI assistant for a flight tracking application.
+
+Current timestamp: ${now}
+
+The user's complete flight record is below — ${allFlights.length} flight${allFlights.length === 1 ? '' : 's'} in total. This is the whole record, not a sample.
+
+Flights per year, counted for you (use these numbers directly; do not recount):
+${periodSummary}
+
+Derived travel statistics:
+${JSON.stringify(userStats, null, 2)}
+
+Every flight, newest first:
+${flightsText || 'No flights on record.'}${trimmedNote}
+
+Answer only from the record above, and never invent a flight. When you are asked how many, or which month or year, take the figure from the counted list rather than tallying the lines yourself. If the record genuinely does not cover something, say so plainly.
+
+The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.`
 
     // --- LOGGING for debugging ---
 
@@ -312,7 +280,7 @@ export async function POST(request: Request) {
       .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-    console.log(`Chat: ${relevantFlightsWithDuration.length} flights, ${history.length} prior messages to ${selectedModel} — ${filterExplanation}`)
+    console.log(`Chat: ${allFlights.length} flights, ${history.length} prior messages to ${selectedModel}`)
 
     // Store user message in database
     await supabase
@@ -400,14 +368,6 @@ export async function POST(request: Request) {
       })
       .select('id, created_at')
       .single()
-
-    // If user asks for JSON, return it directly
-    if (/show me (that )?json|show json|show me the json/i.test(message)) {
-      return NextResponse.json({
-        flights: relevantFlightsWithDuration,
-        explanation: filterExplanation
-      });
-    }
 
     return NextResponse.json({
       id: storedAssistant?.id,
