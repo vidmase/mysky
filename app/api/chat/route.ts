@@ -179,18 +179,6 @@ function calculateDurationString(depDate: string, depTime: string, arrDate: stri
   return `${hours}h ${minutes}m`;
 }
 
-function createContextualPrompt(userStats: UserStats & { nextFlight?: any }, userMessage: string, flightsText: string): string {
-  const today = new Date().toISOString().split('T')[0]
-  let nextFlightText = ''
-  if (userStats.nextFlight) {
-    nextFlightText = `\nNext upcoming flight: ${userStats.nextFlight.departure_airport || ''} (${userStats.nextFlight.departure_iata || ''}) to ${userStats.nextFlight.arrival_airport || ''} (${userStats.nextFlight.arrival_iata || ''}) on ${userStats.nextFlight.departure_date} at ${userStats.nextFlight.departure_time || 'unknown time'} (local time). Arrival: ${userStats.nextFlight.arrival_time || 'unknown time'}`
-  } else {
-    nextFlightText = '\nNo upcoming flights found.'
-  }
-  const context = `You are a helpful AI assistant for a flight tracking application. Here are the user's current travel statistics:\n\nToday's date: ${today}${nextFlightText}\n\nTravel Profile:\n- Total flights taken: ${userStats.totalFlights}\n- Countries visited: ${userStats.totalCountries}\n- Total kilometers flown: ${userStats.totalKilometers.toLocaleString()} km\n- Total hours in air: ${userStats.hoursInAir} hours\n${userStats.lastFlightDate ? `- Last flight: ${userStats.lastFlightDate}` : ''}\n${userStats.favoriteDestination ? `- Favorite destination: ${userStats.favoriteDestination}` : ''}\n${userStats.mostFrequentAirline ? `- Most frequent airline: ${userStats.mostFrequentAirline}` : ''}\n${userStats.averageFlightDuration ? `- Average flight duration: ${userStats.averageFlightDuration} hours` : ''}\n\nRelevant Flights:\n${flightsText || 'No relevant flights found.'}\n\nUse this context to provide personalized, relevant responses about travel, flights, destinations, and travel planning. Be helpful, engaging, and reference their travel history when appropriate. Keep responses concise and conversational.\n\nUser's question: ${userMessage}`
-  return context
-}
-
 function getErrorMessage(error: any): string {
   if (error?.status === 429) {
     return "I'm currently experiencing high demand. Please wait a moment and try again. You can also try rephrasing your question to use fewer words."
@@ -227,7 +215,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { message, conversation = [], model } = body
+    const { message, model } = body
 
     // The model is chosen by an allowlist, never taken as given: an
     // unrecognised name would otherwise reach DeepSeek verbatim.
@@ -294,10 +282,37 @@ export async function POST(request: Request) {
     const now = new Date().toISOString()
     // Read CSV and include in prompt
     const csvData = getSampledCSV('data/flights.csv', 100);
-    const contextualPrompt = `You are a helpful AI assistant for a flight tracking application.\n\nCurrent timestamp: ${now}\n\nHere are the user's current travel statistics:\n${JSON.stringify(userStats, null, 2)}\n\n${filterExplanation ? 'Flight search explanation: ' + filterExplanation + '\n' : ''}Relevant Flights (summary):\n${flightsText || 'No relevant flights found.'}\n\nRelevant Flights (JSON):\n${flightsJson}\n\nHere is your flight database in CSV format:\n${csvData}\n\nUse ONLY the above data to answer the user's question. Do not make up or interpret data.\n\nUser's question: ${message}`
+    // The data belongs in the system message, not in every user turn: repeating
+    // it made each question read as a fresh data dump rather than the next line
+    // of a conversation.
+    const systemPrompt = `You are a helpful AI assistant for a flight tracking application.\n\nCurrent timestamp: ${now}\n\nHere are the user's current travel statistics:\n${JSON.stringify(userStats, null, 2)}\n\n${filterExplanation ? 'Flight search explanation: ' + filterExplanation + '\n' : ''}Relevant Flights (summary):\n${flightsText || 'No relevant flights found.'}\n\nRelevant Flights (JSON):\n${flightsJson}\n\nHere is your flight database in CSV format:\n${csvData}\n\nUse ONLY the above data to answer questions about the user's flights. Do not make up or interpret data.\n\nThe messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.`
 
     // --- LOGGING for debugging ---
-    console.log(`Chat: ${relevantFlightsWithDuration.length} flights to ${selectedModel} — ${filterExplanation}`)
+
+    // The conversation so far, oldest first. Read before the current message is
+    // stored, so the question does not appear twice. Ten messages is five
+    // exchanges — enough for "and the return leg?" to resolve, without pushing
+    // the flight data out of the model's context.
+    const HISTORY_MESSAGES = 10
+    const { data: priorMessages, error: historyError } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(HISTORY_MESSAGES)
+
+    // Losing the history degrades the answer; it does not invalidate it. Carry
+    // on without it rather than failing the message the user just sent.
+    if (historyError) {
+      console.error('Chat: could not load conversation history:', historyError.message)
+    }
+
+    const history = (priorMessages ?? [])
+      .reverse()
+      .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
+    console.log(`Chat: ${relevantFlightsWithDuration.length} flights, ${history.length} prior messages to ${selectedModel} — ${filterExplanation}`)
 
     // Store user message in database
     await supabase
@@ -318,8 +333,9 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: selectedModel,
         messages: [
-          { role: 'system', content: 'You are a helpful AI assistant for a flight tracking application.' },
-          { role: 'user', content: contextualPrompt }
+          { role: 'system', content: systemPrompt },
+          ...history,
+          { role: 'user', content: message }
         ],
         max_tokens: 1000,
         temperature: 0.7
