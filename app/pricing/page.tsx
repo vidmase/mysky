@@ -95,13 +95,13 @@ export default function PricingPage() {
       <div className="flex items-center justify-center gap-4 mb-8">
         <span className={billing === 'monthly' ? 'font-bold text-flight' : 'text-muted-foreground'}>Monthly</span>
         <button
-          className="relative inline-flex h-6 w-12 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors focus:outline-none"
+          className="relative inline-flex h-6 w-12 items-center rounded-full bg-[var(--paper-3)] transition-colors focus:outline-none"
           onClick={() => setBilling(billing === 'monthly' ? 'annual' : 'monthly')}
           aria-label="Toggle billing period"
         >
           <span className={cn('inline-block h-5 w-5 transform rounded-full bg-flight transition-transform', billing === 'annual' ? 'translate-x-6' : 'translate-x-1')} />
         </button>
-        <span className={billing === 'annual' ? 'font-bold text-flight' : 'text-muted-foreground'}>Annual <span className="ml-1 px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded text-xs align-middle">Save 17%</span></span>
+        <span className={billing === 'annual' ? 'font-bold text-flight' : 'text-muted-foreground'}>Annual <span className="ml-1 px-2 py-0.5 bg-[var(--wash-brass-2)] text-[var(--ink)] rounded text-xs align-middle">Save 17%</span></span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto">

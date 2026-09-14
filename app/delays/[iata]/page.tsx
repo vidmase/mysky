@@ -14,17 +14,17 @@ export default async function AirportDelayPage({ params }: { params: Promise<{ i
         <div className="flex items-center gap-4">
           <Link
             href="/delays"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-white/50 hover:text-white/70 hover:bg-white/[0.06] transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--wash-ink)] border border-[var(--rule)] text-xs text-[var(--ink-2)] hover:text-[var(--ink)] hover:bg-[var(--wash-ink)] transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Dashboard
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-white">
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">{iata}</span>
-              <span className="text-white/50 text-lg ml-2">Airport Delays</span>
+            <h1 className="text-3xl font-bold text-[var(--ink)]">
+              <span className="bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] bg-clip-text text-transparent">{iata}</span>
+              <span className="text-[var(--ink-2)] text-lg ml-2">Airport Delays</span>
             </h1>
-            <p className="text-white/40 text-xs mt-0.5">
+            <p className="text-[var(--ink-3)] text-xs mt-0.5">
               Live delay statistics powered by AeroDataBox
             </p>
           </div>

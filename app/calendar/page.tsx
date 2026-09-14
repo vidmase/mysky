@@ -1,18 +1,12 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { auth } from '@clerk/nextjs/server'
-import { Archivo, Bodoni_Moda, Martian_Mono } from 'next/font/google'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { CalendarClient } from './CalendarClient'
 import type { Flight } from "@/types/flight"
 
-import '@/app/styles/paper.css'
-
 export const dynamic = 'force-dynamic'
 
-const display = Bodoni_Moda({ subsets: ['latin'], style: ['normal', 'italic'], weight: ['400', '500', '700'], variable: '--font-display', display: 'swap' })
-const body = Archivo({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-body', display: 'swap' })
-const code = Martian_Mono({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-code', display: 'swap' })
 
 export default async function CalendarPage() {
   const { userId: clerkId } = await auth()
@@ -27,7 +21,7 @@ export default async function CalendarPage() {
   if (error) throw new Error(error.message)
 
   return (
-    <div className={`paper-stock ${display.variable} ${body.variable} ${code.variable}`}>
+    <div className="paper-stock">
       <Suspense fallback={<div className="container mx-auto px-4 py-8">Loading calendar...</div>}>
         <CalendarClient initialFlights={(flights as Flight[]) ?? []} />
       </Suspense>

@@ -21,7 +21,7 @@ const formatDate = (dateString: string | null) => {
 const formatDeactivationStatus = (user: User) => {
   if (!user.disabled) {
     return (
-      <span className="px-3 py-1 rounded-full bg-green-600/80 text-white text-xs font-bold shadow">
+      <span className="px-3 py-1 rounded-full bg-[var(--wash-jade)] text-[var(--ink)] text-xs font-bold shadow">
         Active
       </span>
     );
@@ -29,7 +29,7 @@ const formatDeactivationStatus = (user: User) => {
   
   if (!user.deactivation_end_date) {
     return (
-      <span className="px-3 py-1 rounded-full bg-red-600/80 text-white text-xs font-bold shadow">
+      <span className="px-3 py-1 rounded-full bg-[var(--wash-accent)] text-[var(--ink)] text-xs font-bold shadow">
         Permanently Disabled
       </span>
     );
@@ -41,7 +41,7 @@ const formatDeactivationStatus = (user: User) => {
   if (endDate <= now) {
     // This should be handled by the auto-reactivate function, but just in case
     return (
-      <span className="px-3 py-1 rounded-full bg-green-600/80 text-white text-xs font-bold shadow">
+      <span className="px-3 py-1 rounded-full bg-[var(--wash-jade)] text-[var(--ink)] text-xs font-bold shadow">
         Active
       </span>
     );
@@ -60,7 +60,7 @@ const formatDeactivationStatus = (user: User) => {
   }
   
   return (
-    <span className="px-3 py-1 rounded-full bg-amber-600/80 text-white text-xs font-bold shadow">
+    <span className="px-3 py-1 rounded-full bg-[var(--wash-brass)] text-[var(--ink)] text-xs font-bold shadow">
       Disabled ({timeDisplay})
     </span>
   );
@@ -266,20 +266,20 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
   };
 
   return (
-    <div className="bg-gradient-to-br from-blue-900/80 to-blue-800/60 backdrop-blur-xl border border-blue-700 rounded-3xl shadow-2xl p-8 mt-10 mb-10 max-w-5xl mx-auto">
-      <h2 className="text-3xl font-extrabold mb-8 flex items-center gap-3 text-cyan-100 tracking-tight">
-        <Search className="h-7 w-7 text-cyan-300" /> User Management
+    <div className="bg-gradient-to-br from-[color-mix(in_srgb,var(--vermillion)_80%,transparent)] to-[color-mix(in_srgb,var(--vermillion)_60%,transparent)] backdrop-blur-xl border border-[var(--vermillion)] rounded-3xl shadow-2xl p-8 mt-10 mb-10 max-w-5xl mx-auto">
+      <h2 className="text-3xl font-extrabold mb-8 flex items-center gap-3 text-[var(--vermillion)] tracking-tight">
+        <Search className="h-7 w-7 text-[var(--vermillion)]" /> User Management
       </h2>
       
       {/* SQL Function Error Alert */}
       {sqlFunctionError && (
-        <div className="mb-6 p-4 bg-amber-700/30 border border-amber-600 rounded-lg text-white flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-300 mt-0.5 flex-shrink-0" />
+        <div className="mb-6 p-4 bg-[var(--wash-brass)] border border-[var(--brass)] rounded-lg text-[var(--ink)] flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-[var(--brass)] mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-medium">SQL Function Missing</p>
             <p className="text-sm mt-1">
               The required database functions are not set up. Please check the instructions in 
-              <code className="mx-1 px-1 py-0.5 bg-amber-900/70 rounded text-amber-200">supabase/README.md</code>
+              <code className="mx-1 px-1 py-0.5 bg-[var(--wash-brass)] rounded text-[var(--brass)]">supabase/README.md</code>
               to apply the SQL functions to your database.
             </p>
           </div>
@@ -294,28 +294,28 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Search by email..."
-            className="w-full rounded-xl bg-blue-800/60 border border-blue-600 px-12 py-3 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 shadow-inner"
+            className="w-full rounded-xl bg-[var(--wash-accent)] border border-[var(--vermillion)] px-12 py-3 text-[var(--ink)] placeholder-[var(--vermillion)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)] shadow-inner"
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--vermillion)]" />
         </div>
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-700/80 border border-blue-600 text-white hover:bg-blue-700/90 transition font-semibold shadow"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--wash-accent)] border border-[var(--vermillion)] text-[var(--ink)] hover:bg-[var(--wash-accent)] transition font-semibold shadow"
         >
           <Filter className="h-5 w-5" />
           {showFilters ? 'Hide Filters' : 'Show Filters'}
         </button>
         <button
           type="submit"
-          className="px-5 py-3 rounded-xl bg-cyan-600 text-white font-bold hover:bg-cyan-500 transition shadow"
+          className="px-5 py-3 rounded-xl bg-[var(--vermillion)] text-[var(--paper)] font-bold hover:bg-[var(--vermillion-dk)] transition shadow"
         >
           Search
         </button>
         <button
           type="button"
           onClick={exportCsv}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-green-700/80 border border-green-600 text-white hover:bg-green-700/90 transition font-semibold shadow"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[var(--wash-jade)] border border-[var(--jade)] text-[var(--ink)] hover:bg-[var(--wash-jade)] transition font-semibold shadow"
         >
           <Download className="h-5 w-5" />
           Export CSV
@@ -324,13 +324,13 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
       
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-blue-800/30 p-4 rounded-xl border border-blue-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-[var(--wash-accent)] p-4 rounded-xl border border-[var(--vermillion)]">
           <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">User Role</label>
+            <label className="block text-sm font-medium text-[var(--vermillion)] mb-1">User Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full rounded-lg bg-blue-800/50 border border-blue-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-3 py-2 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
             >
               <option value="">Any role</option>
               <option value="user">User</option>
@@ -340,42 +340,42 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Signup After</label>
+            <label className="block text-sm font-medium text-[var(--vermillion)] mb-1">Signup After</label>
             <input
               type="date"
               value={signupAfter}
               onChange={(e) => setSignupAfter(e.target.value)}
-              className="w-full rounded-lg bg-blue-800/50 border border-blue-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-3 py-2 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Signup Before</label>
+            <label className="block text-sm font-medium text-[var(--vermillion)] mb-1">Signup Before</label>
             <input
               type="date"
               value={signupBefore}
               onChange={(e) => setSignupBefore(e.target.value)}
-              className="w-full rounded-lg bg-blue-800/50 border border-blue-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-3 py-2 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Last Active After</label>
+            <label className="block text-sm font-medium text-[var(--vermillion)] mb-1">Last Active After</label>
             <input
               type="date"
               value={lastActiveAfter}
               onChange={(e) => setLastActiveAfter(e.target.value)}
-              className="w-full rounded-lg bg-blue-800/50 border border-blue-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-3 py-2 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-cyan-200 mb-1">Last Active Before</label>
+            <label className="block text-sm font-medium text-[var(--vermillion)] mb-1">Last Active Before</label>
             <input
               type="date"
               value={lastActiveBefore}
               onChange={(e) => setLastActiveBefore(e.target.value)}
-              className="w-full rounded-lg bg-blue-800/50 border border-blue-700 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-3 py-2 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
             />
           </div>
         </div>
@@ -383,7 +383,7 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
       
       {/* Error message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-700/30 border border-red-700 rounded-lg text-white">
+        <div className="mb-6 p-4 bg-[var(--wash-accent)] border border-[var(--vermillion-dk)] rounded-lg text-[var(--ink)]">
           {error}
         </div>
       )}
@@ -391,14 +391,14 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
       {/* Results Table */}
       <div className="overflow-x-auto rounded-2xl shadow-lg">
         {loading ? (
-          <div className="text-cyan-200 text-center py-8">Loading users...</div>
+          <div className="text-[var(--vermillion)] text-center py-8">Loading users...</div>
         ) : users.length === 0 ? (
-          <div className="text-cyan-200 text-center py-8">No users found matching your criteria.</div>
+          <div className="text-[var(--vermillion)] text-center py-8">No users found matching your criteria.</div>
         ) : (
           <>
             <table className="w-full text-base border-separate border-spacing-y-2">
               <thead>
-                <tr className="text-cyan-200 bg-blue-800/60">
+                <tr className="text-[var(--vermillion)] bg-[var(--wash-accent)]">
                   <th className="px-4 py-3 rounded-l-2xl">Email</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Signup Date</th>
@@ -412,16 +412,16 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
                 {users.map((user) => (
                   <tr
                     key={user.id}
-                    className="bg-zinc-100/80 dark:bg-zinc-800/80 rounded-2xl hover:bg-blue-900/30 transition"
+                    className="bg-[color-mix(in_srgb,var(--paper-2)_80%,transparent)] rounded-2xl hover:bg-[var(--wash-accent)] transition"
                   >
-                    <td className="py-3 px-4 rounded-l-2xl font-mono text-cyan-100">{user.email}</td>
+                    <td className="py-3 px-4 rounded-l-2xl font-mono text-[var(--vermillion)]">{user.email}</td>
                     <td className="py-3 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold shadow ${
                         user.role === 'admin'
-                          ? 'bg-gradient-to-r from-purple-600 to-purple-400 text-white'
+                          ? 'bg-[var(--vermillion)] text-[var(--paper)]'
                           : user.role === 'moderator'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white'
-                            : 'bg-gradient-to-r from-gray-600 to-gray-400 text-white'
+                            ? 'bg-[var(--vermillion)] text-[var(--paper)]'
+                            : 'bg-gradient-to-r from-[var(--ink-2)] to-[var(--ink-3)] text-[var(--paper)]'
                       }`}>
                         {user.role}
                       </span>
@@ -434,7 +434,7 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
                     </td>
                     <td className="py-3 px-4 rounded-r-2xl text-center flex gap-2 justify-center items-center">
                       <button
-                        className="inline-flex items-center justify-center rounded-full text-base font-medium text-cyan-300 hover:text-cyan-100 hover:bg-blue-700/50 h-10 w-10 transition"
+                        className="inline-flex items-center justify-center rounded-full text-base font-medium text-[var(--vermillion)] hover:text-[var(--vermillion-dk)] hover:bg-[var(--wash-accent)] h-10 w-10 transition"
                         title="View user details"
                         onClick={() => handleViewUser(user)}
                       >
@@ -445,8 +445,8 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
                         <button
                           className={`px-3 py-1 rounded-full text-xs font-bold shadow transition ${
                             user.disabled
-                              ? 'bg-gradient-to-r from-green-600 to-green-400 text-white hover:from-green-700 hover:to-green-500'
-                              : 'bg-gradient-to-r from-red-600 to-red-400 text-white hover:from-red-700 hover:to-red-500'
+                              ? 'bg-[var(--jade)] text-[var(--paper)] hover:from-[var(--jade)] hover:to-[var(--jade)]'
+                              : 'bg-[var(--vermillion-dk)] text-[var(--paper)] hover:from-[var(--vermillion-dk)] hover:to-[var(--vermillion-dk)]'
                           }`}
                           onClick={() => handleToggleUserStatus(user)}
                           disabled={loadingUserId === user.id}
@@ -463,26 +463,26 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
             {/* Pagination */}
             {pagination.totalPages > 1 && (
               <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-cyan-200">
+                <div className="text-sm text-[var(--vermillion)]">
                   Showing {((pagination.page - 1) * pagination.pageSize) + 1} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} users
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     disabled={pagination.page <= 1}
                     onClick={() => goToPage(pagination.page - 1)}
-                    className="p-2 rounded-lg bg-blue-800/50 border border-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] text-[var(--ink)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   
-                  <span className="text-sm text-cyan-200">
+                  <span className="text-sm text-[var(--vermillion)]">
                     Page {pagination.page} of {pagination.totalPages}
                   </span>
                   
                   <button
                     disabled={pagination.page >= pagination.totalPages}
                     onClick={() => goToPage(pagination.page + 1)}
-                    className="p-2 rounded-lg bg-blue-800/50 border border-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] text-[var(--ink)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -496,7 +496,7 @@ export default function UserSearchPanel({ onUsersLoaded }: UserSearchPanelProps)
       <UserDetailsModal user={selectedUser} open={modalOpen} onClose={handleCloseModal} />
       {/* Action Error Message */}
       {actionError && (
-        <div className="mb-4 p-2 bg-red-700/30 border border-red-700 rounded text-red-200 text-sm">{actionError}</div>
+        <div className="mb-4 p-2 bg-[var(--wash-accent)] border border-[var(--vermillion-dk)] rounded text-[var(--vermillion-dk)] text-sm">{actionError}</div>
       )}
     </div>
   );

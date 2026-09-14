@@ -104,7 +104,7 @@ export function AircraftPhoto({ registration, className = '', showDetails = true
             onError={() => setError(true)}
           />
           <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="bg-black/50 text-white border-0">
+            <Badge variant="secondary" className="bg-[rgba(23,19,14,0.55)] text-[var(--paper)] border-0">
               <Camera className="w-3 h-3 mr-1" />
               Photo
             </Badge>

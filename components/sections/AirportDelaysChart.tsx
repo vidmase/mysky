@@ -35,8 +35,8 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 shadow-2xl">
-      <p className="text-[10px] text-white/40 font-medium mb-2">
+    <div className="bg-[hsl(var(--card))]/95 backdrop-blur-xl border border-[var(--rule)] rounded-xl px-4 py-3 shadow-2xl">
+      <p className="text-[10px] text-[color-mix(in_srgb,var(--ink-2)_40%,transparent)] font-medium mb-2">
         {new Date(label).toLocaleString()}
       </p>
       <div className="space-y-1.5">
@@ -47,9 +47,9 @@ function CustomTooltip({ active, payload, label }: any) {
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: entry.color, boxShadow: `0 0 4px ${entry.color}80` }}
               />
-              <span className="text-xs text-white/60">{entry.name}</span>
+              <span className="text-xs text-[color-mix(in_srgb,var(--ink-2)_60%,transparent)]">{entry.name}</span>
             </div>
-            <span className="text-xs font-semibold text-white">{entry.value}</span>
+            <span className="text-xs font-semibold text-[var(--ink)]">{entry.value}</span>
           </div>
         ))}
       </div>
@@ -110,20 +110,20 @@ export function AirportDelaysChart({
   }
 
   return (
-    <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-4">
+    <div className="bg-[hsl(var(--card))]/60 backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h3 className="text-lg font-bold text-white">{iata} Delay Trends</h3>
+        <h3 className="text-lg font-bold text-[var(--ink)]">{iata} Delay Trends</h3>
 
         {/* Time range selector */}
-        <div className="flex items-center gap-1 bg-white/[0.04] rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-[var(--wash-ink)] rounded-lg p-1">
           {TIME_RANGES.map((range) => (
             <button
               key={range.label}
               onClick={() => setSelectedRange(range)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${selectedRange.label === range.label
-                ? 'bg-cyan-500/20 text-cyan-400 shadow-sm'
-                : 'text-white/40 hover:text-white/60 hover:bg-white/[0.04]'
+                ? 'bg-[var(--wash-accent)] text-[var(--vermillion)] shadow-sm'
+                : 'text-[color-mix(in_srgb,var(--ink-2)_40%,transparent)] hover:text-[color-mix(in_srgb,var(--ink-2)_60%,transparent)] hover:bg-[var(--wash-ink)]'
                 }`}
             >
               {range.label}
@@ -139,8 +139,8 @@ export function AirportDelaysChart({
             key={m.key}
             onClick={() => toggleMetric(m.key)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium border transition-all ${visibleMetrics.has(m.key)
-              ? 'border-white/20 bg-white/[0.06]'
-              : 'border-transparent bg-white/[0.02] opacity-50'
+              ? 'border-[var(--rule)] bg-[var(--wash-ink)]'
+              : 'border-transparent bg-[var(--wash-ink)] opacity-50'
               }`}
           >
             <div
@@ -159,16 +159,16 @@ export function AirportDelaysChart({
         {loading && (
           <div className="h-full flex items-center justify-center">
             <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
-              <span className="text-xs text-white/30">Loading chart…</span>
+              <div className="w-8 h-8 border-2 border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)] border-t-[var(--vermillion)] rounded-full animate-spin" />
+              <span className="text-xs text-[color-mix(in_srgb,var(--ink-2)_30%,transparent)]">Loading chart…</span>
             </div>
           </div>
         )}
         {!loading && error && (
-          <div className="h-full flex items-center justify-center text-red-400 text-sm">{error}</div>
+          <div className="h-full flex items-center justify-center text-[var(--vermillion-dk)] text-sm">{error}</div>
         )}
         {!loading && !error && series.length === 0 && (
-          <div className="h-full flex items-center justify-center text-white/30 text-sm">
+          <div className="h-full flex items-center justify-center text-[color-mix(in_srgb,var(--ink-2)_30%,transparent)] text-sm">
             No timeseries data for this range. Try a different time period or sync delay snapshots.
           </div>
         )}
@@ -217,7 +217,7 @@ export function AirportDelaysChart({
                   activeDot={{
                     r: 4,
                     fill: m.color,
-                    stroke: '#0f172a',
+                    stroke: '#f2ece1',
                     strokeWidth: 2,
                   }}
                 />

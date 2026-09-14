@@ -35,9 +35,9 @@ export const useDisabledUserModal = () => {
   // Modal is now only a fallback in case redirect fails
   const modal = show ? (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-blue-900 rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border-2 border-red-600">
-        <h2 className="text-2xl font-bold text-red-400 mb-4">Account Disabled</h2>
-        <p className="text-cyan-100 mb-6">
+      <div className="bg-[var(--vermillion)] rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border-2 border-[var(--vermillion-dk)]">
+        <h2 className="text-2xl font-bold text-[var(--vermillion-dk)] mb-4">Account Disabled</h2>
+        <p className="text-[var(--vermillion)] mb-6">
           Sorry, your account has been disabled by an administrator.<br />
           Please contact support if you believe this is a mistake.
         </p>

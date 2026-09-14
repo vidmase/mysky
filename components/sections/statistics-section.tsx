@@ -8,22 +8,22 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 // Dynamically import components with loading states
 const TotalFlights = dynamic(() => import("@/components/total-flights").then(mod => mod.TotalFlights), {
-    loading: () => <Card className="stat-card bg-gradient-stats text-white"><CardHeader><LoadingSpinner /></CardHeader></Card>,
+    loading: () => <Card className="stat-card bg-gradient-stats text-[var(--ink)]"><CardHeader><LoadingSpinner /></CardHeader></Card>,
     ssr: false
 })
 
 const TotalCountries = dynamic(() => import("@/components/total-countries").then(mod => mod.TotalCountries), {
-    loading: () => <Card className="stat-card bg-gradient-stats text-white"><CardHeader><LoadingSpinner /></CardHeader></Card>,
+    loading: () => <Card className="stat-card bg-gradient-stats text-[var(--ink)]"><CardHeader><LoadingSpinner /></CardHeader></Card>,
     ssr: false
 })
 
 const HoursInAir = dynamic(() => import("@/components/hours-in-air").then(mod => mod.HoursInAir), {
-    loading: () => <Card className="stat-card bg-gradient-stats text-white"><CardHeader><LoadingSpinner /></CardHeader></Card>,
+    loading: () => <Card className="stat-card bg-gradient-stats text-[var(--ink)]"><CardHeader><LoadingSpinner /></CardHeader></Card>,
     ssr: false
 })
 
 const TotalKilometers = dynamic(() => import("@/components/total-kilometers").then(mod => mod.TotalKilometers), {
-    loading: () => <Card className="stat-card bg-gradient-stats text-white"><CardHeader><LoadingSpinner /></CardHeader></Card>,
+    loading: () => <Card className="stat-card bg-gradient-stats text-[var(--ink)]"><CardHeader><LoadingSpinner /></CardHeader></Card>,
     ssr: false
 })
 
@@ -61,7 +61,7 @@ export default function StatisticsSection() {
 const StatisticsLoadingFallback = () => (
     <>
         {[...Array(4)].map((_, i) => (
-            <Card key={i} className="stat-card bg-gradient-stats text-white">
+            <Card key={i} className="stat-card bg-gradient-stats text-[var(--ink)]">
                 <CardHeader>
                     <LoadingSpinner />
                 </CardHeader>

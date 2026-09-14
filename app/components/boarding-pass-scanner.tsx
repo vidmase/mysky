@@ -353,12 +353,12 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             <div className="mt-6 space-y-6">
                 {/* Raw Response */}
                 {rawResponse && (
-                    <div className="rounded-lg bg-gradient-to-r from-blue-900/50 to-blue-800/50 p-6 shadow-lg">
-                        <div className="flex items-center gap-2 text-xl font-semibold text-blue-100">
+                    <div className="rounded-lg bg-gradient-to-r from-[color-mix(in_srgb,var(--vermillion)_50%,transparent)] to-[color-mix(in_srgb,var(--vermillion)_50%,transparent)] p-6 shadow-lg">
+                        <div className="flex items-center gap-2 text-xl font-semibold text-[var(--vermillion)]">
                             <FileText className="h-6 w-6" />
                             Your Flight Details
                         </div>
-                        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm text-blue-100">
+                        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm text-[var(--vermillion)]">
                             {rawResponse}
                         </pre>
                     </div>
@@ -374,7 +374,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                             </div>
                             <Button
                                 onClick={() => saveToSupabase(flight)}
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-[var(--jade)] hover:bg-[var(--ink)] text-[var(--paper)]"
                             >
                                 <Save className="mr-2 h-4 w-4" />
                                 Save to My Flights
@@ -405,7 +405,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                         <p className="text-muted-foreground text-sm">Departure</p>
                                         <p className="font-medium">{flight.departure_airport || 'N/A'}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                            <span className="text-xs px-2 py-0.5 bg-[var(--vermillion)] text-[var(--vermillion)] rounded">
                                                 {flight.departure_iata || 'N/A'}
                                             </span>
                                             {flight.departure_country && (
@@ -420,7 +420,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                         <p className="text-muted-foreground text-sm">Arrival</p>
                                         <p className="font-medium">{flight.arrival_airport || 'N/A'}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                            <span className="text-xs px-2 py-0.5 bg-[var(--vermillion)] text-[var(--vermillion)] rounded">
                                                 {flight.arrival_iata || 'N/A'}
                                             </span>
                                             {flight.arrival_country && (
@@ -442,7 +442,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                         <p className="text-muted-foreground text-sm">Departure</p>
                                         <p className="font-medium">{formatDate(flight.departure_date)}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-sm font-medium text-blue-600">
+                                            <span className="text-sm font-medium text-[var(--vermillion)]">
                                                 {formatTime(flight.departure_time)}
                                             </span>
                                         </div>
@@ -451,7 +451,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                         <p className="text-muted-foreground text-sm">Arrival</p>
                                         <p className="font-medium">{formatDate(flight.arrival_date || flight.departure_date)}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-sm font-medium text-blue-600">
+                                            <span className="text-sm font-medium text-[var(--vermillion)]">
                                                 {formatTime(flight.arrival_time)}
                                             </span>
                                             {flight.return_arrival_time && (
@@ -473,7 +473,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                             <div className="flex-1">
                                                 <p className="font-medium">{passenger.name}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                                    <span className="text-xs px-2 py-0.5 bg-[var(--vermillion)] text-[var(--vermillion)] rounded">
                                                         {passenger.type || 'N/A'}
                                                     </span>
                                                     {passenger.age && (
@@ -484,7 +484,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                                 </div>
                                             </div>
                                             {passenger.name === flight.passenger_name && (
-                                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                                                <span className="text-xs px-2 py-0.5 bg-[var(--jade)] text-[var(--jade)] rounded">
                                                     Main Passenger
                                                 </span>
                                             )}
@@ -515,7 +515,7 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
                                                 {flight.booking_type === 'OUTBOUND' ? 'Outbound Price' :
                                                     flight.booking_type === 'RETURN' ? 'Return Price' : 'Flight Cost'}
                                             </p>
-                                            <p className="font-medium text-green-600">{flight.total_receipt}</p>
+                                            <p className="font-medium text-[var(--jade)]">{flight.total_receipt}</p>
                                         </div>
                                     )}
                                 </div>

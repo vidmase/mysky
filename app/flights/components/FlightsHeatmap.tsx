@@ -126,7 +126,7 @@ export function FlightsHeatmap() {
               <div key={country} className="flex items-center justify-between rounded-md border px-3 py-2">
                 <div className="truncate mr-3">{country}</div>
                 <div
-                  className="px-2 py-0.5 rounded text-xs font-medium text-white"
+                  className="px-2 py-0.5 rounded text-xs font-medium text-[var(--ink)]"
                   style={{ backgroundColor: colorForCount(count) }}
                   title={`${count} visits`}
                 >

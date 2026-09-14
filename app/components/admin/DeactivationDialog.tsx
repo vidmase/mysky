@@ -64,10 +64,10 @@ export function DeactivationDialog({ isOpen, onClose, userId, userEmail, onDeact
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-blue-900/90 border-blue-700">
+      <DialogContent className="sm:max-w-[425px] bg-[var(--wash-accent)] border-[var(--vermillion)]">
         <DialogHeader>
-          <DialogTitle className="text-cyan-100">Deactivate User Account</DialogTitle>
-          <DialogDescription className="text-cyan-200">
+          <DialogTitle className="text-[var(--vermillion)]">Deactivate User Account</DialogTitle>
+          <DialogDescription className="text-[var(--vermillion)]">
             Choose how long to deactivate the account for {userEmail}
           </DialogDescription>
         </DialogHeader>
@@ -92,14 +92,14 @@ export function DeactivationDialog({ isOpen, onClose, userId, userEmail, onDeact
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-blue-700 text-cyan-200 hover:bg-blue-800/50"
+            className="border-[var(--vermillion)] text-[var(--vermillion)] hover:bg-[var(--wash-accent)]"
           >
             Cancel
           </Button>
           <Button
             onClick={handleDeactivate}
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-[var(--vermillion-dk)] hover:bg-[var(--vermillion)] text-[var(--paper)]"
           >
             {isLoading ? "Deactivating..." : "Deactivate"}
           </Button>

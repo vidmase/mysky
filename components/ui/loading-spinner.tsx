@@ -15,11 +15,11 @@ export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerPr
     return (
         <div className={`relative ${sizeClasses[size]} ${className}`}>
             {/* Outer ring */}
-            <div className="absolute inset-0 rounded-full border-2 border-white/20"></div>
+            <div className="absolute inset-0 rounded-full border-2 border-[var(--rule)]"></div>
             {/* Spinning gradient ring */}
-            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-white animate-spin-gradient"></div>
+            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--vermillion)] animate-spin-gradient"></div>
             {/* Inner pulsing circle */}
-            <div className="absolute inset-2 rounded-full bg-white/20 animate-pulse"></div>
+            <div className="absolute inset-2 rounded-full bg-[var(--wash-ink)] animate-pulse"></div>
         </div>
     )
 } 

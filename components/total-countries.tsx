@@ -25,7 +25,7 @@ export function TotalCountries() {
   // Memoize the card content to prevent unnecessary re-renders
   const cardContent = useMemo(() => {
     if (error) {
-      return <span className="text-red-200">{error}</span>
+      return <span className="text-[var(--vermillion-dk)]">{error}</span>
     }
 
     if (loading) {
@@ -52,7 +52,7 @@ export function TotalCountries() {
             {statistics.countries.join(', ')}
           </div>
         )}
-        <span className="text-xs text-white/60 font-normal mt-1">
+        <span className="text-xs text-[color-mix(in_srgb,var(--ink-2)_60%,transparent)] font-normal mt-1">
           Last updated: {new Date(statistics.lastUpdated).toLocaleTimeString()}
         </span>
       </div>
@@ -60,7 +60,7 @@ export function TotalCountries() {
   }, [error, loading, statistics, showCountries])
 
   return (
-    <Card className="stat-card bg-gradient-to-br from-green-500 via-teal-500 to-cyan-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+    <Card className="stat-card bg-gradient-to-br from-[var(--jade)] via-[var(--jade)] to-[var(--vermillion)] text-[var(--paper)] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-col gap-1">
           <div className="text-4xl font-bold flex items-center justify-between">
@@ -70,7 +70,7 @@ export function TotalCountries() {
             </div>
           </div>
         </CardTitle>
-        <CardDescription className="text-white/90 font-medium">
+        <CardDescription className="text-[color-mix(in_srgb,var(--ink-2)_90%,transparent)] font-medium">
           🗺️ Countries Visited
         </CardDescription>
       </CardHeader>

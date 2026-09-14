@@ -92,13 +92,13 @@ export const useRealtimeDisabled = () => {
   const DisabledDialog = show ? (
     <Dialog open={show} onOpenChange={setShow}>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-gradient-to-br from-red-950 to-red-900 border border-red-800 rounded-xl p-6 shadow-2xl max-w-md w-full mx-4">
+        <div className="bg-[var(--vermillion-dk)] border border-[var(--vermillion-dk)] rounded-xl p-6 shadow-2xl max-w-md w-full mx-4">
           <div className="flex items-center gap-3 mb-4">
-            <AlertTriangle className="h-8 w-8 text-red-400" />
-            <h2 className="text-xl font-bold text-white">Account Deactivated</h2>
+            <AlertTriangle className="h-8 w-8 text-[var(--vermillion-dk)]" />
+            <h2 className="text-xl font-bold text-[var(--ink)]">Account Deactivated</h2>
           </div>
 
-          <p className="text-red-200 mb-4">
+          <p className="text-[var(--vermillion-dk)] mb-4">
             {isPermanent ? (
               "Your account has been deactivated by an administrator. You no longer have access to the system."
             ) : (
@@ -107,16 +107,16 @@ export const useRealtimeDisabled = () => {
           </p>
 
           {!isPermanent && remainingTime && (
-            <div className="bg-red-950 border border-red-800 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 text-amber-400 font-medium mb-2">
+            <div className="bg-[var(--vermillion-dk)] border border-[var(--vermillion-dk)] rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 text-[var(--brass)] font-medium mb-2">
                 <Clock className="h-5 w-5" />
                 <span>Temporary Deactivation</span>
               </div>
-              <p className="text-red-200">
-                Your account will be automatically reactivated in <strong className="text-white">{remainingTime}</strong>.
+              <p className="text-[var(--vermillion-dk)]">
+                Your account will be automatically reactivated in <strong className="text-[var(--ink)]">{remainingTime}</strong>.
               </p>
               {endDate && (
-                <div className="flex items-center gap-2 mt-2 text-red-300 text-sm">
+                <div className="flex items-center gap-2 mt-2 text-[var(--vermillion-dk)] text-sm">
                   <CalendarX className="h-4 w-4" />
                   <span>Ends on: {endDate.toLocaleString()}</span>
                 </div>
@@ -124,13 +124,13 @@ export const useRealtimeDisabled = () => {
             </div>
           )}
 
-          <p className="text-red-300 text-sm mb-6">
+          <p className="text-[var(--vermillion-dk)] text-sm mb-6">
             If you believe this is a mistake, please contact your system administrator.
           </p>
 
           <Button
             onClick={handleAcknowledge}
-            className="w-full bg-red-700 hover:bg-red-600 text-white py-2 rounded-lg transition"
+            className="w-full bg-[var(--vermillion-dk)] hover:bg-[var(--vermillion)] text-[var(--paper)] py-2 rounded-lg transition"
             disabled={loading}
           >
             {loading ? "Signing out..." : "Sign Out"}

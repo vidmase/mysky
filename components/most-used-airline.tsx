@@ -79,7 +79,7 @@ export function MostUsedAirline() {
               {loading ? (
                 <div className="animate-pulse">Loading...</div>
               ) : error ? (
-                <span className="text-red-500">{error}</span>
+                <span className="text-[var(--vermillion-dk)]">{error}</span>
               ) : (
                 mostUsedAirline?.airline
               )}
@@ -88,7 +88,7 @@ export function MostUsedAirline() {
               {loading ? (
                 <div className="animate-pulse">Loading...</div>
               ) : error ? (
-                <span className="text-red-500">Failed to load data</span>
+                <span className="text-[var(--vermillion-dk)]">Failed to load data</span>
               ) : mostUsedAirline?.airline === 'Sign in to view' ? (
                 'Sign in to view flight count'
               ) : (

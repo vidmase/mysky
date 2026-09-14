@@ -146,8 +146,8 @@ export function formatFlightTime(isoString: string | null): string {
 export function getDelayBadgeClass(delayMinutes: number | null): string {
   if (delayMinutes === null) return 'bg-muted/30 text-muted-foreground/80'
   if (delayMinutes === 0) return 'bg-muted text-muted-foreground'
-  if (delayMinutes > 0) return 'bg-red-500/15 text-red-600 dark:text-red-400'
-  return 'bg-green-500/15 text-green-600 dark:text-green-400'
+  if (delayMinutes > 0) return 'bg-[var(--wash-accent)] text-[var(--vermillion-dk)]'
+  return 'bg-[var(--wash-jade)] text-[var(--jade)]'
 }
 
 /**

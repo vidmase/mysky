@@ -317,12 +317,12 @@ export function EnhancedGmailImport() {
 
   const getStageColor = (stage: string) => {
     switch (stage) {
-      case 'searching': return 'text-blue-600'
-      case 'fetching': return 'text-blue-600'
-      case 'parsing': return 'text-yellow-600'
-      case 'filtering': return 'text-purple-600'
-      case 'importing': return 'text-green-600'
-      default: return 'text-gray-600'
+      case 'searching': return 'text-[var(--vermillion)]'
+      case 'fetching': return 'text-[var(--vermillion)]'
+      case 'parsing': return 'text-[var(--brass)]'
+      case 'filtering': return 'text-[var(--vermillion)]'
+      case 'importing': return 'text-[var(--jade)]'
+      default: return 'text-[var(--ink-2)]'
     }
   }
 
@@ -863,7 +863,7 @@ export function EnhancedGmailImport() {
                     setCustomFilters({})
                     setDateRange({ start: '', end: '' })
                   }}
-                  className="text-xs text-red-600 hover:text-red-700"
+                  className="text-xs text-[var(--vermillion-dk)] hover:text-[var(--vermillion)]"
                 >
                   Clear All
                 </Button>
@@ -1463,7 +1463,7 @@ export function EnhancedGmailImport() {
               </Label>
             </div>
             {processingOptions.useEnhancedSystem && (
-              <div className="text-sm text-muted-foreground bg-blue-50 p-3 rounded-lg">
+              <div className="text-sm text-muted-foreground bg-[var(--vermillion)] p-3 rounded-lg">
                 ✨ Enhanced system provides 99%+ success rate, intelligent error recovery, and resumable imports.
               </div>
             )}
@@ -1530,7 +1530,7 @@ export function EnhancedGmailImport() {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {progress && getStageIcon(progress.stage)}
-                <span className={progress ? getStageColor(progress.stage) : 'text-blue-600'}>
+                <span className={progress ? getStageColor(progress.stage) : 'text-[var(--vermillion)]'}>
                   {enhancedProgress ? 
                     enhancedProgress.phase.charAt(0).toUpperCase() + enhancedProgress.phase.slice(1) :
                     progress ? (progress.stage.charAt(0).toUpperCase() + progress.stage.slice(1)) : 'Processing'
@@ -1575,19 +1575,19 @@ export function EnhancedGmailImport() {
               {enhancedProgress && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="text-center">
-                    <div className="font-bold text-green-600">{enhancedProgress.successfullyParsed}</div>
+                    <div className="font-bold text-[var(--jade)]">{enhancedProgress.successfullyParsed}</div>
                     <div className="text-muted-foreground">Parsed</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-blue-600">{enhancedProgress.duplicatesFound}</div>
+                    <div className="font-bold text-[var(--vermillion)]">{enhancedProgress.duplicatesFound}</div>
                     <div className="text-muted-foreground">Duplicates</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-red-600">{enhancedProgress.errors}</div>
+                    <div className="font-bold text-[var(--vermillion-dk)]">{enhancedProgress.errors}</div>
                     <div className="text-muted-foreground">Errors</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-bold text-purple-600">{enhancedProgress.processingRate.toFixed(1)}/s</div>
+                    <div className="font-bold text-[var(--vermillion)]">{enhancedProgress.processingRate.toFixed(1)}/s</div>
                     <div className="text-muted-foreground">Rate</div>
                   </div>
                 </div>
@@ -1623,9 +1623,9 @@ export function EnhancedGmailImport() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {result.success ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
+                <CheckCircle className="w-5 h-5 text-[var(--jade)]" />
               ) : (
-                <XCircle className="w-5 h-5 text-red-600" />
+                <XCircle className="w-5 h-5 text-[var(--vermillion-dk)]" />
               )}
               Import Results
             </CardTitle>
@@ -1635,19 +1635,19 @@ export function EnhancedGmailImport() {
               {/* Summary Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{result.imported}</div>
+                  <div className="text-2xl font-bold text-[var(--jade)]">{result.imported}</div>
                   <div className="text-sm text-muted-foreground">Imported</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-600">{result.skipped}</div>
+                  <div className="text-2xl font-bold text-[var(--brass)]">{result.skipped}</div>
                   <div className="text-sm text-muted-foreground">Skipped</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{result.duplicates}</div>
+                  <div className="text-2xl font-bold text-[var(--vermillion)]">{result.duplicates}</div>
                   <div className="text-sm text-muted-foreground">Duplicates</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{result.errors}</div>
+                  <div className="text-2xl font-bold text-[var(--vermillion-dk)]">{result.errors}</div>
                   <div className="text-sm text-muted-foreground">Errors</div>
                 </div>
               </div>
@@ -1679,7 +1679,7 @@ export function EnhancedGmailImport() {
                 
                 {/* Recovery Stats */}
                 {result.recoveryStats && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                  <div className="mt-2 p-2 bg-[var(--vermillion)] rounded text-sm">
                     <div className="font-medium mb-1">Error Recovery:</div>
                     <div>Recovered: {result.recoveryStats.recoveredErrors}/{result.recoveryStats.totalErrors}</div>
                     <div>Success Rate: {Math.round((result.recoveryStats.recoveredErrors / Math.max(result.recoveryStats.totalErrors, 1)) * 100)}%</div>
@@ -1690,7 +1690,7 @@ export function EnhancedGmailImport() {
               {/* Errors */}
               {result.errorDetails && result.errorDetails.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-medium text-red-600">Errors ({result.errorDetails.length})</h4>
+                  <h4 className="font-medium text-[var(--vermillion-dk)]">Errors ({result.errorDetails.length})</h4>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {result.errorDetails.slice(0, 5).map((error: any, index: number) => (
                       <Alert key={index} variant="destructive">

@@ -498,7 +498,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
       const diffMin = Math.round(actual.diff(sched, 'minutes').minutes)
       if (diffMin === 0) return <span className="text-xs text-muted-foreground">On time</span>
       const sign = diffMin > 0 ? '+' : ''
-      const cls = diffMin > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+      const cls = diffMin > 0 ? 'text-[var(--vermillion-dk)]' : 'text-[var(--jade)]'
       return <span className={`text-xs font-medium ${cls}`}>{sign}{diffMin}m {diffMin>0?'late':'early'}</span>
     } catch { return null }
   }
@@ -543,7 +543,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
           <Button
-            className="gap-2 bg-sky-600 text-white hover:bg-sky-500"
+            className="gap-2 bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--vermillion)]"
             onClick={() => setLiveSearchOpen(true)}
           >
             <RotateCcw className="h-4 w-4" />
@@ -552,15 +552,15 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div
-          className="relative rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg"
+          className="relative rounded-xl overflow-hidden bg-[hsl(var(--card))] shadow-lg"
           style={{ border: `3px solid ${airlineColor}` }}
         >
           {/* Modernized Flight Card Visuals: glassmorphism, gradient, animated border, airline branding */}
           <div className="absolute inset-0 z-0 animate-gradient-x bg-gradient-to-r from-flight/30 via-airport/20 to-stats/30 blur-[2px] opacity-70" />
-          <div className="absolute inset-0 z-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[8px]" />
-          <div className="absolute inset-0 z-10 rounded-xl border-2 border-flight/30 dark:border-airport/30 animate-border-glow pointer-events-none" />
+          <div className="absolute inset-0 z-0 bg-[color-mix(in_srgb,var(--paper)_60%,transparent)] backdrop-blur-[8px]" />
+          <div className="absolute inset-0 z-10 rounded-xl border-2 border-flight/30 animate-border-glow pointer-events-none" />
           <div
-            className="p-4 text-white relative z-20"
+            className="p-4 text-[var(--ink)] relative z-20"
             style={{
               background: `linear-gradient(90deg, ${airlineColor} 0%, #38bdf8 100%)`,
             }}
@@ -585,9 +585,9 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                             }}
                           />
                         ) : (
-                          <Building className="h-5 w-5 text-white" />
+                          <Building className="h-5 w-5 text-[var(--ink)]" />
                         )}
-                        <Building className="h-5 w-5 text-white absolute fallback-icon hidden" />
+                        <Building className="h-5 w-5 text-[var(--ink)] absolute fallback-icon hidden" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="font-medium">
@@ -597,7 +597,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                 </TooltipProvider>
                 <span className="text-lg font-semibold">{flight.airline}</span>
               </div>
-              <Badge variant="outline" className="bg-white/10 text-white border-white/20">
+              <Badge variant="outline" className="bg-[rgba(255,255,255,0.15)] text-[var(--paper)] border-[rgba(255,255,255,0.35)]">
                 {flight.flight_number}
               </Badge>
             </div>
@@ -621,7 +621,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
               <div className="flex flex-col items-center w-full max-w-xs md:max-w-sm">
                 <div className="relative w-full h-8 flex items-center justify-center">
-                  <div className="absolute left-0 right-0 top-1/2 h-2 bg-gradient-to-r from-flight via-blue-400 to-airport rounded-full shadow-inner" style={{ transform: 'translateY(-50%)' }} />
+                  <div className="absolute left-0 right-0 top-1/2 h-2 bg-gradient-to-r from-flight via-[var(--brass)] to-airport rounded-full shadow-inner" style={{ transform: 'translateY(-50%)' }} />
                   {(() => {
                     let progress = 0;
                     try {
@@ -665,8 +665,8 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       </div>
                     );
                   })()}
-                  <div className="absolute left-0 top-1/2 w-4 h-4 bg-flight rounded-full border-2 border-white shadow" style={{ transform: 'translateY(-50%)' }} />
-                  <div className="absolute right-0 top-1/2 w-4 h-4 bg-airport rounded-full border-2 border-white shadow" style={{ transform: 'translateY(-50%)' }} />
+                  <div className="absolute left-0 top-1/2 w-4 h-4 bg-flight rounded-full border-2 border-[var(--paper)] shadow" style={{ transform: 'translateY(-50%)' }} />
+                  <div className="absolute right-0 top-1/2 w-4 h-4 bg-airport rounded-full border-2 border-[var(--paper)] shadow" style={{ transform: 'translateY(-50%)' }} />
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground font-medium text-center">
                   {renderDuration()}

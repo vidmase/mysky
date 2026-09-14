@@ -79,11 +79,11 @@ function todayIso() {
 }
 
 function priceColor(price: number, min: number, max: number) {
-  if (max <= min) return "bg-emerald-500/25 text-emerald-100 border-emerald-500/40"
+  if (max <= min) return "bg-[var(--wash-jade)] text-[var(--jade)] border-[color-mix(in_srgb,var(--jade)_40%,transparent)]"
   const t = (price - min) / (max - min)
-  if (t <= 0.33) return "bg-emerald-500/25 text-emerald-100 border-emerald-500/40"
-  if (t <= 0.66) return "bg-amber-500/20 text-amber-100 border-amber-500/40"
-  return "bg-rose-500/20 text-rose-100 border-rose-500/40"
+  if (t <= 0.33) return "bg-[var(--wash-jade)] text-[var(--jade)] border-[color-mix(in_srgb,var(--jade)_40%,transparent)]"
+  if (t <= 0.66) return "bg-[var(--wash-brass)] text-[var(--brass)] border-[color-mix(in_srgb,var(--brass)_40%,transparent)]"
+  return "bg-[var(--wash-accent)] text-[var(--vermillion-dk)] border-[color-mix(in_srgb,var(--vermillion-dk)_40%,transparent)]"
 }
 
 function priceLabel(currency: string, price: number) {
@@ -293,14 +293,14 @@ export function PriceMonthPanel({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+    <div className="space-y-3 rounded-xl border border-[var(--rule)] bg-[hsl(var(--card))]/50 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <Button
             type="button"
             size="icon"
             variant="outline"
-            className="h-8 w-8 border-zinc-700 bg-zinc-900"
+            className="h-8 w-8 border-[var(--rule)] bg-[hsl(var(--card))]"
             onClick={() => {
               cancelRef.current = true
               setMonth((m) => addMonths(m, -1))
@@ -308,14 +308,14 @@ export function PriceMonthPanel({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <p className="min-w-[9rem] text-center text-sm font-semibold text-zinc-100">
+          <p className="min-w-[9rem] text-center text-sm font-semibold text-[var(--ink)]">
             {formatMonthTitle(month)}
           </p>
           <Button
             type="button"
             size="icon"
             variant="outline"
-            className="h-8 w-8 border-zinc-700 bg-zinc-900"
+            className="h-8 w-8 border-[var(--rule)] bg-[hsl(var(--card))]"
             onClick={() => {
               cancelRef.current = true
               setMonth((m) => addMonths(m, 1))
@@ -327,7 +327,7 @@ export function PriceMonthPanel({
         <Button
           type="button"
           size="sm"
-          className="gap-1.5 bg-sky-600 text-white hover:bg-sky-500"
+          className="gap-1.5 bg-[var(--vermillion)] text-[var(--paper)] hover:bg-[var(--vermillion-dk)]"
           disabled={!canLoad || loadingMonth}
           onClick={() => void loadMonth(false)}
         >
@@ -342,12 +342,12 @@ export function PriceMonthPanel({
         </Button>
       </div>
 
-      <p className="text-[11px] text-zinc-500">
+      <p className="text-[11px] text-[var(--ink-3)]">
         One-way cheapest per day · {fromCode || "—"} → {toCode || "—"} · loads ~2 at a time
         (cached 6h)
       </p>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium uppercase tracking-wide text-[var(--ink-3)]">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div key={d} className="py-1">
             {d}
@@ -361,7 +361,7 @@ export function PriceMonthPanel({
           const selected = cell.date === selectedDate
           const clickable = cell.inMonth && !past
           const heat =
-            cell.price != null ? priceColor(cell.price, minP, maxP) : "border-zinc-800 bg-zinc-950/60 text-zinc-500"
+            cell.price != null ? priceColor(cell.price, minP, maxP) : "border-[var(--rule)] bg-[hsl(var(--card))]/60 text-[var(--ink-3)]"
 
           return (
             <button
@@ -371,18 +371,18 @@ export function PriceMonthPanel({
               onClick={() => onSelectDate(cell.date)}
               className={`min-h-[3.25rem] rounded-lg border px-1 py-1 text-left transition ${
                 !cell.inMonth
-                  ? "border-transparent bg-transparent text-zinc-700"
+                  ? "border-transparent bg-transparent text-[var(--ink-2)]"
                   : past
-                    ? "cursor-not-allowed border-zinc-900 bg-zinc-950/40 text-zinc-600 opacity-50"
+                    ? "cursor-not-allowed border-[var(--rule)] bg-[hsl(var(--card))]/40 text-[var(--ink-2)] opacity-50"
                     : selected
-                      ? "border-sky-500 bg-sky-500/20 text-sky-50 ring-1 ring-sky-400/40"
-                      : `${heat} hover:border-zinc-500`
+                      ? "border-[var(--vermillion)] bg-[var(--wash-accent)] text-[var(--vermillion)] ring-1 ring-[var(--wash-accent)]"
+                      : `${heat} hover:border-[var(--rule)]`
               }`}
             >
-              <div className="text-[10px] tabular-nums text-zinc-400">{cell.date.slice(8)}</div>
+              <div className="text-[10px] tabular-nums text-[var(--ink-3)]">{cell.date.slice(8)}</div>
               <div className="text-[11px] font-semibold tabular-nums leading-tight">
                 {cell.loading ? (
-                  <Loader2 className="mt-0.5 h-3 w-3 animate-spin text-zinc-400" />
+                  <Loader2 className="mt-0.5 h-3 w-3 animate-spin text-[var(--ink-3)]" />
                 ) : cell.price != null ? (
                   priceLabel(currency, cell.price)
                 ) : cell.error ? (
@@ -399,16 +399,16 @@ export function PriceMonthPanel({
       </div>
 
       {priced.length > 0 && (
-        <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
-          <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+        <div className="flex flex-wrap gap-2 text-[10px] text-[var(--ink-3)]">
+          <span className="rounded border border-[color-mix(in_srgb,var(--jade)_30%,transparent)] bg-[var(--wash-jade)] px-1.5 py-0.5 text-[var(--jade)]">
             Low {priceLabel(currency, minP)}
           </span>
-          <span className="rounded border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-rose-200">
+          <span className="rounded border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] bg-[var(--wash-accent)] px-1.5 py-0.5 text-[var(--vermillion-dk)]">
             High {priceLabel(currency, maxP)}
           </span>
           <button
             type="button"
-            className="ml-auto text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
+            className="ml-auto text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink-2)] hover:underline"
             onClick={() => void loadMonth(true)}
             disabled={loadingMonth}
           >
@@ -417,14 +417,14 @@ export function PriceMonthPanel({
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-zinc-800 pb-2">
+      <div className="flex gap-2 border-b border-[var(--rule)] pb-2">
         <button
           type="button"
           onClick={() => setChartTab("month")}
           className={`rounded-md px-2 py-1 text-xs ${
             chartTab === "month"
-              ? "bg-zinc-800 text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-300"
+              ? "bg-[hsl(var(--card))] text-[var(--ink)]"
+              : "text-[var(--ink-3)] hover:text-[var(--ink-2)]"
           }`}
         >
           Month graph
@@ -434,8 +434,8 @@ export function PriceMonthPanel({
           onClick={() => setChartTab("history")}
           className={`rounded-md px-2 py-1 text-xs ${
             chartTab === "history"
-              ? "bg-zinc-800 text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-300"
+              ? "bg-[hsl(var(--card))] text-[var(--ink)]"
+              : "text-[var(--ink-3)] hover:text-[var(--ink-2)]"
           }`}
         >
           Price history
@@ -445,23 +445,23 @@ export function PriceMonthPanel({
       <div className="h-40 w-full">
         {chartTab === "month" ? (
           priced.length === 0 ? (
-            <p className="flex h-full items-center justify-center text-xs text-zinc-500">
+            <p className="flex h-full items-center justify-center text-xs text-[var(--ink-3)]">
               Load month prices to see the graph.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,19,14,0.16)" />
+                <XAxis dataKey="label" tick={{ fill: "#5b5142", fontSize: 10 }} />
                 <YAxis
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
+                  tick={{ fill: "#5b5142", fontSize: 10 }}
                   width={36}
                   domain={["auto", "auto"]}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "#18181b",
-                    border: "1px solid #3f3f46",
+                    background: "#f2ece1",
+                    border: "1px solid rgba(23,19,14,0.16)",
                     borderRadius: 8,
                     fontSize: 12,
                   }}
@@ -487,20 +487,20 @@ export function PriceMonthPanel({
             </ResponsiveContainer>
           )
         ) : historyData.length < 2 ? (
-          <p className="flex h-full items-center justify-center px-4 text-center text-xs text-zinc-500">
+          <p className="flex h-full items-center justify-center px-4 text-center text-xs text-[var(--ink-3)]">
             History for {selectedDate || "this date"} builds as you load the grid / search.
             Need at least two checks.
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={historyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-              <XAxis dataKey="t" tick={{ fill: "#a1a1aa", fontSize: 9 }} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} width={36} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,19,14,0.16)" />
+              <XAxis dataKey="t" tick={{ fill: "#5b5142", fontSize: 9 }} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#5b5142", fontSize: 10 }} width={36} />
               <Tooltip
                 contentStyle={{
-                  background: "#18181b",
-                  border: "1px solid #3f3f46",
+                  background: "#f2ece1",
+                  border: "1px solid rgba(23,19,14,0.16)",
                   borderRadius: 8,
                   fontSize: 12,
                 }}

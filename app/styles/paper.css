@@ -1,71 +1,18 @@
 /* ============================================================
-   PAPER STOCK — shared design tokens for the print-aesthetic
-   surfaces (landing page, flight logbook).
-
-   Adding `paper-stock` to a container does two things:
-     1. exposes the palette + type stack as --paper/--ink/etc.
-     2. remaps the app's shadcn HSL tokens to paper values, so
-        Buttons, Selects, Badges and Inputs rendered inside
-        adopt the aesthetic without being rewritten.
-
-   Radix portals (dialogs, dropdown menus) mount on <body> and
-   therefore keep the app's dark theme by design.
+   PAPER STOCK — the print treatment layered on top of the app's
+   palette. `paper-stock` marks a page as a printed surface: it
+   lays the grain over it and gives the masthead its rules.
    ============================================================ */
+
+/* The palette, the type stack and the shadcn token remap now live on :root in
+   app/globals.css — the whole app wears paper, so nothing has to opt in. What
+   is left here is the print treatment: the grain, the masthead, and the
+   square-cornered portal surfaces. */
 
 .paper-stock,
 .paper-surface {
-  /* ---- palette ---- */
-  --paper: #f2ece1;
-  --paper-2: #e8dfcd;
-  --paper-3: #ded2ba;
-  --ink: #17130e;
-  --ink-2: #5b5142;
-  --ink-3: #8c8071;
-  --vermillion: #ce3b1e;
-  --vermillion-dk: #a32c14;
-  --navy: #0e2033;
-  --brass: #c9942f;
-  --jade: #2f6b53;
-
-  --rule: rgba(23, 19, 14, 0.16);
-  --rule-strong: rgba(23, 19, 14, 0.38);
-
-  /* ---- type ---- */
-  --display: var(--font-display), "Bodoni MT", Didot, "Times New Roman", serif;
-  --body: var(--font-body), "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --code: var(--font-code), ui-monospace, "SF Mono", Consolas, monospace;
-
-  /* ---- shadcn token remap (HSL triplets) ---- */
-  --background: 39 39% 92%;
-  --foreground: 33 24% 7%;
-  --card: 39 42% 95%;
-  --card-foreground: 33 24% 7%;
-  --popover: 39 42% 95%;
-  --popover-foreground: 33 24% 7%;
-  --primary: 10 75% 46%;
-  --primary-foreground: 39 45% 96%;
-  --secondary: 40 37% 86%;
-  --secondary-foreground: 33 24% 7%;
-  --muted: 40 30% 88%;
-  --muted-foreground: 33 12% 42%;
-  --accent: 40 37% 86%;
-  --accent-foreground: 33 24% 7%;
-  --destructive: 10 75% 42%;
-  --destructive-foreground: 39 45% 96%;
-  --border: 35 18% 74%;
-  --input: 35 18% 74%;
-  --ring: 10 75% 46%;
-
-  /* app-specific accents used by shared components */
-  --color-flight: 10 75% 46%;
-  --color-airport: 210 45% 24%;
-  --color-airline: 39 62% 42%;
-  --color-stats: 158 39% 30%;
-
   background-color: var(--paper);
   color: var(--ink);
-  font-family: var(--body);
-  -webkit-font-smoothing: antialiased;
 }
 
 /* Only the page wrapper takes a stacking context — portalled surfaces are
@@ -75,11 +22,10 @@
   isolation: isolate;
 }
 
-/* Radix mounts dropdowns, selects and dialogs on <body>, outside the page's
-   `paper-stock` wrapper, so they would otherwise keep the app's dark theme.
-   Add `paper-surface` to that portalled content to carry the palette across —
-   it is the same token block minus the page-level grain, which is fixed to the
-   viewport and would tint the whole screen once per open portal. */
+/* Portalled content already inherits the palette from :root. `paper-surface`
+   only squares off its corners to match the printed surfaces — it deliberately
+   skips the grain, which is fixed to the viewport and would tint the whole
+   screen once per open portal. */
 .paper-surface {
   border-radius: 0;
 }
@@ -98,6 +44,12 @@
   opacity: 0.4;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.38'/%3E%3C/svg%3E");
+}
+
+/* The page measure the masthead and the printed surfaces share. */
+.paper-shell {
+  width: min(1440px, 100% - 3rem);
+  margin-inline: auto;
 }
 
 /* ============================================================
