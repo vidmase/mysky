@@ -14,7 +14,7 @@ export async function resolveDeepSeekKey(userId: string): Promise<string | null>
     const supabase = createSupabaseServer()
 
     const { data, error } = await supabase
-        .from('user_api_keys')
+        .from('chat_api_keys')
         .select('ciphertext, iv, auth_tag')
         .eq('user_id', userId)
         .eq('provider', 'deepseek')

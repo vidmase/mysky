@@ -23,7 +23,7 @@ export async function GET() {
 
         const supabase = createSupabaseServer()
         const { data, error } = await supabase
-            .from('user_api_keys')
+            .from('chat_api_keys')
             .select('hint, updated_at')
             .eq('user_id', userId)
             .eq('provider', PROVIDER)
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         const supabase = createSupabaseServer()
 
         const { error } = await supabase
-            .from('user_api_keys')
+            .from('chat_api_keys')
             .upsert(
                 {
                     user_id: userId,
@@ -116,7 +116,7 @@ export async function DELETE() {
 
         const supabase = createSupabaseServer()
         const { error } = await supabase
-            .from('user_api_keys')
+            .from('chat_api_keys')
             .delete()
             .eq('user_id', userId)
             .eq('provider', PROVIDER)
