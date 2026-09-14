@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Send, Bot, User, Plane, MapPin, Clock, BarChart3, Trash2, Pin, Pencil, Search } from 'lucide-react'
+import { Loader2, Send, Bot, User, Plane, MapPin, Clock, BarChart3, Trash2, Pin, Pencil, Search, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DEEPSEEK_MODELS, DEFAULT_DEEPSEEK_MODEL, type DeepSeekModelId } from '@/lib/deepseek-models'
+import { ApiKeyDialog, type KeyStatus } from './components/ApiKeyDialog'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -45,6 +47,13 @@ export default function ChatPage() {
   const [searchRole, setSearchRole] = useState<'all' | 'user' | 'assistant'>('all')
   const [toast, setToast] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [model, setModel] = useState<DeepSeekModelId>(DEFAULT_DEEPSEEK_MODEL)
+  const [keyDialogOpen, setKeyDialogOpen] = useState(false)
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>({
+    configured: false,
+    hint: null,
+    sharedKeyAvailable: false,
+  })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
@@ -57,6 +66,16 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  const loadKeyStatus = async () => {
+    try {
+      const response = await fetch('/api/chat/key')
+      if (response.ok) setKeyStatus(await response.json())
+    } catch {
+      // A failed status check only costs the header badge; chat still works,
+      // and a genuinely missing key surfaces on the first message.
+    }
+  }
 
   const loadChatHistory = async () => {
     try {
@@ -84,6 +103,7 @@ export default function ChatPage() {
       setIsCheckingAuth(false)
       setUserId(user.id)
       loadChatHistory()
+      loadKeyStatus()
     } else {
       setIsAuthenticated(false)
       setIsCheckingAuth(false)
@@ -133,12 +153,21 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          conversation: messages.slice(-10)
+          conversation: messages.slice(-10),
+          model
         })
       })
 
       if (!response.ok) {
-        throw new Error('Failed to send message')
+        const detail = await response.json().catch(() => ({}))
+
+        // A missing or rejected key is the one failure the user can fix from
+        // here, so open the key dialog instead of just logging an error.
+        if (detail.code === 'missing_api_key' || detail.code === 'invalid_api_key') {
+          setKeyStatus(prev => ({ ...prev, configured: detail.code === 'invalid_api_key' }))
+          setKeyDialogOpen(true)
+        }
+        throw new Error(detail.error || 'Failed to send message')
       }
 
       const data = await response.json()
@@ -300,6 +329,12 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))] p-4">
+      <ApiKeyDialog
+        open={keyDialogOpen}
+        onOpenChange={setKeyDialogOpen}
+        status={keyStatus}
+        onStatusChange={setKeyStatus}
+      />
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
           <Card className="bg-[hsl(var(--card))] border border-[var(--rule)] shadow-sm">
@@ -318,7 +353,36 @@ export default function ChatPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <label className="sr-only" htmlFor="chat-model">Model</label>
+                  <select
+                    id="chat-model"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value as DeepSeekModelId)}
+                    title={DEEPSEEK_MODELS.find(m => m.id === model)?.description}
+                    className="h-9 rounded-md border border-[var(--rule)] bg-[hsl(var(--card))] px-2 text-sm text-[var(--ink)]"
+                  >
+                    {DEEPSEEK_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setKeyDialogOpen(true)}
+                    className="flex items-center gap-2"
+                    title={keyStatus.configured
+                      ? `Using your key ending ${keyStatus.hint}`
+                      : 'Add your DeepSeek API key'}
+                  >
+                    <KeyRound className={cn(
+                      'h-4 w-4',
+                      keyStatus.configured ? 'text-[var(--jade)]' : 'text-[var(--vermillion)]'
+                    )} />
+                    {keyStatus.configured ? `Key …${keyStatus.hint}` : 'Add key'}
+                  </Button>
+
                   <Button
                     variant="outline"
                     size="sm"
