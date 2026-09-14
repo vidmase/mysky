@@ -3,38 +3,77 @@
 @tailwind utilities;
 
 @layer base {
+  /* The app is printed on paper stock. These are the same values the
+     print-aesthetic surfaces used to opt into via `.paper-stock`; they live
+     here so every component — including the Radix dialogs and menus that
+     portal onto <body> — wears the palette by default. */
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* ---- palette ---- */
+    --paper: #f2ece1;
+    --paper-2: #e8dfcd;
+    --paper-3: #ded2ba;
+    --ink: #17130e;
+    --ink-2: #5b5142;
+    --ink-3: #8c8071;
+    --vermillion: #ce3b1e;
+    --vermillion-dk: #a32c14;
+    --navy: #0e2033;
+    --brass: #c9942f;
+    --jade: #2f6b53;
+
+    --rule: rgba(23, 19, 14, 0.16);
+    --rule-strong: rgba(23, 19, 14, 0.38);
+
+    /* Translucent washes of the accents, for chips and tinted panels. The
+       accents are opaque inks, so anything that used to be a glow on the dark
+       theme becomes one of these on stock. */
+    --wash-ink: rgba(23, 19, 14, 0.04);
+    --wash-accent: rgba(206, 59, 30, 0.1);
+    --wash-accent-2: rgba(206, 59, 30, 0.18);
+    --wash-jade: rgba(47, 107, 83, 0.1);
+    --wash-jade-2: rgba(47, 107, 83, 0.18);
+    --wash-brass: rgba(201, 148, 47, 0.12);
+    --wash-brass-2: rgba(201, 148, 47, 0.2);
+    --wash-navy: rgba(14, 32, 51, 0.08);
+    --wash-navy-2: rgba(14, 32, 51, 0.14);
+
+    /* ---- type (font vars come from app/styles/paper-fonts.ts) ---- */
+    --display: var(--font-display), "Bodoni MT", Didot, "Times New Roman", serif;
+    --body: var(--font-body), "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --code: var(--font-code), ui-monospace, "SF Mono", Consolas, monospace;
+
+    /* ---- shadcn tokens (HSL triplets) ---- */
+    --background: 39 39% 92%;
+    --foreground: 33 24% 7%;
+    --card: 39 42% 95%;
+    --card-foreground: 33 24% 7%;
+    --popover: 39 42% 95%;
+    --popover-foreground: 33 24% 7%;
+    --primary: 10 75% 46%;
+    --primary-foreground: 39 45% 96%;
+    --secondary: 40 37% 86%;
+    --secondary-foreground: 33 24% 7%;
+    --muted: 40 30% 88%;
+    --muted-foreground: 33 12% 42%;
+    --accent: 40 37% 86%;
+    --accent-foreground: 33 24% 7%;
+    --destructive: 10 75% 42%;
+    --destructive-foreground: 39 45% 96%;
+    --border: 35 18% 74%;
+    --input: 35 18% 74%;
+    --ring: 10 75% 46%;
     --radius: 0.5rem;
 
-    /* Custom colors */
-    --color-airline: 221.2 83.2% 53.3%;
-    --color-airport: 262.1 83.3% 57.8%;
-    --color-flight: 24.6 95% 53.1%;
-    --color-stats: 142.1 76.2% 36.3%;
-    --color-map: 262.1 83.3% 57.8%;
-    --gradient-blue: linear-gradient(135deg, hsl(221.2, 83.2%, 53.3%), hsl(224, 76.3%, 48%));
-    --gradient-purple: linear-gradient(135deg, hsl(262.1, 83.3%, 57.8%), hsl(258, 90%, 66%));
-    --gradient-orange: linear-gradient(135deg, hsl(24.6, 95%, 53.1%), hsl(27, 96%, 61%));
-    --gradient-green: linear-gradient(135deg, hsl(142.1, 76.2%, 36.3%), hsl(160, 84%, 39%));
+    /* Custom accents used by shared components */
+    --color-airline: 39 62% 42%;
+    --color-airport: 210 45% 24%;
+    --color-flight: 10 75% 46%;
+    --color-stats: 158 39% 30%;
+    --color-map: 210 45% 24%;
+    --gradient-blue: linear-gradient(135deg, hsl(210, 45%, 24%), hsl(210, 45%, 32%));
+    --gradient-purple: linear-gradient(135deg, hsl(210, 45%, 24%), hsl(258, 30%, 40%));
+    --gradient-orange: linear-gradient(135deg, hsl(10, 75%, 46%), hsl(16, 78%, 55%));
+    --gradient-green: linear-gradient(135deg, hsl(158, 39%, 30%), hsl(158, 39%, 38%));
   }
 }
 
@@ -45,6 +84,8 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
   }
 }
 
@@ -242,7 +283,7 @@
 }
 
 .leaflet-tile-pane {
-  filter: brightness(0.8) saturate(1.2) contrast(1.1);
+  filter: saturate(0.85) contrast(0.95);
 }
 
 .leaflet-popup-content-wrapper {
@@ -253,47 +294,4 @@
 
 .leaflet-popup-tip {
   background-color: hsl(var(--card));
-}
-
-/* Aurora Background */
-.aurora-bg {
-  background-color: #000;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-  position: relative;
-  overflow: hidden;
-}
-
-.aurora-bg::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    hsl(221.2, 83.2%, 53.3%) 0deg,
-    hsl(262.1, 83.3%, 57.8%) 60deg,
-    hsl(24.6, 95%, 53.1%) 120deg,
-    hsl(221.2, 83.2%, 53.3%) 180deg,
-    hsl(262.1, 83.3%, 57.8%) 240deg,
-    hsl(24.6, 95%, 53.1%) 300deg,
-    hsl(221.2, 83.2%, 53.3%) 360deg
-  );
-  filter: blur(80px);
-  opacity: 0.15;
-  animation: aurora-spin 20s linear infinite;
-  z-index: 0;
-}
-
-@keyframes aurora-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }

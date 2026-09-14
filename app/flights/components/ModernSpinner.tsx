@@ -15,17 +15,17 @@ export function ModernSpinner({ size = 'md', className }: ModernSpinnerProps) {
   return (
     <div className={cn("relative", sizeClasses[size], className)}>
       {/* Modern gradient spinner with blur effect */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-spin">
+      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[var(--vermillion)] via-[var(--vermillion)] to-[var(--vermillion-dk)] animate-spin">
         <div className="absolute inset-1 rounded-full bg-background"></div>
       </div>
       
       {/* Pulsing dot in center */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="h-1 w-1 bg-blue-500 rounded-full animate-pulse"></div>
+        <div className="h-1 w-1 bg-[var(--vermillion)] rounded-full animate-pulse"></div>
       </div>
       
       {/* Glow effect */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 blur-sm animate-pulse"></div>
+      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[color-mix(in_srgb,var(--vermillion)_20%,transparent)] via-[color-mix(in_srgb,var(--vermillion)_20%,transparent)] to-[color-mix(in_srgb,var(--vermillion-dk)_20%,transparent)] blur-sm animate-pulse"></div>
     </div>
   )
 }
@@ -40,11 +40,11 @@ export function ModernDotsSpinner({ size = 'md', className }: ModernSpinnerProps
 
   return (
     <div className={cn("flex items-center space-x-1", className)}>
-      <div className={cn("bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-bounce", sizeClasses[size])} 
+      <div className={cn("bg-[var(--vermillion)] rounded-full animate-bounce", sizeClasses[size])} 
            style={{ animationDelay: '0ms' }}></div>
-      <div className={cn("bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-bounce", sizeClasses[size])} 
+      <div className={cn("bg-gradient-to-r from-[var(--vermillion)] to-[var(--vermillion-dk)] rounded-full animate-bounce", sizeClasses[size])} 
            style={{ animationDelay: '150ms' }}></div>
-      <div className={cn("bg-gradient-to-r from-pink-500 to-blue-500 rounded-full animate-bounce", sizeClasses[size])} 
+      <div className={cn("bg-gradient-to-r from-[var(--vermillion-dk)] to-[var(--vermillion)] rounded-full animate-bounce", sizeClasses[size])} 
            style={{ animationDelay: '300ms' }}></div>
     </div>
   )
@@ -64,7 +64,7 @@ export function ModernWaveSpinner({ size = 'md', className }: ModernSpinnerProps
         <div
           key={i}
           className={cn(
-            "bg-gradient-to-b from-blue-500 to-purple-500 rounded-sm animate-pulse",
+            "bg-[var(--vermillion)] rounded-sm animate-pulse",
             sizeClasses[size]
           )}
           style={{

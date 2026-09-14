@@ -50,7 +50,7 @@ export function AirportCodeField({
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-zinc-300">
+      <label htmlFor={id} className="text-sm font-medium text-[var(--ink-2)]">
         {label}
       </label>
       <Popover open={open} onOpenChange={setOpen}>
@@ -61,37 +61,37 @@ export function AirportCodeField({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="h-10 w-full justify-between border-zinc-700 bg-zinc-900 px-3 font-normal text-zinc-100 hover:bg-zinc-800 hover:text-zinc-50"
+            className="h-10 w-full justify-between border-[var(--rule)] bg-[hsl(var(--card))] px-3 font-normal text-[var(--ink)] hover:bg-[hsl(var(--card))] hover:text-[var(--vermillion)]"
           >
             <span className="flex min-w-0 items-center gap-2 truncate">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--vermillion)]" />
               {value ? (
                 <span className="truncate">
                   <span className="font-semibold">{value}</span>
                   {selected ? (
-                    <span className="text-zinc-400"> · {selected.city}</span>
+                    <span className="text-[var(--ink-3)]"> · {selected.city}</span>
                   ) : null}
                 </span>
               ) : (
-                <span className="text-zinc-500">{placeholder}</span>
+                <span className="text-[var(--ink-3)]">{placeholder}</span>
               )}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[min(22rem,calc(100vw-2rem))] border-zinc-700 bg-zinc-950 p-0"
+          className="w-[min(22rem,calc(100vw-2rem))] border-[var(--rule)] bg-[hsl(var(--card))] p-0"
           align="start"
         >
-          <Command shouldFilter={false} className="bg-zinc-950 text-zinc-100">
+          <Command shouldFilter={false} className="bg-[hsl(var(--card))] text-[var(--ink)]">
             <CommandInput
               placeholder="Search city or code…"
               value={query}
               onValueChange={setQuery}
-              className="text-zinc-100"
+              className="text-[var(--ink)]"
             />
             <CommandList>
-              <CommandEmpty className="py-4 text-sm text-zinc-500">
+              <CommandEmpty className="py-4 text-sm text-[var(--ink-3)]">
                 No airports found.
               </CommandEmpty>
               <CommandGroup>
@@ -104,7 +104,7 @@ export function AirportCodeField({
                       setOpen(false)
                       setQuery("")
                     }}
-                    className="aria-selected:bg-zinc-800"
+                    className="aria-selected:bg-[hsl(var(--card))]"
                   >
                     <Check
                       className={cn(
@@ -115,7 +115,7 @@ export function AirportCodeField({
                       )}
                     />
                     <span className="font-semibold tabular-nums">{airport.iata}</span>
-                    <span className="ml-2 truncate text-zinc-400">
+                    <span className="ml-2 truncate text-[var(--ink-3)]">
                       {airport.city} — {airport.name}
                     </span>
                   </CommandItem>

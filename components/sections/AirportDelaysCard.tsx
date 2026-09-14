@@ -84,21 +84,21 @@ function GaugeArc({ value, max = 100, size = 120, strokeWidth = 10 }: { value: n
 
 function StatCard({ label, value, color = 'cyan' }: { label: string; value: string | number; color?: string }) {
   const colorMap: Record<string, { text: string; bg: string; glow: string }> = {
-    cyan: { text: 'text-cyan-400', bg: 'bg-cyan-500/10', glow: 'rgba(0,212,255,0.15)' },
-    amber: { text: 'text-amber-400', bg: 'bg-amber-500/10', glow: 'rgba(251,191,36,0.15)' },
-    red: { text: 'text-red-400', bg: 'bg-red-500/10', glow: 'rgba(239,68,68,0.15)' },
-    green: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', glow: 'rgba(16,185,129,0.15)' },
-    violet: { text: 'text-violet-400', bg: 'bg-violet-500/10', glow: 'rgba(139,92,246,0.15)' },
-    orange: { text: 'text-orange-400', bg: 'bg-orange-500/10', glow: 'rgba(251,146,60,0.15)' },
+    cyan: { text: 'text-[var(--vermillion)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(0,212,255,0.15)' },
+    amber: { text: 'text-[var(--brass)]', bg: 'bg-[var(--wash-brass)]', glow: 'rgba(251,191,36,0.15)' },
+    red: { text: 'text-[var(--vermillion-dk)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(239,68,68,0.15)' },
+    green: { text: 'text-[var(--jade)]', bg: 'bg-[var(--wash-jade)]', glow: 'rgba(16,185,129,0.15)' },
+    violet: { text: 'text-[var(--vermillion)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(139,92,246,0.15)' },
+    orange: { text: 'text-[var(--brass)]', bg: 'bg-[var(--wash-brass)]', glow: 'rgba(251,146,60,0.15)' },
   }
   const c = colorMap[color] || colorMap.cyan
 
   return (
     <div
-      className={`rounded-xl p-4 border border-white/[0.06] ${c.bg}`}
+      className={`rounded-xl p-4 border border-[var(--rule)] ${c.bg}`}
       style={{ boxShadow: `0 0 20px ${c.glow}` }}
     >
-      <div className="text-[10px] uppercase tracking-[0.15em] text-white/40 font-semibold mb-1">{label}</div>
+      <div className="text-[10px] uppercase tracking-[0.15em] text-[color-mix(in_srgb,var(--ink-2)_40%,transparent)] font-semibold mb-1">{label}</div>
       <div className={`text-2xl font-bold ${c.text}`}>{value}</div>
     </div>
   )
@@ -137,12 +137,12 @@ export function AirportDelaysCard({ iata = 'BRS', window = '60m' }: { iata?: str
 
   if (loading) {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
+      <div className="bg-[hsl(var(--card))]/60 backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 w-48 bg-white/10 rounded-lg" />
+          <div className="h-6 w-48 bg-[var(--wash-ink)] rounded-lg" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-20 bg-white/5 rounded-xl" />
+              <div key={i} className="h-20 bg-[var(--wash-ink)] rounded-xl" />
             ))}
           </div>
         </div>
@@ -152,8 +152,8 @@ export function AirportDelaysCard({ iata = 'BRS', window = '60m' }: { iata?: str
 
   if (error) {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-red-500/20 p-6">
-        <div className="flex items-center gap-3 text-red-400">
+      <div className="bg-[hsl(var(--card))]/60 backdrop-blur-xl rounded-2xl border border-[color-mix(in_srgb,var(--vermillion-dk)_20%,transparent)] p-6">
+        <div className="flex items-center gap-3 text-[var(--vermillion-dk)]">
           <AlertCircle className="h-5 w-5" />
           <span className="text-sm">{error}</span>
         </div>
@@ -163,30 +163,30 @@ export function AirportDelaysCard({ iata = 'BRS', window = '60m' }: { iata?: str
 
   if (!data) {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
-        <p className="text-white/40 text-sm">No delay data available for {iata}.</p>
+      <div className="bg-[hsl(var(--card))]/60 backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6">
+        <p className="text-[color-mix(in_srgb,var(--ink-2)_40%,transparent)] text-sm">No delay data available for {iata}.</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-6">
+    <div className="bg-[hsl(var(--card))]/60 backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6 space-y-6">
       {/* Header with gauge */}
       <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
         <div className="flex flex-col items-center">
           <GaugeArc value={data.delay_index} />
         </div>
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-white mb-1">
+          <h3 className="text-lg font-bold text-[var(--ink)] mb-1">
             Airport Delays — {iata}
           </h3>
-          <p className="text-xs text-white/40 mb-3">
+          <p className="text-xs text-[color-mix(in_srgb,var(--ink-2)_40%,transparent)] mb-3">
             {new Date(data.ts).toLocaleString()} • {source === 'rapidapi' ? 'Live via AeroDataBox' : source || 'cached'}
           </p>
 
           {zeroish && (source === 'rapidapi' || source === 'api-market' || source === 'market') && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-3">
-              <p className="text-xs text-amber-400 font-medium">
+            <div className="bg-[var(--wash-brass)] border border-[color-mix(in_srgb,var(--brass)_20%,transparent)] rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs text-[var(--brass)] font-medium">
                 ⚠️ Live data unavailable — provider returned zeros (rate limits or no subscription)
               </p>
             </div>

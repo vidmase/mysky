@@ -54,7 +54,7 @@ export function UserMenu() {
       <Button
         asChild
         variant="default"
-        className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-medium px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-300 animate-pulse-subtle"
+        className="bg-[var(--vermillion)] hover:from-[var(--vermillion)] hover:to-[var(--vermillion)] text-[var(--paper)] font-medium px-4 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-300 animate-pulse-subtle"
         aria-label="Sign In"
         tabIndex={0}
       >
@@ -73,7 +73,7 @@ export function UserMenu() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-[var(--jade)]" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-64" align="end" forceMount>
@@ -108,7 +108,7 @@ export function UserMenu() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            className="text-red-600 cursor-pointer"
+            className="text-[var(--vermillion-dk)] cursor-pointer"
             onClick={handleSignOut}
             aria-label="Sign out"
             tabIndex={0}
@@ -122,7 +122,7 @@ export function UserMenu() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="relative w-full max-w-4xl bg-background rounded-2xl shadow-2xl p-6 border border-flight">
             <button
-              className="absolute top-4 right-4 text-2xl text-flight hover:text-red-500 focus:outline-none"
+              className="absolute top-4 right-4 text-2xl text-flight hover:text-[var(--vermillion-dk)] focus:outline-none"
               aria-label="Close user management"
               tabIndex={0}
               onClick={() => setShowUserManagement(false)}

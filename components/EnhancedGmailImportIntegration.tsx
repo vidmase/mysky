@@ -177,9 +177,9 @@ export function EnhancedGmailImportIntegration({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {result.success ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
+                <CheckCircle className="w-5 h-5 text-[var(--jade)]" />
               ) : (
-                <XCircle className="w-5 h-5 text-red-600" />
+                <XCircle className="w-5 h-5 text-[var(--vermillion-dk)]" />
               )}
               Enhanced Import Results
             </CardTitle>
@@ -187,19 +187,19 @@ export function EnhancedGmailImportIntegration({
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{result.imported}</div>
+                <div className="text-2xl font-bold text-[var(--jade)]">{result.imported}</div>
                 <div className="text-sm text-muted-foreground">Imported</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">{result.skipped}</div>
+                <div className="text-2xl font-bold text-[var(--brass)]">{result.skipped}</div>
                 <div className="text-sm text-muted-foreground">Skipped</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{result.duplicates}</div>
+                <div className="text-2xl font-bold text-[var(--vermillion)]">{result.duplicates}</div>
                 <div className="text-sm text-muted-foreground">Duplicates</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{result.errorCount}</div>
+                <div className="text-2xl font-bold text-[var(--vermillion-dk)]">{result.errorCount}</div>
                 <div className="text-sm text-muted-foreground">Errors</div>
               </div>
             </div>

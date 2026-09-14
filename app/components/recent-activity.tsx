@@ -95,13 +95,10 @@ export function RecentActivity() {
         const isUpcoming = type === 'upcoming'
 
         return (
-            <div className={`group relative overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] ${isUpcoming
-                ? 'bg-[#1a1f2e]'
-                : 'bg-[#1a1f2e]'
-                }`}>
-                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/20"></div>
+            <div className="group relative overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] bg-[hsl(var(--card))]">
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-[var(--wash-ink)]"></div>
                 <div className="relative p-4 flex items-start space-x-4">
-                    <div className={`shrink-0 p-3 rounded-xl bg-white/5 text-white/80 ring-1 ring-white/10`}>
+                    <div className={`shrink-0 p-3 rounded-xl bg-[var(--wash-ink)] text-[color-mix(in_srgb,var(--ink-2)_80%,transparent)] ring-1 ring-[var(--rule)]`}>
                         {isUpcoming ? (
                             <Clock className="h-6 w-6" />
                         ) : (
@@ -111,16 +108,16 @@ export function RecentActivity() {
                     <div className="flex-1 min-w-0 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="font-jakarta font-normal tracking-wide text-base text-white group-hover:text-white/90">
+                                <p className="font-jakarta font-normal tracking-wide text-base text-[var(--ink)] group-hover:text-[color-mix(in_srgb,var(--ink-2)_90%,transparent)]">
                                     {flight.departure_airport} → {flight.arrival_airport}
                                 </p>
-                                <p className={`font-jakarta font-light tracking-normal text-sm mt-1 ${isUpcoming ? 'text-orange-500' : 'text-white/60'
+                                <p className={`font-jakarta font-light tracking-normal text-sm mt-1 ${isUpcoming ? 'text-[var(--brass)]' : 'text-[color-mix(in_srgb,var(--ink-2)_60%,transparent)]'
                                     }`}>
                                     {format(departureDate, 'MMM d, yyyy')}
                                 </p>
                             </div>
                             {isUpcoming && (
-                                <span className="inline-flex items-center shrink-0 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-light tracking-wide text-orange-500 ring-1 ring-orange-500/20">
+                                <span className="inline-flex items-center shrink-0 rounded-full bg-[var(--wash-brass)] px-3 py-1 text-xs font-light tracking-wide text-[var(--brass)] ring-1 ring-[var(--wash-brass)]">
                                     Upcoming
                                 </span>
                             )}
@@ -128,7 +125,7 @@ export function RecentActivity() {
                         <AirlineBadge
                             airline={flight.airline}
                             flightNumber={flight.flight_number}
-                            className={`${isUpcoming ? 'bg-white/5' : 'bg-white/5'} text-white/80`}
+                            className={`${isUpcoming ? 'bg-[var(--wash-ink)]' : 'bg-[var(--wash-ink)]'} text-white/80`}
                         />
                     </div>
                 </div>

@@ -142,7 +142,7 @@ export function Flightradar24ExportDialog({ open, onOpenChange, flights }: Fligh
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Plane className="h-5 w-5 text-orange-500" />
+            <Plane className="h-5 w-5 text-[var(--brass)]" />
             Export for Flightradar24
           </DialogTitle>
           <DialogDescription>
@@ -151,7 +151,7 @@ export function Flightradar24ExportDialog({ open, onOpenChange, flights }: Fligh
               href="https://my.flightradar24.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-orange-500 hover:underline inline-flex items-center gap-1"
+              className="text-[var(--brass)] hover:underline inline-flex items-center gap-1"
             >
               my.flightradar24.com
               <ExternalLink className="h-3 w-3" />
@@ -161,9 +161,9 @@ export function Flightradar24ExportDialog({ open, onOpenChange, flights }: Fligh
 
         <div className="space-y-6 py-4">
           {/* Format Info */}
-          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
+          <div className="rounded-lg border border-[color-mix(in_srgb,var(--brass)_20%,transparent)] bg-[var(--wash-brass)] p-4">
             <div className="flex items-start gap-3">
-              <Badge variant="outline" className="border-orange-500/50 text-orange-500 shrink-0">
+              <Badge variant="outline" className="border-[color-mix(in_srgb,var(--brass)_50%,transparent)] text-[var(--brass)] shrink-0">
                 FR24 Format
               </Badge>
               <div className="text-sm text-muted-foreground">
@@ -218,7 +218,7 @@ export function Flightradar24ExportDialog({ open, onOpenChange, flights }: Fligh
             <p className="text-sm text-muted-foreground">
               {filteredCount} flight{filteredCount !== 1 ? "s" : ""} will be exported
               {validFlightsCount < flights.length && (
-                <span className="text-yellow-500 ml-1">
+                <span className="text-[var(--brass)] ml-1">
                   ({flights.length - validFlightsCount} missing required fields)
                 </span>
               )}
@@ -289,7 +289,7 @@ export function Flightradar24ExportDialog({ open, onOpenChange, flights }: Fligh
           <Button 
             onClick={handleExport} 
             disabled={isExporting || filteredCount === 0}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-[var(--brass)] hover:bg-[var(--ink-2)] text-[var(--paper)]"
           >
             <Download className="mr-2 h-4 w-4" />
             {isExporting ? "Exporting..." : `Export ${filteredCount} Flight${filteredCount !== 1 ? "s" : ""}`}

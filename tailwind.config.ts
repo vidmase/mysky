@@ -128,9 +128,6 @@ const config = {
         shimmer: "shimmer 3s ease-in-out infinite",
         "border-beam": "border-beam 3s ease-in-out infinite alternate",
       },
-      backgroundImage: {
-        'gradient-aurora': "radial-gradient(100% 100% at 50% 50%, #2E3159 0%, #000000 100%)",
-      },
       fontFamily: {
         // Default app fonts mapped to Geist variables from app/layout.tsx
         sans: ['var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Apple Color Emoji', 'Segoe UI Emoji'],

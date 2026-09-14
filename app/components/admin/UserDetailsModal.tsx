@@ -133,21 +133,21 @@ export default function UserDetailsModal({ user, open, onClose, onUserUpdated }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="backdrop-blur-xl bg-blue-900/95 border border-blue-700 rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+      <div className="backdrop-blur-xl bg-[var(--wash-accent)] border border-[var(--vermillion)] rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-cyan-200 hover:text-red-400 text-2xl font-bold"
+          className="absolute top-3 right-3 text-[var(--vermillion)] hover:text-[var(--vermillion-dk)] text-2xl font-bold"
           aria-label="Close"
         >
           ×
         </button>
-        <h2 className="text-2xl font-bold mb-4 text-cyan-100">User Details</h2>
+        <h2 className="text-2xl font-bold mb-4 text-[var(--vermillion)]">User Details</h2>
         <div className="space-y-3 mb-6">
-          <div><span className="font-semibold text-cyan-200">Email:</span> <span className="text-white font-mono">{user.email}</span></div>
+          <div><span className="font-semibold text-[var(--vermillion)]">Email:</span> <span className="text-[var(--ink)] font-mono">{user.email}</span></div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-cyan-200">Role:</span>
+            <span className="font-semibold text-[var(--vermillion)]">Role:</span>
             <select
-              className="rounded-lg bg-blue-800/50 border border-blue-700 px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-2 py-1 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
               value={editRole}
               onChange={e => setEditRole(e.target.value)}
               disabled={user.is_super_admin}
@@ -156,26 +156,26 @@ export default function UserDetailsModal({ user, open, onClose, onUserUpdated }:
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            {user.is_super_admin && <span className="text-xs text-purple-300 ml-2">Super Admin</span>}
+            {user.is_super_admin && <span className="text-xs text-[var(--vermillion)] ml-2">Super Admin</span>}
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-cyan-200">Account Status:</span>
+            <span className="font-semibold text-[var(--vermillion)]">Account Status:</span>
             <button
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition ${editStatus ? 'bg-red-700/60 text-red-100' : 'bg-green-700/60 text-green-100'}`}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition ${editStatus ? 'bg-[var(--wash-accent)] text-[var(--vermillion-dk)]' : 'bg-[var(--wash-jade)] text-[var(--jade)]'}`}
               onClick={() => setEditStatus(!editStatus)}
               disabled={user.is_super_admin}
             >
               {editStatus ? 'Deactivated' : 'Active'}
             </button>
-            {user.is_super_admin && <span className="text-xs text-purple-300 ml-2">Cannot deactivate super admin</span>}
+            {user.is_super_admin && <span className="text-xs text-[var(--vermillion)] ml-2">Cannot deactivate super admin</span>}
           </div>
           
           {/* Deactivation Duration Section */}
           {editStatus && !user.is_super_admin && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-cyan-200">Deactivation Duration:</span>
+              <span className="font-semibold text-[var(--vermillion)]">Deactivation Duration:</span>
               <select
-                className="rounded-lg bg-blue-800/50 border border-blue-700 px-2 py-1 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                className="rounded-lg bg-[var(--wash-accent)] border border-[var(--vermillion)] px-2 py-1 text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--wash-accent)]"
                 value={deactivationDuration}
                 onChange={e => setDeactivationDuration(e.target.value)}
               >
@@ -189,20 +189,20 @@ export default function UserDetailsModal({ user, open, onClose, onUserUpdated }:
           {/* Show current deactivation end date if exists */}
           {user.disabled && user.deactivation_end_date && (
             <div>
-              <span className="font-semibold text-cyan-200">Current Deactivation:</span>
-              <span className="text-amber-300 ml-2">{formatDeactivationDate(user.deactivation_end_date)}</span>
+              <span className="font-semibold text-[var(--vermillion)]">Current Deactivation:</span>
+              <span className="text-[var(--brass)] ml-2">{formatDeactivationDate(user.deactivation_end_date)}</span>
             </div>
           )}
           
-          <div><span className="font-semibold text-cyan-200">Super Admin:</span> <span className="text-white">{user.is_super_admin ? 'Yes' : 'No'}</span></div>
-          <div><span className="font-semibold text-cyan-200">Signup Date:</span> <span className="text-white">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</span></div>
-          <div><span className="font-semibold text-cyan-200">Last Sign In:</span> <span className="text-white">{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : '—'}</span></div>
-          <div><span className="font-semibold text-cyan-200">Last Active:</span> <span className="text-white">{user.last_active_at ? new Date(user.last_active_at).toLocaleString() : '—'}</span></div>
+          <div><span className="font-semibold text-[var(--vermillion)]">Super Admin:</span> <span className="text-[var(--ink)]">{user.is_super_admin ? 'Yes' : 'No'}</span></div>
+          <div><span className="font-semibold text-[var(--vermillion)]">Signup Date:</span> <span className="text-[var(--ink)]">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</span></div>
+          <div><span className="font-semibold text-[var(--vermillion)]">Last Sign In:</span> <span className="text-[var(--ink)]">{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : '—'}</span></div>
+          <div><span className="font-semibold text-[var(--vermillion)]">Last Active:</span> <span className="text-[var(--ink)]">{user.last_active_at ? new Date(user.last_active_at).toLocaleString() : '—'}</span></div>
         </div>
         <div className="flex flex-col gap-3">
           <button
             onClick={handleResetPassword}
-            className="w-full py-2 rounded-lg bg-cyan-700 text-white font-semibold hover:bg-cyan-600 transition disabled:opacity-50"
+            className="w-full py-2 rounded-lg bg-[var(--vermillion)] text-[var(--paper)] font-semibold hover:bg-[var(--vermillion-dk)] transition disabled:opacity-50"
             disabled={loading}
           >
             Send Password Reset Email
@@ -210,21 +210,21 @@ export default function UserDetailsModal({ user, open, onClose, onUserUpdated }:
           <div className="flex gap-2 mt-2">
             <button
               onClick={handleSave}
-              className="flex-1 py-2 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-600 transition disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-[var(--jade)] text-[var(--paper)] font-semibold hover:bg-[var(--ink)] transition disabled:opacity-50"
               disabled={loading || (editRole === user.role && editStatus === !!user.disabled && (!editStatus || deactivationDuration === '0'))}
             >
               {loading ? 'Saving...' : 'Save Changes'}
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-2 rounded-lg bg-zinc-700 text-white font-semibold hover:bg-zinc-600 transition"
+              className="flex-1 py-2 rounded-lg bg-[hsl(var(--card))] text-[var(--ink)] font-semibold hover:bg-[hsl(var(--card))] transition"
               disabled={loading}
             >
               Cancel
             </button>
           </div>
-          {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
-          {success && <div className="text-green-300 text-sm mt-2">{success}</div>}
+          {error && <div className="text-[var(--vermillion-dk)] text-sm mt-2">{error}</div>}
+          {success && <div className="text-[var(--jade)] text-sm mt-2">{success}</div>}
         </div>
       </div>
     </div>

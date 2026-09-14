@@ -474,30 +474,30 @@ export function LiveSearchDrawer({
         return (
           <div
             key={key}
-            className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 shadow-sm"
+            className="rounded-xl border border-[var(--rule)] bg-[hsl(var(--card))]/80 p-4 shadow-sm"
           >
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
-                <p className="text-lg font-semibold text-zinc-50">
+                <p className="text-lg font-semibold text-[var(--ink)]">
                   {priceLabel(currency, offer.price)}
                 </p>
-                <p className="text-xs text-zinc-400">{airlines}</p>
+                <p className="text-xs text-[var(--ink-3)]">{airlines}</p>
               </div>
               <div className="flex flex-col items-end gap-1">
                 {offer.is_best && (
                   <Badge
-                    className="border-sky-500/30 bg-sky-500/15 text-sky-300"
+                    className="border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)] bg-[var(--wash-accent)] text-[var(--vermillion)]"
                     variant="outline"
                   >
                     Best
                   </Badge>
                 )}
                 {typeof offer.carbon?.emission === "number" && offer.carbon.emission > 0 && (
-                  <span className="text-[10px] text-emerald-400/90">
+                  <span className="text-[10px] text-[color-mix(in_srgb,var(--jade)_90%,transparent)]">
                     ~{offer.carbon.emission} kg CO₂
                   </span>
                 )}
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-[var(--ink-3)]">
                   {offer.stops === 0
                     ? "Direct"
                     : `${offer.stops} stop${offer.stops === 1 ? "" : "s"}`}
@@ -507,11 +507,11 @@ export function LiveSearchDrawer({
               </div>
             </div>
 
-            <div className="mb-3 flex items-center gap-2 text-sm text-zinc-200">
+            <div className="mb-3 flex items-center gap-2 text-sm text-[var(--ink-2)]">
               <span className="font-medium tabular-nums">{depTime}</span>
-              <span className="text-zinc-500">→</span>
+              <span className="text-[var(--ink-3)]">→</span>
               <span className="font-medium tabular-nums">{arrTime}</span>
-              <span className="ml-auto text-xs text-zinc-500">
+              <span className="ml-auto text-xs text-[var(--ink-3)]">
                 {fromCode || first?.from_airport?.code} → {toCode || last?.to_airport?.code}
               </span>
             </div>
@@ -519,7 +519,7 @@ export function LiveSearchDrawer({
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                className="gap-1.5 bg-sky-600 text-white hover:bg-sky-500"
+                className="gap-1.5 bg-[var(--vermillion)] text-[var(--paper)] hover:bg-[var(--vermillion-dk)]"
                 disabled={addingKey === key}
                 onClick={() => void handleAddPlanned(offer, key, leg)}
               >
@@ -534,7 +534,7 @@ export function LiveSearchDrawer({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 border-zinc-700 text-zinc-200"
+                  className="gap-1.5 border-[var(--rule)] text-[var(--ink-2)]"
                   asChild
                 >
                   <a href={googleUrl} target="_blank" rel="noopener noreferrer">
@@ -554,28 +554,28 @@ export function LiveSearchDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex h-full w-full flex-col gap-0 overflow-hidden border-zinc-800 bg-zinc-950 p-0 sm:max-w-lg"
+        className="flex h-full w-full flex-col gap-0 overflow-hidden border-[var(--rule)] bg-[hsl(var(--card))] p-0 sm:max-w-lg"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <SheetHeader className="shrink-0 border-b border-zinc-800 px-6 py-4 pr-12 text-left">
-          <SheetTitle className="flex items-center gap-2 text-zinc-50">
-            <Search className="h-5 w-5 text-sky-400" />
+        <SheetHeader className="shrink-0 border-b border-[var(--rule)] px-6 py-4 pr-12 text-left">
+          <SheetTitle className="flex items-center gap-2 text-[var(--ink)]">
+            <Search className="h-5 w-5 text-[var(--vermillion)]" />
             Live flight search
           </SheetTitle>
-          <SheetDescription className="text-zinc-400">
+          <SheetDescription className="text-[var(--ink-3)]">
             Search Google Flights live, then add an offer as a planned upcoming trip.
           </SheetDescription>
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="space-y-3 border-b border-zinc-800 px-6 py-4">
+        <div className="space-y-3 border-b border-[var(--rule)] px-6 py-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label className="text-zinc-300">Trip</Label>
+              <Label className="text-[var(--ink-2)]">Trip</Label>
               <Select value={trip} onValueChange={(v) => setTrip(v as TripType)}>
-                <SelectTrigger className="border-zinc-700 bg-zinc-900 text-zinc-100">
+                <SelectTrigger className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -585,9 +585,9 @@ export function LiveSearchDrawer({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-zinc-300">Stops</Label>
+              <Label className="text-[var(--ink-2)]">Stops</Label>
               <Select value={maxStops} onValueChange={(v) => setMaxStops(v as StopsFilter)}>
-                <SelectTrigger className="border-zinc-700 bg-zinc-900 text-zinc-100">
+                <SelectTrigger className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -605,7 +605,7 @@ export function LiveSearchDrawer({
               type="button"
               variant="outline"
               size="icon"
-              className="mb-0.5 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+              className="mb-0.5 border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink-2)] hover:bg-[hsl(var(--card))]"
               onClick={swapAirports}
               title="Swap airports"
             >
@@ -616,7 +616,7 @@ export function LiveSearchDrawer({
 
           <div className={`grid gap-3 ${trip === "round-trip" ? "grid-cols-2" : "grid-cols-2"}`}>
             <div className="space-y-1.5">
-              <Label htmlFor="live-date" className="text-zinc-300">
+              <Label htmlFor="live-date" className="text-[var(--ink-2)]">
                 {trip === "round-trip" ? "Outbound" : "Date"}
               </Label>
               <Input
@@ -624,12 +624,12 @@ export function LiveSearchDrawer({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]"
               />
             </div>
             {trip === "round-trip" ? (
               <div className="space-y-1.5">
-                <Label htmlFor="live-return" className="text-zinc-300">
+                <Label htmlFor="live-return" className="text-[var(--ink-2)]">
                   Return
                 </Label>
                 <Input
@@ -638,14 +638,14 @@ export function LiveSearchDrawer({
                   value={returnDate}
                   min={date}
                   onChange={(e) => setReturnDate(e.target.value)}
-                  className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                  className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]"
                 />
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label className="text-zinc-300">Cabin</Label>
+                <Label className="text-[var(--ink-2)]">Cabin</Label>
                 <Select value={seat} onValueChange={(v) => setSeat(v as SeatType)}>
-                  <SelectTrigger className="border-zinc-700 bg-zinc-900 text-zinc-100">
+                  <SelectTrigger className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -661,9 +661,9 @@ export function LiveSearchDrawer({
 
           {trip === "round-trip" && (
             <div className="space-y-1.5">
-              <Label className="text-zinc-300">Cabin</Label>
+              <Label className="text-[var(--ink-2)]">Cabin</Label>
               <Select value={seat} onValueChange={(v) => setSeat(v as SeatType)}>
-                <SelectTrigger className="border-zinc-700 bg-zinc-900 text-zinc-100">
+                <SelectTrigger className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -686,14 +686,14 @@ export function LiveSearchDrawer({
               ] as const
             ).map(([label, val, setter, min]) => (
               <div key={label} className="space-y-1.5">
-                <Label className="text-[11px] text-zinc-400">{label}</Label>
+                <Label className="text-[11px] text-[var(--ink-3)]">{label}</Label>
                 <Input
                   type="number"
                   min={min}
                   max={9}
                   value={val}
                   onChange={(e) => setter(Number(e.target.value) || min)}
-                  className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                  className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]"
                 />
               </div>
             ))}
@@ -701,25 +701,25 @@ export function LiveSearchDrawer({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-zinc-300">Carry-on</Label>
+              <Label className="text-[var(--ink-2)]">Carry-on</Label>
               <Input
                 type="number"
                 min={0}
                 max={9}
                 value={carryOn}
                 onChange={(e) => setCarryOn(Number(e.target.value) || 0)}
-                className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-zinc-300">Checked bags</Label>
+              <Label className="text-[var(--ink-2)]">Checked bags</Label>
               <Input
                 type="number"
                 min={0}
                 max={9}
                 value={checkedBags}
                 onChange={(e) => setCheckedBags(Number(e.target.value) || 0)}
-                className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                className="border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink)]"
               />
             </div>
           </div>
@@ -728,7 +728,7 @@ export function LiveSearchDrawer({
             <Button
               type="button"
               variant="outline"
-              className="w-full border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+              className="w-full border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink-2)] hover:bg-[hsl(var(--card))]"
               onClick={() => setShowMonthCalendar((v) => !v)}
             >
               {showMonthCalendar ? "Hide month prices" : "Month price grid & graph"}
@@ -754,7 +754,7 @@ export function LiveSearchDrawer({
               href={googleUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-sky-400 hover:text-sky-300"
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--vermillion)] hover:text-[var(--vermillion-dk)]"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Open full search on Google Flights
@@ -763,8 +763,8 @@ export function LiveSearchDrawer({
         </div>
 
         {dayPrices.length > 0 && (
-          <div className="border-b border-zinc-800 px-4 py-3">
-            <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div className="border-b border-[var(--rule)] px-4 py-3">
+            <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-[var(--ink-3)]">
               Flexible dates (±3)
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -778,11 +778,11 @@ export function LiveSearchDrawer({
                     onClick={() => void handleSearch(day.date)}
                     className={`min-w-[4.5rem] shrink-0 rounded-lg border px-2 py-2 text-left transition ${
                       active
-                        ? "border-sky-500/60 bg-sky-500/15 text-sky-100"
-                        : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
+                        ? "border-[color-mix(in_srgb,var(--vermillion)_60%,transparent)] bg-[var(--wash-accent)] text-[var(--vermillion)]"
+                        : "border-[var(--rule)] bg-[hsl(var(--card))] text-[var(--ink-2)] hover:border-[var(--rule)]"
                     }`}
                   >
-                    <div className="text-[10px] text-zinc-400">{formatChipDate(day.date)}</div>
+                    <div className="text-[10px] text-[var(--ink-3)]">{formatChipDate(day.date)}</div>
                     <div className="text-sm font-semibold tabular-nums">
                       {day.loading
                         ? "…"
@@ -797,8 +797,8 @@ export function LiveSearchDrawer({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-2">
-          <p className="text-xs text-zinc-500">
+        <div className="flex items-center justify-between border-b border-[var(--rule)] px-6 py-2">
+          <p className="text-xs text-[var(--ink-3)]">
             {searched && !loading
               ? trip === "round-trip"
                 ? `${sortedOutbound.length} out · ${sortedReturn.length} return`
@@ -806,7 +806,7 @@ export function LiveSearchDrawer({
               : "Results"}
           </p>
           <Select value={sort} onValueChange={(v) => setSort(v as SortMode)}>
-            <SelectTrigger className="h-8 w-[140px] border-zinc-700 bg-zinc-900 text-xs text-zinc-100">
+            <SelectTrigger className="h-8 w-[140px] border-[var(--rule)] bg-[hsl(var(--card))] text-xs text-[var(--ink)]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -819,7 +819,7 @@ export function LiveSearchDrawer({
 
         <div className="px-6 py-4">
           {error && (
-            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            <div className="mb-3 rounded-lg border border-[color-mix(in_srgb,var(--brass)_30%,transparent)] bg-[var(--wash-brass)] px-3 py-2 text-sm text-[var(--brass)]">
               {error}
             </div>
           )}
@@ -829,25 +829,25 @@ export function LiveSearchDrawer({
             sortedOutbound.length === 0 &&
             sortedReturn.length === 0 &&
             !error && (
-              <p className="text-sm text-zinc-500">No results yet. Try another date or route.</p>
+              <p className="text-sm text-[var(--ink-3)]">No results yet. Try another date or route.</p>
             )}
 
           {!searched && !loading && (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-zinc-500">
-              <Plane className="h-8 w-8 text-zinc-600" />
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-[var(--ink-3)]">
+              <Plane className="h-8 w-8 text-[var(--ink-2)]" />
               <p className="text-sm">Enter a route and search for live prices.</p>
             </div>
           )}
 
           {searched && trip === "round-trip" && cheapestCombo && (
-            <div className="mb-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+            <div className="mb-4 rounded-lg border border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)] bg-[var(--wash-accent)] px-3 py-2 text-sm text-[var(--vermillion)]">
               Cheapest combo (one-way + one-way):{" "}
               <span className="font-semibold tabular-nums">
                 {priceLabel(currency, cheapestCombo.outbound)} +{" "}
                 {priceLabel(currency, cheapestCombo.ret)} ={" "}
                 {priceLabel(currency, cheapestCombo.total)}
               </span>
-              <span className="mt-0.5 block text-xs text-sky-200/80">
+              <span className="mt-0.5 block text-xs text-[color-mix(in_srgb,var(--vermillion)_80%,transparent)]">
                 Separate tickets estimate — Google Flights link is the true round-trip fare.
               </span>
             </div>
@@ -858,16 +858,16 @@ export function LiveSearchDrawer({
               <section className="space-y-3">
                 {trip === "round-trip" && (
                   <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-100">
+                    <h3 className="text-sm font-semibold text-[var(--ink)]">
                       Outbound · {formatChipDate(date)}
                     </h3>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-[var(--ink-3)]">
                       {from.trim().toUpperCase()} → {to.trim().toUpperCase()}
                     </span>
                   </div>
                 )}
                 {sortedOutbound.length === 0 && searched && !loading ? (
-                  <p className="text-sm text-zinc-500">No outbound flights.</p>
+                  <p className="text-sm text-[var(--ink-3)]">No outbound flights.</p>
                 ) : (
                   renderOfferCards(
                     sortedOutbound,
@@ -882,15 +882,15 @@ export function LiveSearchDrawer({
             {searched && trip === "round-trip" && (
               <section className="space-y-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-zinc-100">
+                  <h3 className="text-sm font-semibold text-[var(--ink)]">
                     Return · {formatChipDate(returnDate)}
                   </h3>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-[var(--ink-3)]">
                     {to.trim().toUpperCase()} → {from.trim().toUpperCase()}
                   </span>
                 </div>
                 {sortedReturn.length === 0 && !loading ? (
-                  <p className="text-sm text-zinc-500">No return flights.</p>
+                  <p className="text-sm text-[var(--ink-3)]">No return flights.</p>
                 ) : (
                   renderOfferCards(
                     sortedReturn,
@@ -905,9 +905,9 @@ export function LiveSearchDrawer({
         </div>
         </div>
 
-        <div className="shrink-0 border-t border-zinc-800 bg-zinc-950 px-6 py-3">
+        <div className="shrink-0 border-t border-[var(--rule)] bg-[hsl(var(--card))] px-6 py-3">
           <Button
-            className="w-full gap-2 bg-sky-600 text-white hover:bg-sky-500"
+            className="w-full gap-2 bg-[var(--vermillion)] text-[var(--paper)] hover:bg-[var(--vermillion-dk)]"
             onClick={() => void handleSearch()}
             disabled={loading}
           >

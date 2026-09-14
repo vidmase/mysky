@@ -47,10 +47,10 @@ function OnTimeRing({ pct }: { pct: number }) {
   const offset = circumference * (1 - pct / 100)
 
   const getColor = (v: number) => {
-    if (v >= 80) return '#22c55e'
-    if (v >= 60) return '#facc15'
-    if (v >= 40) return '#f97316'
-    return '#ef4444'
+    if (v >= 80) return '#2f6b53'
+    if (v >= 60) return '#c9942f'
+    if (v >= 40) return '#ce3b1e'
+    return '#a32c14'
   }
   const color = getColor(pct)
 
@@ -59,7 +59,7 @@ function OnTimeRing({ pct }: { pct: number }) {
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={strokeWidth}
+          fill="none" stroke="rgba(23,19,14,0.1)" strokeWidth={strokeWidth}
         />
         <circle
           cx={size / 2} cy={size / 2} r={radius}
@@ -75,10 +75,10 @@ function OnTimeRing({ pct }: { pct: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-white" style={{ textShadow: `0 0 12px ${color}40` }}>
+        <span className="text-3xl font-bold text-[var(--ink)]" style={{ textShadow: `0 0 12px ${color}40` }}>
           {pct}%
         </span>
-        <span className="text-[10px] uppercase tracking-[0.15em] text-white/40 font-semibold">On Time</span>
+        <span className="text-[10px] uppercase tracking-[0.15em] text-[var(--ink-3)] font-semibold">On Time</span>
       </div>
     </div>
   )
@@ -88,61 +88,60 @@ function KPICard({ icon: Icon, label, value, subtext, color }: {
   icon: any; label: string; value: string | number; subtext?: string; color: string
 }) {
   const colorMap: Record<string, { text: string; bg: string; glow: string; iconBg: string }> = {
-    cyan: { text: 'text-cyan-400', bg: 'bg-cyan-500/10', glow: 'rgba(0,212,255,0.12)', iconBg: 'bg-cyan-500/15' },
-    green: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', glow: 'rgba(16,185,129,0.12)', iconBg: 'bg-emerald-500/15' },
-    red: { text: 'text-red-400', bg: 'bg-red-500/10', glow: 'rgba(239,68,68,0.12)', iconBg: 'bg-red-500/15' },
-    amber: { text: 'text-amber-400', bg: 'bg-amber-500/10', glow: 'rgba(251,191,36,0.12)', iconBg: 'bg-amber-500/15' },
-    violet: { text: 'text-violet-400', bg: 'bg-violet-500/10', glow: 'rgba(139,92,246,0.12)', iconBg: 'bg-violet-500/15' },
-    orange: { text: 'text-orange-400', bg: 'bg-orange-500/10', glow: 'rgba(251,146,60,0.12)', iconBg: 'bg-orange-500/15' },
+    accent: { text: 'text-[var(--vermillion)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(206,59,30,0.12)', iconBg: 'bg-[var(--wash-accent-2)]' },
+    good: { text: 'text-[var(--jade)]', bg: 'bg-[var(--wash-jade)]', glow: 'rgba(47,107,83,0.12)', iconBg: 'bg-[var(--wash-jade-2)]' },
+    warn: { text: 'text-[var(--brass)]', bg: 'bg-[var(--wash-brass)]', glow: 'rgba(201,148,47,0.14)', iconBg: 'bg-[var(--wash-brass-2)]' },
+    bad: { text: 'text-[var(--vermillion-dk)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(163,44,20,0.12)', iconBg: 'bg-[var(--wash-accent-2)]' },
+    navy: { text: 'text-[var(--navy)]', bg: 'bg-[var(--wash-navy)]', glow: 'rgba(14,32,51,0.1)', iconBg: 'bg-[var(--wash-navy-2)]' },
   }
-  const c = colorMap[color] || colorMap.cyan
+  const c = colorMap[color] || colorMap.accent
 
   return (
     <div
-      className={`rounded-xl p-4 border border-white/[0.06] ${c.bg} flex items-start gap-3`}
+      className={`rounded-xl p-4 border border-[var(--rule)] ${c.bg} flex items-start gap-3`}
       style={{ boxShadow: `0 0 24px ${c.glow}` }}
     >
       <div className={`w-10 h-10 rounded-lg ${c.iconBg} flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-5 h-5 ${c.text}`} />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-white/35 font-semibold">{label}</div>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] font-semibold">{label}</div>
         <div className={`text-xl font-bold ${c.text}`}>{value}</div>
-        {subtext && <div className="text-[11px] text-white/30 mt-0.5">{subtext}</div>}
+        {subtext && <div className="text-[11px] text-[var(--ink-3)] mt-0.5">{subtext}</div>}
       </div>
     </div>
   )
 }
 
 function getDelayColor(minutes: number | null): string {
-  if (minutes === null) return 'text-white/30'
-  if (minutes < 0) return 'text-emerald-400'
-  if (minutes === 0) return 'text-emerald-400'
-  if (minutes < 15) return 'text-emerald-400'
-  if (minutes < 30) return 'text-amber-400'
-  if (minutes < 60) return 'text-orange-400'
-  return 'text-red-400'
+  if (minutes === null) return 'text-[var(--ink-3)]'
+  if (minutes < 0) return 'text-[var(--jade)]'
+  if (minutes === 0) return 'text-[var(--jade)]'
+  if (minutes < 15) return 'text-[var(--jade)]'
+  if (minutes < 30) return 'text-[var(--brass)]'
+  if (minutes < 60) return 'text-[var(--brass)]'
+  return 'text-[var(--vermillion-dk)]'
 }
 
 function getDelayBg(minutes: number | null): string {
-  if (minutes === null) return 'bg-white/[0.03]'
-  if (minutes < 0) return 'bg-emerald-500/5'
-  if (minutes < 15) return 'bg-emerald-500/5'
-  if (minutes < 30) return 'bg-amber-500/5'
-  if (minutes < 60) return 'bg-orange-500/5'
-  return 'bg-red-500/5'
+  if (minutes === null) return 'bg-[var(--wash-ink)]'
+  if (minutes < 0) return 'bg-[var(--wash-jade)]'
+  if (minutes < 15) return 'bg-[var(--wash-jade)]'
+  if (minutes < 30) return 'bg-[var(--wash-brass)]'
+  if (minutes < 60) return 'bg-[var(--wash-brass)]'
+  return 'bg-[var(--wash-accent)]'
 }
 
 function getDelayLabel(dep: number | null, arr: number | null, status: string | null): { text: string; color: string } {
-  if (status?.toLowerCase().includes('cancel')) return { text: 'Cancelled', color: 'text-red-400' }
+  if (status?.toLowerCase().includes('cancel')) return { text: 'Cancelled', color: 'text-[var(--vermillion-dk)]' }
   const max = Math.max(dep ?? 0, arr ?? 0)
-  if (dep === null && arr === null) return { text: 'No data', color: 'text-white/25' }
-  if (max < 0) return { text: `${Math.abs(max)}m early`, color: 'text-emerald-400' }
-  if (max === 0) return { text: 'On time', color: 'text-emerald-400' }
-  if (max < 15) return { text: `${max}m`, color: 'text-emerald-400' }
-  if (max < 30) return { text: `${max}m late`, color: 'text-amber-400' }
-  if (max < 60) return { text: `${max}m late`, color: 'text-orange-400' }
-  return { text: `${max}m late`, color: 'text-red-400' }
+  if (dep === null && arr === null) return { text: 'No data', color: 'text-[var(--ink-3)]' }
+  if (max < 0) return { text: `${Math.abs(max)}m early`, color: 'text-[var(--jade)]' }
+  if (max === 0) return { text: 'On time', color: 'text-[var(--jade)]' }
+  if (max < 15) return { text: `${max}m`, color: 'text-[var(--jade)]' }
+  if (max < 30) return { text: `${max}m late`, color: 'text-[var(--brass)]' }
+  if (max < 60) return { text: `${max}m late`, color: 'text-[var(--brass)]' }
+  return { text: `${max}m late`, color: 'text-[var(--vermillion-dk)]' }
 }
 
 export default function DelaysDashboard() {
@@ -198,17 +197,17 @@ export default function DelaysDashboard() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Flight Delays</h1>
-            <p className="text-white/40 text-sm">Analyzing your flights…</p>
+            <h1 className="text-3xl font-bold text-[var(--ink)] mb-2">Flight Delays</h1>
+            <p className="text-[var(--ink-3)] text-sm">Analyzing your flights…</p>
           </div>
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="relative">
-              <div className="w-16 h-16 border-2 border-cyan-500/20 rounded-full" />
-              <div className="absolute inset-0 w-16 h-16 border-2 border-transparent border-t-cyan-400 rounded-full animate-spin" />
-              <Plane className="absolute inset-0 m-auto w-6 h-6 text-cyan-400/60" />
+              <div className="w-16 h-16 border-2 border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)] rounded-full" />
+              <div className="absolute inset-0 w-16 h-16 border-2 border-transparent border-t-[var(--vermillion)] rounded-full animate-spin" />
+              <Plane className="absolute inset-0 m-auto w-6 h-6 text-[color-mix(in_srgb,var(--vermillion)_70%,transparent)]" />
             </div>
-            <p className="text-white/30 text-sm">Fetching delay data for your flights…</p>
-            <p className="text-white/20 text-xs">This may take a moment for many flights</p>
+            <p className="text-[var(--ink-3)] text-sm">Fetching delay data for your flights…</p>
+            <p className="text-[var(--ink-3)] text-xs">This may take a moment for many flights</p>
           </div>
         </div>
       </div>
@@ -219,8 +218,8 @@ export default function DelaysDashboard() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-white mb-4">Flight Delays</h1>
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-red-400">
+          <h1 className="text-3xl font-bold text-[var(--ink)] mb-4">Flight Delays</h1>
+          <div className="bg-[var(--wash-accent)] border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] rounded-xl p-6 text-[var(--vermillion-dk)]">
             <AlertTriangle className="w-5 h-5 mb-2" />
             <p>{error}</p>
           </div>
@@ -233,12 +232,12 @@ export default function DelaysDashboard() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto text-center py-20">
-          <Plane className="w-12 h-12 text-white/20 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">No Flights Yet</h1>
-          <p className="text-white/40 text-sm mb-6">Add some flights to see your delay analytics.</p>
+          <Plane className="w-12 h-12 text-[var(--ink-3)] mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-[var(--ink)] mb-2">No Flights Yet</h1>
+          <p className="text-[var(--ink-3)] text-sm mb-6">Add some flights to see your delay analytics.</p>
           <Link
             href="/add-flight"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500/15 text-cyan-400 rounded-lg hover:bg-cyan-500/25 transition-all text-sm font-medium"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--wash-accent-2)] text-[var(--vermillion)] rounded-lg hover:bg-[var(--wash-accent-2)] transition-all text-sm font-medium"
           >
             Add Your First Flight <ArrowRight className="w-4 h-4" />
           </Link>
@@ -256,8 +255,8 @@ export default function DelaysDashboard() {
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-white mb-1">Flight Delays</h1>
-          <p className="text-white/40 text-sm">
+          <h1 className="text-3xl font-bold text-[var(--ink)] mb-1">Flight Delays</h1>
+          <p className="text-[var(--ink-3)] text-sm">
             Personal delay analytics from your {stats.totalFlights} flights •{' '}
             {stats.flightsWithData} with delay data
           </p>
@@ -266,14 +265,14 @@ export default function DelaysDashboard() {
         {/* The status provider refused us — say so, rather than letting every
             row read "No data" as if the log were simply empty. */}
         {stats.providerError && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4">
+          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--brass)_40%,transparent)] bg-[var(--wash-brass)] px-5 py-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" />
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 text-[var(--brass)]" />
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-amber-200">
+                <p className="text-sm font-semibold text-[var(--ink)]">
                   No delay data could be fetched
                 </p>
-                <p className="text-sm text-amber-100/70">
+                <p className="text-sm text-[var(--ink-2)]">
                   {/* status 0 means we never sent the request — the key is
                       unusable locally, so blaming the provider would misdirect. */}
                   {stats.providerError.status === 0
@@ -283,20 +282,20 @@ export default function DelaysDashboard() {
                   {stats.providerError.status > 0 && ` (HTTP ${stats.providerError.status})`}.
                 </p>
                 {stats.providerError.status === 0 ? (
-                  <p className="text-xs text-amber-100/50">
+                  <p className="text-xs text-[var(--ink-3)]">
                     This is a local configuration problem, not the provider. An
                     environment variable of that name takes precedence over
                     .env.local — clear it, then restart the terminal and the dev
                     server so both pick up the real key.
                   </p>
                 ) : stats.providerError.kind === 'configuration' && (
-                  <p className="text-xs text-amber-100/50">
+                  <p className="text-xs text-[var(--ink-3)]">
                     This is an account or API-key problem on the provider side —
                     the figures below stay empty until it is resolved.
                   </p>
                 )}
                 {stats.providerError.kind === 'rate-limit' && (
-                  <p className="text-xs text-amber-100/50">
+                  <p className="text-xs text-[var(--ink-3)]">
                     The provider&apos;s rate limit was hit. Try again shortly.
                   </p>
                 )}
@@ -306,7 +305,7 @@ export default function DelaysDashboard() {
         )}
 
         {/* Hero KPI Section */}
-        <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
+        <div className="bg-[hsl(var(--card))] backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6">
           <div className="flex flex-col lg:flex-row items-center gap-8">
             {/* On-time ring */}
             <div className="flex-shrink-0">
@@ -320,80 +319,80 @@ export default function DelaysDashboard() {
                 label="On Time"
                 value={stats.onTime}
                 subtext={`${onTimePct}% of flights`}
-                color="green"
+                color="good"
               />
               <KPICard
                 icon={AlertTriangle}
                 label="Delayed ≥15m"
                 value={stats.delayed}
                 subtext={stats.flightsWithData > 0 ? `${Math.round((stats.delayed / stats.flightsWithData) * 100)}%` : '—'}
-                color="amber"
+                color="warn"
               />
               <KPICard
                 icon={XCircle}
                 label="Cancelled"
                 value={stats.cancelled}
-                color="red"
+                color="bad"
               />
               <KPICard
                 icon={Timer}
                 label="Avg Dep Delay"
                 value={stats.avgDepDelay !== null ? `${stats.avgDepDelay}m` : '—'}
-                color="orange"
+                color="warn"
               />
               <KPICard
                 icon={Clock}
                 label="Avg Arr Delay"
                 value={stats.avgArrDelay !== null ? `${stats.avgArrDelay}m` : '—'}
-                color="cyan"
+                color="accent"
               />
               <KPICard
                 icon={TrendingDown}
                 label="Early"
                 value={stats.early}
-                color="green"
+                color="good"
               />
             </div>
           </div>
 
           {/* Airline insights */}
           {(stats.bestAirline || stats.worstAirline || stats.worstDelay) && (
-            <div className="mt-6 pt-6 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="mt-6 pt-6 border-t border-[var(--rule)] grid grid-cols-1 sm:grid-cols-3 gap-4">
               {stats.bestAirline && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-emerald-400" />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--wash-jade-2)] flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-[var(--jade)]" />
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-white/35 font-semibold">Most Reliable</div>
-                    <div className="text-sm font-medium text-emerald-400">{stats.bestAirline.name}</div>
-                    <div className="text-[11px] text-white/30">avg {stats.bestAirline.avgDelay}m • {stats.bestAirline.flights} flights</div>
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] font-semibold">Most Reliable</div>
+                    <div className="text-sm font-medium text-[var(--jade)]">{stats.bestAirline.name}</div>
+                    <div className="text-[11px] text-[var(--ink-3)]">avg {stats.bestAirline.avgDelay}m • {stats.bestAirline.flights} flights</div>
                   </div>
                 </div>
               )}
               {stats.worstAirline && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4 text-red-400" />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--wash-accent-2)] flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-[var(--vermillion-dk)]" />
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-white/35 font-semibold">Least Reliable</div>
-                    <div className="text-sm font-medium text-red-400">{stats.worstAirline.name}</div>
-                    <div className="text-[11px] text-white/30">avg {stats.worstAirline.avgDelay}m • {stats.worstAirline.flights} flights</div>
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] font-semibold">Least Reliable</div>
+                    <div className="text-sm font-medium text-[var(--vermillion-dk)]">{stats.worstAirline.name}</div>
+                    <div className="text-[11px] text-[var(--ink-3)]">avg {stats.worstAirline.avgDelay}m • {stats.worstAirline.flights} flights</div>
                   </div>
                 </div>
               )}
               {stats.worstDelay && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/15 flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4 text-orange-400" />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--wash-brass-2)] flex items-center justify-center">
+                    <AlertTriangle className="w-4 h-4 text-[var(--brass)]" />
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-white/35 font-semibold">Worst Delay</div>
-                    <div className="text-sm font-medium text-orange-400">
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] font-semibold">Worst Delay</div>
+                    <div className="text-sm font-medium text-[var(--brass)]">
                       {stats.worstDelay.flight_number} — {Math.max(stats.worstDelay.depDelayMinutes ?? 0, stats.worstDelay.arrDelayMinutes ?? 0)}m
                     </div>
-                    <div className="text-[11px] text-white/30">
+                    <div className="text-[11px] text-[var(--ink-3)]">
                       {stats.worstDelay.departure_iata} → {stats.worstDelay.arrival_iata} • {new Date(stats.worstDelay.departure_date).toLocaleDateString()}
                     </div>
                   </div>
@@ -404,31 +403,31 @@ export default function DelaysDashboard() {
         </div>
 
         {/* Flight Delay History */}
-        <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-4">
+        <div className="bg-[hsl(var(--card))] backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h2 className="text-lg font-bold text-white">Your Flight Delay History</h2>
+            <h2 className="text-lg font-bold text-[var(--ink)]">Your Flight Delay History</h2>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:flex-initial">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--ink-3)]" />
                 <input
                   type="text"
                   placeholder="Search flights…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full sm:w-48 pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-xs text-white placeholder-white/25 focus:outline-none focus:border-cyan-500/30 focus:ring-1 focus:ring-cyan-500/10 transition-all"
+                  className="w-full sm:w-48 pl-8 pr-3 py-1.5 bg-[var(--wash-ink)] border border-[var(--rule)] rounded-lg text-xs text-[var(--ink)] placeholder-[var(--ink-3)] focus:outline-none focus:border-[color-mix(in_srgb,var(--vermillion)_40%,transparent)] focus:ring-1 focus:ring-[var(--wash-accent)] transition-all"
                 />
               </div>
-              <div className="flex items-center gap-1 bg-white/[0.04] rounded-lg p-0.5">
+              <div className="flex items-center gap-1 bg-[var(--wash-ink)] rounded-lg p-0.5">
                 <button
                   onClick={() => setSortBy('date')}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'date' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/40 hover:text-white/60'
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'date' ? 'bg-[var(--wash-accent-2)] text-[var(--vermillion)]' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                     }`}
                 >
                   Date
                 </button>
                 <button
                   onClick={() => setSortBy('delay')}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'delay' ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/40 hover:text-white/60'
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${sortBy === 'delay' ? 'bg-[var(--wash-accent-2)] text-[var(--vermillion)]' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                     }`}
                 >
                   Delay
@@ -446,22 +445,22 @@ export default function DelaysDashboard() {
                 <Link
                   key={r.id}
                   href={`/flights/${r.id}`}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.04] ${getDelayBg(maxDelay)} hover:bg-white/[0.05] transition-all group`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--rule)] ${getDelayBg(maxDelay)} hover:bg-[var(--wash-ink)] transition-all group`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="text-xs font-mono font-semibold text-white/70 w-16 flex-shrink-0">
+                    <div className="text-xs font-mono font-semibold text-[var(--ink-2)] w-16 flex-shrink-0">
                       {r.flight_number}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-white/50 min-w-0">
-                      <span className="font-medium text-white/60">{r.departure_iata || r.departure_airport.slice(0, 3)}</span>
-                      <ArrowRight className="w-3 h-3 text-white/20 flex-shrink-0" />
-                      <span className="font-medium text-white/60">{r.arrival_iata || r.arrival_airport.slice(0, 3)}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--ink-2)] min-w-0">
+                      <span className="font-medium text-[var(--ink-2)]">{r.departure_iata || r.departure_airport.slice(0, 3)}</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--ink-3)] flex-shrink-0" />
+                      <span className="font-medium text-[var(--ink-2)]">{r.arrival_iata || r.arrival_airport.slice(0, 3)}</span>
                     </div>
-                    <span className="text-[11px] text-white/25 hidden sm:inline">
+                    <span className="text-[11px] text-[var(--ink-3)] hidden sm:inline">
                       {new Date(r.departure_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                     {r.airline && (
-                      <span className="text-[11px] text-white/20 hidden md:inline truncate">{r.airline}</span>
+                      <span className="text-[11px] text-[var(--ink-3)] hidden md:inline truncate">{r.airline}</span>
                     )}
                   </div>
                   <div className={`text-xs font-semibold ${delay.color} text-right flex-shrink-0`}>
@@ -471,15 +470,15 @@ export default function DelaysDashboard() {
               )
             })}
             {filteredRecords?.length === 0 && (
-              <div className="text-center py-8 text-white/25 text-sm">No matching flights found.</div>
+              <div className="text-center py-8 text-[var(--ink-3)] text-sm">No matching flights found.</div>
             )}
           </div>
         </div>
 
         {/* Airport Quick-Search */}
-        <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-4">
-          <h2 className="text-lg font-bold text-white">Airport Delay Lookup</h2>
-          <p className="text-xs text-white/40">
+        <div className="bg-[hsl(var(--card))] backdrop-blur-xl rounded-2xl border border-[var(--rule)] p-6 space-y-4">
+          <h2 className="text-lg font-bold text-[var(--ink)]">Airport Delay Lookup</h2>
+          <p className="text-xs text-[var(--ink-3)]">
             View live delay statistics for any airport. Quick-links to airports you&apos;ve flown through:
           </p>
 
@@ -492,7 +491,7 @@ export default function DelaysDashboard() {
                   <Link
                     key={iata}
                     href={`/delays/${iata}`}
-                    className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs font-medium text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20 transition-all"
+                    className="px-3 py-1.5 rounded-lg bg-[var(--wash-ink)] border border-[var(--rule)] text-xs font-medium text-[var(--vermillion)] hover:bg-[var(--wash-accent)] hover:border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)] transition-all"
                   >
                     {iata}
                   </Link>
@@ -503,12 +502,12 @@ export default function DelaysDashboard() {
           {/* Custom IATA input */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--ink-3)]" />
               <input
                 type="text"
                 placeholder="Enter IATA code (e.g. LHR)"
                 maxLength={4}
-                className="w-full pl-8 pr-3 py-2 bg-white/[0.04] border border-white/[0.06] rounded-lg text-sm text-white placeholder-white/25 focus:outline-none focus:border-cyan-500/30 focus:ring-1 focus:ring-cyan-500/10 transition-all uppercase"
+                className="w-full pl-8 pr-3 py-2 bg-[var(--wash-ink)] border border-[var(--rule)] rounded-lg text-sm text-[var(--ink)] placeholder-[var(--ink-3)] focus:outline-none focus:border-[color-mix(in_srgb,var(--vermillion)_40%,transparent)] focus:ring-1 focus:ring-[var(--wash-accent)] transition-all uppercase"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const val = (e.target as HTMLInputElement).value.trim().toUpperCase()
@@ -523,7 +522,7 @@ export default function DelaysDashboard() {
                 const val = input?.value?.trim()?.toUpperCase()
                 if (val && val.length >= 3) router.push(`/delays/${val}`)
               }}
-              className="px-4 py-2 bg-cyan-500/15 text-cyan-400 rounded-lg text-sm font-medium hover:bg-cyan-500/25 transition-all"
+              className="px-4 py-2 bg-[var(--wash-accent-2)] text-[var(--vermillion)] rounded-lg text-sm font-medium hover:bg-[var(--wash-accent-2)] transition-all"
             >
               View Delays
             </button>

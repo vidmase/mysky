@@ -71,7 +71,7 @@ export function FlightEventModal({ event, isOpen, onClose }: FlightEventModalPro
               <p className="text-sm text-muted-foreground mt-1">
                 {event.airline || 'Unknown Airline'} • Flight Duration: {formatDuration()}
                 {isMultiDay && (
-                  <span className="ml-2 text-orange-500">• Multi-day flight</span>
+                  <span className="ml-2 text-[var(--brass)]">• Multi-day flight</span>
                 )}
               </p>
             </div>
@@ -84,7 +84,7 @@ export function FlightEventModal({ event, isOpen, onClose }: FlightEventModalPro
             {/* Departure */}
             <div className="space-y-3">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <MapPinIcon className="h-5 w-5 text-green-500" />
+                <MapPinIcon className="h-5 w-5 text-[var(--jade)]" />
                 Departure
               </h3>
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
@@ -112,7 +112,7 @@ export function FlightEventModal({ event, isOpen, onClose }: FlightEventModalPro
             {/* Arrival */}
             <div className="space-y-3">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <MapPinIcon className="h-5 w-5 text-red-500" />
+                <MapPinIcon className="h-5 w-5 text-[var(--vermillion-dk)]" />
                 Arrival
               </h3>
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
@@ -134,7 +134,7 @@ export function FlightEventModal({ event, isOpen, onClose }: FlightEventModalPro
                 <p className="text-xs text-muted-foreground">
                   {format(event.end, 'MMMM d, yyyy')}
                   {isMultiDay && (
-                    <span className="ml-1 text-orange-500">(+1 day)</span>
+                    <span className="ml-1 text-[var(--brass)]">(+1 day)</span>
                   )}
                 </p>
               </div>

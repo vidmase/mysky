@@ -624,7 +624,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 Export CSV
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsFlightradar24ExportDialogOpen(true)} className="gap-2">
-                <Plane className="h-4 w-4 text-orange-500" />
+                <Plane className="h-4 w-4 text-[var(--brass)]" />
                 Export for Flightradar24
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -975,7 +975,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                           {disabled && (
                             <Badge
                               variant="secondary"
-                              className="mt-1 bg-red-500/15 text-red-400 border border-red-500/30 text-xs"
+                              className="mt-1 bg-[var(--wash-accent)] text-[var(--vermillion-dk)] border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] text-xs"
                             >
                               Duplicate
                             </Badge>
@@ -984,7 +984,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                         <td className="p-3 text-sm">
                           <div className="space-y-1">
                             {p.departure_iata && (
-                              <div className="inline-flex items-center rounded bg-blue-500/20 text-blue-400 px-2 py-1 text-xs font-bold border border-blue-500/30">
+                              <div className="inline-flex items-center rounded bg-[var(--wash-accent)] text-[var(--vermillion)] px-2 py-1 text-xs font-bold border border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)]">
                                 {p.departure_iata}
                               </div>
                             )}
@@ -1001,7 +1001,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                         <td className="p-3 text-sm">
                           <div className="space-y-1">
                             {p.arrival_iata && (
-                              <div className="inline-flex items-center rounded bg-green-500/20 text-green-400 px-2 py-1 text-xs font-bold border border-green-500/30">
+                              <div className="inline-flex items-center rounded bg-[var(--wash-jade)] text-[var(--jade)] px-2 py-1 text-xs font-bold border border-[color-mix(in_srgb,var(--jade)_30%,transparent)]">
                                 {p.arrival_iata}
                               </div>
                             )}

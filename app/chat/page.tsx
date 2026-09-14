@@ -235,14 +235,14 @@ export default function ChatPage() {
     const parts = text.split(regex)
     return parts.map((part, i) =>
       regex.test(part)
-        ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-1 py-0.5">{part}</mark>
+        ? <mark key={i} className="bg-[var(--wash-brass-2)] text-[var(--ink)] rounded px-1 py-0.5">{part}</mark>
         : part
     )
   }
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900">
+      <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
@@ -299,21 +299,21 @@ export default function ChatPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 p-4">
+    <div className="min-h-screen bg-[hsl(var(--background))] p-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-0 shadow-xl">
+          <Card className="bg-[hsl(var(--card))] border border-[var(--rule)] shadow-sm">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                    <Bot className="h-6 w-6 text-white" />
+                  <div className="p-2 bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] rounded-lg">
+                    <Bot className="h-6 w-6 text-[var(--paper)]" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    <CardTitle className="text-2xl bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] bg-clip-text text-transparent">
                       Flight Assistant
                     </CardTitle>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-[var(--ink-2)]">
                       Your personalized travel companion powered by AI
                     </p>
                   </div>
@@ -337,25 +337,25 @@ export default function ChatPage() {
         {/* Centered welcome card with same width as header, only when no messages */}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center w-full max-w-6xl mx-auto">
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-0 shadow-xl w-full">
+            <Card className="bg-[hsl(var(--card))] border border-[var(--rule)] shadow-sm w-full">
               <CardContent className="p-0">
                 <div className="h-[600px] flex flex-col items-center justify-center p-8">
                   <div className="flex flex-col items-center justify-center w-full">
-                    <div className="bg-gradient-to-br from-blue-500/80 to-purple-600/80 rounded-full p-4 shadow-lg mb-6">
-                      <Bot className="h-14 w-14 text-white drop-shadow-xl" />
+                    <div className="bg-gradient-to-br from-[color-mix(in_srgb,var(--vermillion)_80%,transparent)] to-[color-mix(in_srgb,var(--brass)_80%,transparent)] rounded-full p-4 shadow-lg mb-6">
+                      <Bot className="h-14 w-14 text-[var(--paper)] drop-shadow-xl" />
                     </div>
-                    <h3 className="text-3xl font-extrabold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 tracking-tight">
+                    <h3 className="text-3xl font-extrabold text-center bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] bg-clip-text text-transparent mb-2 tracking-tight">
                       Welcome to your Flight Assistant!
                     </h3>
-                    <p className="text-base text-gray-700 dark:text-gray-300 max-w-xl text-center mb-6">
+                    <p className="text-base text-[var(--ink-2)] max-w-xl text-center mb-6">
                       Ask anything about your travel history, get flight recommendations, or plan your next adventure.<br />
-                      <span className="text-blue-600 dark:text-blue-300 font-semibold">I have access to your flight statistics to provide personalized suggestions.</span>
+                      <span className="text-[var(--vermillion)] font-semibold">I have access to your flight statistics to provide personalized suggestions.</span>
                     </p>
-                    <div className="mt-2 px-5 py-3 bg-white/80 dark:bg-gray-900/80 border border-blue-200 dark:border-blue-900 rounded-xl shadow flex items-center gap-2 max-w-md mx-auto">
-                      <span className="text-blue-500 dark:text-blue-300">
+                    <div className="mt-2 px-5 py-3 bg-[hsl(var(--card))] border border-[var(--rule)] rounded-xl shadow flex items-center gap-2 max-w-md mx-auto">
+                      <span className="text-[var(--vermillion)]">
                         <svg xmlns='http://www.w3.org/2000/svg' className='h-5 w-5' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth='2' d='M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z' /></svg>
                       </span>
-                      <span className="text-sm text-blue-700 dark:text-blue-300">
+                      <span className="text-sm text-[var(--vermillion)]">
                         <b>Tip:</b> Keep messages concise (under 1000 characters) for faster responses
                       </span>
                     </div>
@@ -365,7 +365,7 @@ export default function ChatPage() {
             </Card>
             {/* Input box directly below welcome card */}
             <div className="w-full max-w-6xl mx-auto mt-6">
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-0 shadow-xl">
+              <Card className="bg-[hsl(var(--card))] border border-[var(--rule)] shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex gap-2">
                     <Input
@@ -374,12 +374,12 @@ export default function ChatPage() {
                       onKeyPress={handleKeyPress}
                       placeholder="Ask about your flights, get recommendations, or plan your next trip..."
                       disabled={isLoading}
-                      className="flex-1 bg-white/50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600"
+                      className="flex-1 bg-[hsl(var(--card))] border-[var(--rule)]"
                     />
                     <Button
                       onClick={handleSendMessage}
                       disabled={isLoading || !inputMessage.trim()}
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                      className="bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] hover:from-[var(--vermillion-dk)] hover:to-[var(--brass)]"
                     >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -395,7 +395,7 @@ export default function ChatPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className={cn("space-y-4", userStats ? "lg:col-span-3" : "lg:col-span-4")}>
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-0 shadow-xl">
+              <Card className="bg-[hsl(var(--card))] border border-[var(--rule)] shadow-sm">
                 <CardContent className="p-0">
                   <div className="h-[600px] overflow-y-auto p-6 space-y-4">
                     <div className="flex justify-end mb-2">
@@ -412,7 +412,7 @@ export default function ChatPage() {
                     </div>
                     <div className="flex flex-wrap gap-2 mb-4 items-end">
                       <div className="flex items-center gap-2">
-                        <Search className="h-4 w-4 text-gray-400" />
+                        <Search className="h-4 w-4 text-[var(--ink-3)]" />
                         <Input
                           value={searchKeyword}
                           onChange={e => setSearchKeyword(e.target.value)}
@@ -431,7 +431,7 @@ export default function ChatPage() {
                       <select
                         value={searchRole}
                         onChange={e => setSearchRole(e.target.value as any)}
-                        className="border rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+                        className="border rounded px-2 py-1 bg-[hsl(var(--card))] text-[var(--ink-2)]"
                         aria-label="Filter by type"
                       >
                         <option value="all">All</option>
@@ -450,13 +450,13 @@ export default function ChatPage() {
                         <div className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                           message.role === 'user'
-                            ? "bg-gradient-to-r from-blue-500 to-purple-600"
-                            : "bg-gradient-to-r from-green-500 to-teal-600"
+                            ? "bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)]"
+                            : "bg-[var(--jade)]"
                         )}>
                           {message.role === 'user' ? (
-                            <User className="h-4 w-4 text-white" />
+                            <User className="h-4 w-4 text-[var(--paper)]" />
                           ) : (
-                            <Bot className="h-4 w-4 text-white" />
+                            <Bot className="h-4 w-4 text-[var(--paper)]" />
                           )}
                         </div>
 
@@ -464,9 +464,9 @@ export default function ChatPage() {
                           className={cn(
                             "rounded-xl px-4 py-3 max-w-full relative",
                             message.role === 'user'
-                              ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                              : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100",
-                            message.pinned && 'ring-2 ring-yellow-400 shadow-lg',
+                              ? "bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] text-[var(--paper)]"
+                              : "bg-[var(--paper-2)] text-[var(--ink)]",
+                            message.pinned && 'ring-2 ring-[var(--brass)] shadow-lg',
                           )}
                           id={message.role === 'assistant' ? `assistant-msg-${message.id}` : undefined}
                         >
@@ -478,27 +478,27 @@ export default function ChatPage() {
                           </div>
                           <div className={cn(
                             "text-xs mt-2 opacity-70",
-                            message.role === 'user' ? "text-white" : "text-gray-500 dark:text-gray-400"
+                            message.role === 'user' ? "text-[var(--paper)]" : "text-[var(--ink-3)]"
                           )}>
                             {new Date(message.timestamp).toLocaleTimeString()}
                           </div>
                           {message.role === 'assistant' && (
                             <div className="absolute top-2 right-2 flex gap-1 z-10">
                               <button
-                                className={cn('p-1 rounded-full', message.pinned ? 'bg-yellow-200' : 'bg-white/40 hover:bg-yellow-100')}
+                                className={cn('p-1 rounded-full', message.pinned ? 'bg-[var(--wash-brass-2)]' : 'bg-[hsl(var(--card))] hover:bg-[var(--wash-brass)]')}
                                 aria-label={message.pinned ? 'Unpin message' : 'Pin message'}
                                 onClick={() => handlePinMessage(message.id!, !message.pinned)}
                                 tabIndex={0}
                               >
-                                <Pin className={cn('h-4 w-4', message.pinned ? 'text-yellow-500' : 'text-gray-400')} fill={message.pinned ? 'currentColor' : 'none'} />
+                                <Pin className={cn('h-4 w-4', message.pinned ? 'text-[var(--brass)]' : 'text-[var(--ink-3)]')} fill={message.pinned ? 'currentColor' : 'none'} />
                               </button>
                               <button
-                                className={cn('p-1 rounded-full bg-white/40 hover:bg-blue-100')}
+                                className={cn('p-1 rounded-full bg-[hsl(var(--card))] hover:bg-[var(--wash-accent)]')}
                                 aria-label="Export as PDF"
                                 onClick={() => handleExportPDF(message.id!)}
                                 tabIndex={0}
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 text-blue-500"><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-3-3m3 3l3-3M4.5 19.5A2.25 2.25 0 006.75 21h10.5a2.25 2.25 0 002.25-2.25v-15A2.25 2.25 0 0017.25 1.5H6.75A2.25 2.25 0 004.5 4.5v15z" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 text-[var(--vermillion)]"><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-3-3m3 3l3-3M4.5 19.5A2.25 2.25 0 006.75 21h10.5a2.25 2.25 0 002.25-2.25v-15A2.25 2.25 0 0017.25 1.5H6.75A2.25 2.25 0 004.5 4.5v15z" /></svg>
                               </button>
                             </div>
                           )}
@@ -509,15 +509,15 @@ export default function ChatPage() {
                     {/* Loader and description when generating answer */}
                     {isLoading && (
                       <div className="flex items-center gap-3 mt-4" aria-live="polite">
-                        <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                        <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">Generating answer, please wait...</span>
+                        <Loader2 className="h-5 w-5 animate-spin text-[var(--vermillion)]" />
+                        <span className="text-sm text-[var(--vermillion)] font-medium">Generating answer, please wait...</span>
                       </div>
                     )}
 
                     <div ref={messagesEndRef} />
                   </div>
 
-                  <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                  <div className="border-t border-[var(--rule)] p-4">
                     <div className="flex gap-2">
                       <Input
                         value={inputMessage}
@@ -525,12 +525,12 @@ export default function ChatPage() {
                         onKeyPress={handleKeyPress}
                         placeholder="Ask about your flights, get recommendations, or plan your next trip..."
                         disabled={isLoading}
-                        className="flex-1 bg-white/50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600"
+                        className="flex-1 bg-[hsl(var(--card))] border-[var(--rule)]"
                       />
                       <Button
                         onClick={handleSendMessage}
                         disabled={isLoading || !inputMessage.trim()}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                        className="bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] hover:from-[var(--vermillion-dk)] hover:to-[var(--brass)]"
                       >
                         {isLoading ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -547,7 +547,7 @@ export default function ChatPage() {
         )}
       </div>
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--vermillion)] text-[var(--paper)] px-4 py-2 rounded shadow-lg z-50 animate-fade-in">
           {toast}
         </div>
       )}
