@@ -371,8 +371,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Store assistant response in database
-    await supabase
+    // Store assistant response in database. The stored row's id goes back to
+    // the client: it identifies the message for pinning, and the render list
+    // de-duplicates on it, so a message without one is dropped.
+    const { data: storedAssistant } = await supabase
       .from('chat_messages')
       .insert({
         user_id: userId,
@@ -380,6 +382,8 @@ export async function POST(request: Request) {
         content: responseText,
         user_stats: userStats
       })
+      .select('id, created_at')
+      .single()
 
     // If user asks for JSON, return it directly
     if (/show me (that )?json|show json|show me the json/i.test(message)) {
@@ -390,9 +394,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
+      id: storedAssistant?.id,
       response: responseText,
       stats: userStats,
       model: selectedModel,
+      created_at: storedAssistant?.created_at,
       timestamp: new Date().toISOString()
     })
 

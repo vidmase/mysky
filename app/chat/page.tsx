@@ -287,7 +287,7 @@ export default function ChatPage() {
       if (msg.pinned && msg.role === 'assistant') {
         // Add user message before, if exists and not already included
         if (i > 0 && messages[i - 1].role === 'user') {
-          if (!pinnedWithQuestions.some(m => m.id === messages[i - 1].id)) {
+          if (!pinnedWithQuestions.includes(messages[i - 1])) {
             pinnedWithQuestions.push(messages[i - 1])
           }
         }
@@ -304,24 +304,27 @@ export default function ChatPage() {
     return matchesKeyword && matchesDate && matchesRole
   })
 
+  // Paired up by object identity, not by id: a message that has just been sent
+  // has no database id yet, and comparing two undefined ids made every such
+  // message look like one already in the list.
   let filteredWithPairs: ChatMessage[] = []
   filteredMessages.forEach((msg, i) => {
     // If user message matches, add next assistant message
     if (msg.role === 'user') {
       filteredWithPairs.push(msg)
       if (i < messagesToShow.length - 1 && messagesToShow[i + 1].role === 'assistant') {
-        if (!filteredWithPairs.some(m => m.id === messagesToShow[i + 1].id)) {
+        if (!filteredWithPairs.includes(messagesToShow[i + 1])) {
           filteredWithPairs.push(messagesToShow[i + 1])
         }
       }
     } else if (msg.role === 'assistant') {
       // If assistant message matches, add previous user message
       if (i > 0 && messagesToShow[i - 1].role === 'user') {
-        if (!filteredWithPairs.some(m => m.id === messagesToShow[i - 1].id)) {
+        if (!filteredWithPairs.includes(messagesToShow[i - 1])) {
           filteredWithPairs.push(messagesToShow[i - 1])
         }
       }
-      if (!filteredWithPairs.some(m => m.id === msg.id)) {
+      if (!filteredWithPairs.includes(msg)) {
         filteredWithPairs.push(msg)
       }
     }
