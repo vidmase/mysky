@@ -1,11 +1,10 @@
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, type DeepSeekModelId } from '@/lib/deepseek-models'
+import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getUserStats } from "../../../src/lib/services/stats"
 import fs from 'fs'
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export const dynamic = 'force-dynamic'
 
@@ -228,7 +227,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { message, conversation = [] } = body
+    const { message, conversation = [], model } = body
+
+    // The model is chosen by an allowlist, never taken as given: an
+    // unrecognised name would otherwise reach DeepSeek verbatim.
+    const selectedModel: DeepSeekModelId = isDeepSeekModel(model)
+      ? model
+      : DEFAULT_DEEPSEEK_MODEL
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
@@ -241,14 +246,16 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Fail fast if the AI provider key is missing, rather than sending an
-    // unauthenticated request to DeepSeek.
-    const deepseekApiKey = process.env.DEEPSEEK_API_KEY
+    // The user's own stored key, falling back to the deployment key. Fail
+    // fast rather than sending an unauthenticated request to DeepSeek.
+    const deepseekApiKey = await resolveDeepSeekKey(userId)
     if (!deepseekApiKey) {
-      console.error('Chat API error: DEEPSEEK_API_KEY is not set')
       return NextResponse.json(
-        { error: 'Chat is not configured. Please contact support.' },
-        { status: 500 }
+        {
+          error: 'No DeepSeek API key is set. Add yours from the key button above the chat.',
+          code: 'missing_api_key',
+        },
+        { status: 428 }
       )
     }
 
@@ -290,9 +297,7 @@ export async function POST(request: Request) {
     const contextualPrompt = `You are a helpful AI assistant for a flight tracking application.\n\nCurrent timestamp: ${now}\n\nHere are the user's current travel statistics:\n${JSON.stringify(userStats, null, 2)}\n\n${filterExplanation ? 'Flight search explanation: ' + filterExplanation + '\n' : ''}Relevant Flights (summary):\n${flightsText || 'No relevant flights found.'}\n\nRelevant Flights (JSON):\n${flightsJson}\n\nHere is your flight database in CSV format:\n${csvData}\n\nUse ONLY the above data to answer the user's question. Do not make up or interpret data.\n\nUser's question: ${message}`
 
     // --- LOGGING for debugging ---
-    console.log('Gemini prompt context:', contextualPrompt)
-    console.log('Flights sent to Gemini:', relevantFlightsWithDuration)
-    console.log('Flight filter explanation:', filterExplanation)
+    console.log(`Chat: ${relevantFlightsWithDuration.length} flights to ${selectedModel} — ${filterExplanation}`)
 
     // Store user message in database
     await supabase
@@ -304,15 +309,14 @@ export async function POST(request: Request) {
         user_stats: userStats
       })
 
-    // Call Deepseek API instead of Gemini
     const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ${deepseekApiKey}',
+        'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: selectedModel,
         messages: [
           { role: 'system', content: 'You are a helpful AI assistant for a flight tracking application.' },
           { role: 'user', content: contextualPrompt }
@@ -321,8 +325,51 @@ export async function POST(request: Request) {
         temperature: 0.7
       })
     });
+
+    // A non-2xx from DeepSeek used to fall through to `data.choices?.[0]` and
+    // store an empty assistant message, so a rejected key looked like the
+    // assistant simply had nothing to say.
+    if (!deepseekResponse.ok) {
+      const detail = await deepseekResponse.text()
+      console.error(`DeepSeek ${deepseekResponse.status} for model ${selectedModel}:`, detail)
+
+      if (deepseekResponse.status === 401) {
+        return NextResponse.json(
+          {
+            error: 'DeepSeek rejected the API key. Check it from the key button above the chat.',
+            code: 'invalid_api_key',
+          },
+          { status: 401 }
+        )
+      }
+      if (deepseekResponse.status === 402) {
+        return NextResponse.json(
+          { error: 'This DeepSeek account is out of credit.', code: 'insufficient_balance' },
+          { status: 402 }
+        )
+      }
+      if (deepseekResponse.status === 429) {
+        return NextResponse.json({ error: getErrorMessage({ status: 429 }) }, { status: 429 })
+      }
+
+      return NextResponse.json(
+        { error: 'DeepSeek could not answer that. Please try again.' },
+        { status: 502 }
+      )
+    }
+
     const data = await deepseekResponse.json();
     const responseText = data.choices?.[0]?.message?.content || '';
+
+    // An empty body is not an answer; storing it would leave a blank bubble in
+    // the transcript that the user cannot tell from a real reply.
+    if (!responseText) {
+      console.error('DeepSeek returned no content:', JSON.stringify(data).slice(0, 500))
+      return NextResponse.json(
+        { error: 'DeepSeek returned an empty response. Please try again.' },
+        { status: 502 }
+      )
+    }
 
     // Store assistant response in database
     await supabase
@@ -345,6 +392,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       response: responseText,
       stats: userStats,
+      model: selectedModel,
       timestamp: new Date().toISOString()
     })
 
