@@ -1,45 +1,37 @@
 import { NextResponse } from 'next/server'
 
+import {
+  describeUpstreamFailure,
+  flightsApiBase,
+  upstreamHeaders,
+  warnIfEphemeralInProduction,
+} from '@/lib/live-search-upstream'
+
 export const dynamic = 'force-dynamic'
-
-function getFlightsApiBase(): string {
-  const raw = process.env.FLIGHTS_API_URL?.trim() || 'http://72.62.212.33:8000'
-  return raw.replace(/\/+$/, '')
-}
-
-function upstreamHeaders(base: string): HeadersInit {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  }
-  // Ephemeral tunnels used for smoke tests only — do not use in production.
-  if (base.includes('loca.lt') || base.includes('cloudflare') || base.includes('trycloudflare')) {
-    headers['bypass-tunnel-reminder'] = 'true'
-    headers['User-Agent'] = 'Mozilla/5.0'
-  }
-  return headers
-}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const base = getFlightsApiBase()
+    const base = flightsApiBase()
+    warnIfEphemeralInProduction(base)
     const url = `${base}/api/search`
 
     let upstream: Response
     try {
       upstream = await fetch(url, {
         method: 'POST',
-        headers: upstreamHeaders(base),
+        headers: upstreamHeaders(base, true),
         body: JSON.stringify(body),
         cache: 'no-store',
       })
     } catch (err) {
+      // The whole error is logged — `cause` carries the syscall detail that the
+      // returned message is built from.
       console.error('live-search upstream fetch failed:', err)
       return NextResponse.json(
         {
           error: 'Live search service unavailable',
-          message: err instanceof Error ? err.message : 'Failed to reach flights search API',
+          message: describeUpstreamFailure(err, base),
         },
         { status: 502 }
       )

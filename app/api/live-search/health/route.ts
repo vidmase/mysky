@@ -1,27 +1,18 @@
 import { NextResponse } from 'next/server'
 
+import {
+  describeUpstreamFailure,
+  flightsApiBase,
+  isEphemeralTunnel,
+  upstreamHeaders,
+} from '@/lib/live-search-upstream'
+
 export const dynamic = 'force-dynamic'
 
-function getFlightsApiBase(): string {
-  const raw = process.env.FLIGHTS_API_URL?.trim() || 'http://72.62.212.33:8000'
-  return raw.replace(/\/+$/, '')
-}
-
-function upstreamHeaders(base: string): HeadersInit {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-  // Ephemeral tunnels used for smoke tests only — do not use in production.
-  if (base.includes('loca.lt') || base.includes('cloudflare') || base.includes('trycloudflare')) {
-    headers['bypass-tunnel-reminder'] = 'true'
-    headers['User-Agent'] = 'Mozilla/5.0'
-  }
-  return headers
-}
-
 export async function GET() {
+  const base = flightsApiBase()
+
   try {
-    const base = getFlightsApiBase()
     const url = `${base}/api/health`
 
     let upstream: Response
@@ -37,7 +28,11 @@ export async function GET() {
         {
           ok: false,
           error: 'Live search service unavailable',
-          message: err instanceof Error ? err.message : 'Failed to reach flights health API',
+          message: describeUpstreamFailure(err, base),
+          // This endpoint exists to be read when something is wrong, so it says
+          // what it tried to reach. The host is deployment config, not a secret.
+          upstream: base,
+          ephemeralTunnel: isEphemeralTunnel(base),
         },
         { status: 502 }
       )
@@ -51,7 +46,7 @@ export async function GET() {
 
     const text = await upstream.text()
     return NextResponse.json(
-      { ok: upstream.ok, message: text.slice(0, 500) },
+      { ok: upstream.ok, upstream: base, message: text.slice(0, 500) },
       { status: upstream.status }
     )
   } catch (error) {
@@ -61,6 +56,7 @@ export async function GET() {
         ok: false,
         error: 'Internal server error',
         message: error instanceof Error ? error.message : String(error),
+        upstream: base,
       },
       { status: 500 }
     )
