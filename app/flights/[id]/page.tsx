@@ -54,6 +54,8 @@ interface Flight {
   arrival_time: string
   arrival_date?: string | null
   total_receipt: string
+  /** Part of total_receipt spent on seats, bags, priority — not an addition to it. */
+  extras_receipt?: string | null
   purchased_date: string
   purchase_time: string
   airline: string | null
@@ -689,7 +691,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             <div className="mt-8 pt-6 border-t border-dashed">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="space-y-1">
                   <div className="text-sm text-muted-foreground">Passenger</div>
                   <div className="font-medium">{flight.passenger_name}</div>
@@ -709,6 +711,20 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                       "Not Assigned"
                     )}
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">Fare</div>
+                  <div className="font-medium tabular-nums">
+                    {flight.total_receipt || "Not recorded"}
+                  </div>
+                  {/* The extras came out of that fare, so they are shown as a share of
+                      it. Absent means "not known", which is not the same as nothing
+                      bought — so nothing is printed rather than a misleading zero. */}
+                  {flight.extras_receipt && (
+                    <div className="text-xs text-muted-foreground">
+                      incl. <span className="font-medium text-foreground tabular-nums">{flight.extras_receipt}</span> on extras
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

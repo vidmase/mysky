@@ -6,6 +6,7 @@ export type BookingFlight = {
   id: string | number
   reservation_number?: string | null
   total_receipt?: string | null
+  extras_receipt?: string | null
   departure_date?: string | null
   airline?: string | null
   cancelled?: boolean | null
@@ -21,6 +22,12 @@ export type Booking<T extends BookingFlight = BookingFlight> = {
    * relying on this being null.
    */
   total: number | null
+  /**
+   * The part of `total` that went on extras — seats, bags, priority, insurance —
+   * or null when nothing is on record. It is a portion of the fare, never an
+   * addition to it, so a caller reporting both says "of which", not "plus".
+   */
+  extras: number | null
   /** Every leg was cancelled, so the fare is real but the trip never happened. */
   cancelled: boolean
   departure_date: string | null
@@ -33,6 +40,22 @@ export function parseReceiptAmount(raw?: string | null): number | null {
   if (!raw) return null
   const value = parseFloat(String(raw).replace(/[^0-9.-]/g, ''))
   return !isNaN(value) && value > 0 ? value : null
+}
+
+/**
+ * One figure for the whole booking. Identical amounts across the legs are one
+ * charge repeated on each row; amounts that differ were filed per leg and do add
+ * up. The fare and the extras are filed the same way, so they collapse the same
+ * way.
+ */
+function collapseLegAmounts(raws: Array<string | null | undefined>): number | null {
+  const amounts = raws
+    .map(parseReceiptAmount)
+    .filter((amount): amount is number => amount !== null)
+
+  if (amounts.length === 0) return null
+  const repeated = amounts.every((amount) => Math.abs(amount - amounts[0]) < 0.01)
+  return repeated ? amounts[0] : amounts.reduce((sum, amount) => sum + amount, 0)
 }
 
 // Placeholders people type when a booking has no reference. They must not collapse
@@ -61,20 +84,8 @@ export function groupFlightsIntoBookings<T extends BookingFlight>(flights: T[]):
 
   const bookings: Booking<T>[] = []
   for (const [key, group] of groups) {
-    const amounts = group
-      .map((leg) => parseReceiptAmount(leg.total_receipt))
-      .filter((amount): amount is number => amount !== null)
-
-    // Identical amounts across the legs are one fare repeated; amounts that differ
-    // were priced per leg and do add up.
-    const repeatedFare =
-      amounts.length > 0 && amounts.every((amount) => Math.abs(amount - amounts[0]) < 0.01)
-    const total =
-      amounts.length === 0
-        ? null
-        : repeatedFare
-          ? amounts[0]
-          : amounts.reduce((sum, amount) => sum + amount, 0)
+    const total = collapseLegAmounts(group.map((leg) => leg.total_receipt))
+    const extras = collapseLegAmounts(group.map((leg) => leg.extras_receipt))
 
     // Legs run earliest first, so legs[0] is the outbound: the booking is shown
     // and attributed there, whatever order the list happens to be sorted in.
@@ -92,6 +103,7 @@ export function groupFlightsIntoBookings<T extends BookingFlight>(flights: T[]):
     bookings.push({
       key,
       total,
+      extras,
       cancelled,
       departure_date: isFinite(time(outbound)) ? outbound.departure_date ?? null : null,
       airline: outbound?.airline || null,

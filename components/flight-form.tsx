@@ -109,6 +109,7 @@ export function FlightForm({ initialData, onSubmit, onCancel, submitLabel = "Add
     departure_time: initialData?.departure_time || "",
     arrival_time: initialData?.arrival_time || "",
     total_receipt: initialData?.total_receipt || "",
+    extras_receipt: initialData?.extras_receipt || "",
     purchased_date: initialData?.purchased_date ? new Date(initialData.purchased_date) : new Date(),
     purchase_time: initialData?.purchase_time || "",
     airline: initialData?.airline || "",
@@ -155,6 +156,11 @@ export function FlightForm({ initialData, onSubmit, onCancel, submitLabel = "Add
           <Field {...field("arrival_airport")} label="Arrival airport" required />
           <Field {...field("seat")} label="Seat" placeholder="Unassigned" />
           <Field {...field("total_receipt")} label="Fare paid" required />
+          <Field
+            {...field("extras_receipt")}
+            label="Of which extras"
+            placeholder="Seats, bags, priority — leave blank if unknown"
+          />
         </div>
       </fieldset>
 

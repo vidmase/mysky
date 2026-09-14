@@ -7,10 +7,11 @@ import { PaperNav } from "./paper-nav"
 /**
  * The app-wide masthead. The print surfaces render <PaperNav /> themselves,
  * inside their own shell, so the nav lines up with the page's measure; the
- * landing page inlines its own poster masthead. Everywhere else this puts the
- * same nav at the top of the page.
+ * landing page inlines its own poster masthead, and the sign-in pass carries
+ * the wordmark on the pass itself. Everywhere else this puts the same nav at
+ * the top of the page.
  */
-const SELF_NAV_ROUTES = ["/", "/flights", "/map", "/stats", "/stats/review", "/calendar"]
+const SELF_NAV_ROUTES = ["/", "/auth", "/flights", "/map", "/stats", "/stats/review", "/calendar"]
 
 /** Same, for routes with a dynamic segment. */
 const SELF_NAV_PATTERNS = [/^\/flights\/[^/]+\/edit\/?$/]

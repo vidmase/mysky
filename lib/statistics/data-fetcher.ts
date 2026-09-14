@@ -34,7 +34,8 @@ export async function batchFetchFlightData(
         departure_iata,
         seat,
         notes,
-        cancelled
+        cancelled,
+        extras_receipt
       `)
       .eq('owner_id', userId),
 
