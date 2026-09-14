@@ -351,8 +351,10 @@ export default function StatsPage() {
     // the same total fare on both of its rows.
     // A booking with no fare on any leg is still a booking; it just cannot be
     // spent against, so the priced ones are what the money figures work from.
+    // A cancelled booking keeps its fare on the ticket but never reached a
+    // spending figure: the trip did not happen.
     const pricedBookings = groupFlightsIntoBookings(flights).filter(
-      (b): b is typeof b & { total: number } => b.total != null
+      (b): b is typeof b & { total: number } => b.total != null && !b.cancelled
     )
 
     // Spending by year

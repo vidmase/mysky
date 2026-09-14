@@ -8,13 +8,21 @@ export type BookingFlight = {
   total_receipt?: string | null
   departure_date?: string | null
   airline?: string | null
+  cancelled?: boolean | null
 }
 
 export type Booking<T extends BookingFlight = BookingFlight> = {
   /** stable identity of the booking: its reference, or the lone flight's id */
   key: string
-  /** what the booking cost, or null when no leg carries a fare */
+  /**
+   * What the booking cost, or null when no leg carries a fare. A cancelled
+   * booking keeps its total — the money was still spent and the ticket still
+   * shows it — so callers summing spend must skip `cancelled` rather than
+   * relying on this being null.
+   */
   total: number | null
+  /** Every leg was cancelled, so the fare is real but the trip never happened. */
+  cancelled: boolean
   departure_date: string | null
   airline: string | null
   /** every leg of the booking, earliest departure first; legs[0] is the outbound */
@@ -77,9 +85,14 @@ export function groupFlightsIntoBookings<T extends BookingFlight>(flights: T[]):
     const legs = [...group].sort((a, b) => time(a) - time(b))
     const outbound = legs[0]
 
+    // Cancelled only when the whole booking was: one cancelled leg of a return
+    // is a changed trip, not an abandoned one.
+    const cancelled = group.length > 0 && group.every((leg) => leg.cancelled === true)
+
     bookings.push({
       key,
       total,
+      cancelled,
       departure_date: isFinite(time(outbound)) ? outbound.departure_date ?? null : null,
       airline: outbound?.airline || null,
       legs,

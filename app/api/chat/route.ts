@@ -223,7 +223,10 @@ export async function POST(request: Request) {
         `${f.airline || 'unknown airline'} ${f.flight_number || ''}, ` +
         `${f.departure_time || '??'}-${f.arrival_time || '??'}, ` +
         `duration ${f.calculated_duration || 'unknown'}, seat ${f.seat || 'n/a'}, ` +
-        `fare ${f.total_receipt || 'n/a'}, ref ${f.reservation_number || 'n/a'}`
+        `fare ${f.total_receipt || 'n/a'}, ref ${f.reservation_number || 'n/a'}` +
+        // Without this the model sums a cancelled fare into spending, which is
+        // the opposite of what the rest of the app shows.
+        (f.cancelled ? ', CANCELLED (fare was paid but the trip did not happen)' : '')
       )
       .join('\n')
 
@@ -252,6 +255,8 @@ Every flight, newest first:
 ${flightsText || 'No flights on record.'}${trimmedNote}
 
 Answer only from the record above, and never invent a flight. When you are asked how many, or which month or year, take the figure from the counted list rather than tallying the lines yourself. If the record genuinely does not cover something, say so plainly.
+
+A flight marked CANCELLED was paid for but never flown. Leave its fare out of any spending total, the same way the rest of the app does, and mention what was paid only if the user asks about that booking.
 
 The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.`
 

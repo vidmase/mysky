@@ -1165,3 +1165,62 @@
   text-transform: uppercase;
   color: var(--ink-3);
 }
+
+/* ── CANCELLED ─────────────────────────────────────────
+   A cancelled booking stays in the log — the money was spent and the ticket
+   is part of the record — so it is stamped rather than hidden. The stamp sits
+   over the stub the way a rubber stamp would, and the stub beneath it fades
+   so the cancellation reads before the itinerary does. */
+.cancelled .cardMain,
+.cancelled .cardStub {
+  opacity: 0.45;
+}
+
+.cancelled::after {
+  content: "CANCELLED";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  font-family: var(--code);
+  font-size: clamp(1.05rem, 5.5vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--vermillion);
+  border: 3px solid var(--vermillion);
+  border-radius: 3px;
+  padding: 0.32em 0.6em;
+  opacity: 0.72;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+/* The same stamp on a desktop table row, which has no room for the full box. */
+.rowCancelled td {
+  opacity: 0.5;
+}
+
+.cancelledTag {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border: 1.5px solid var(--vermillion);
+  border-radius: 2px;
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--vermillion);
+  vertical-align: middle;
+}
+
+/* What it cost still shows: cancelled does not mean free. The card around it is
+   dimmed, so this needs the darkest ink to stay legible through that. */
+.cancelledPaid {
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink-1);
+}

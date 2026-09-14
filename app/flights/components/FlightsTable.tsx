@@ -299,7 +299,7 @@ function LegRow({
 }: LegRowProps) {
   return (
     <tr
-      className={`${s.row} ${isLeg ? s.legRow : ""}`}
+      className={`${s.row} ${isLeg ? s.legRow : ""} ${flight.cancelled ? s.rowCancelled : ""}`}
       style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
       onClick={() => onRowClick(flight)}
     >
@@ -310,8 +310,10 @@ function LegRow({
         <span className={s.weekday}>
           {format(new Date(flight.departure_date), "EEEE", { locale: enUS })}
         </span>
-        {isUpcoming(flight.departure_date) && (
-          <span className={s.upcoming}>Upcoming</span>
+        {flight.cancelled ? (
+          <span className={s.cancelledTag}>Cancelled</span>
+        ) : (
+          isUpcoming(flight.departure_date) && <span className={s.upcoming}>Upcoming</span>
         )}
         {legCount > 1 && !isLeg && onToggle && (
           <button

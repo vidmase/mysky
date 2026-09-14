@@ -28,6 +28,8 @@ export type Flight = {
   return_departure_time: string | null
   return_flight_duration: string | null
   return_is_direct: boolean | null
+  /** Booking was cancelled: kept in the log, watermarked, and left out of spend. */
+  cancelled: boolean | null
 }
 
 export type Airport = {
