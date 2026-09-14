@@ -1118,7 +1118,10 @@ interface FlightCardProps {
 }
 
 const FlightCard: React.FC<FlightCardProps> = ({ flight, otherLegs = 0, onRowClick, onEdit, onDeleteRequest, onFlyAgain, isUpcoming }) => (
-  <article className={s.card} onClick={() => onRowClick(flight)}>
+  <article
+    className={`${s.card} ${flight.cancelled ? s.cancelled : ""}`}
+    onClick={() => onRowClick(flight)}
+  >
     <div className={s.cardMain}>
       <div className={s.cardHead}>
         <div className={s.cardFlight}>
@@ -1140,7 +1143,11 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, otherLegs = 0, onRowCli
           <span className={s.flightNo}>{flight.flight_number}</span>
           <span className={s.cardAirline}>{resolveAirlineName(flight.airline, flight.flight_number) || "Unknown"}</span>
         </div>
-        {isUpcoming(flight.departure_date) && <span className={s.cardFlag}>Upcoming</span>}
+        {flight.cancelled
+          ? flight.total_receipt && (
+              <span className={s.cancelledPaid}>Paid {flight.total_receipt}</span>
+            )
+          : isUpcoming(flight.departure_date) && <span className={s.cardFlag}>Upcoming</span>}
       </div>
 
       <div className={s.cardRoute}>

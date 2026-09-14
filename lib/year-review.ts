@@ -260,8 +260,10 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
   const legById = new Map(allLegs.map((l) => [l.id, l]))
   const bookings = groupFlightsIntoBookings(flights)
     .map((b) => ({ ...b, date: parseDate(b.departure_date) }))
+    // A cancelled booking keeps its fare on the ticket but never reached a
+    // spending figure: the trip did not happen.
     .filter((b): b is typeof b & { total: number; date: string } =>
-      b.total != null && !!b.date && b.date.startsWith(prefix) && b.date <= todayISO()
+      b.total != null && !b.cancelled && !!b.date && b.date.startsWith(prefix) && b.date <= todayISO()
     )
   const total = bookings.reduce((s, b) => s + b.total, 0)
   const cheapest = [...bookings].sort((a, b) => a.total - b.total)[0]
