@@ -353,12 +353,12 @@ export function BoardingPassScanner({ onDataExtracted }: BoardingPassScannerProp
             <div className="mt-6 space-y-6">
                 {/* Raw Response */}
                 {rawResponse && (
-                    <div className="rounded-lg bg-gradient-to-r from-blue-900/50 to-blue-800/50 p-6 shadow-lg">
-                        <div className="flex items-center gap-2 text-xl font-semibold text-blue-100">
+                    <div className="border border-border bg-muted/50 p-6">
+                        <div className="flex items-center gap-2 text-xl font-semibold">
                             <FileText className="h-6 w-6" />
                             Your Flight Details
                         </div>
-                        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm text-blue-100">
+                        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-sm text-muted-foreground">
                             {rawResponse}
                         </pre>
                     </div>

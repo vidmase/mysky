@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from "next/navigation"
-import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, ArrowLeft, X, Loader2, Check } from "lucide-react"
+import { CalendarIcon, Clock, Plane, MapPin, Building, User, CreditCard, FileText, X, Loader2, Check } from "lucide-react"
 import { format, isBefore } from "date-fns"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
@@ -26,6 +26,8 @@ import { PassengerSelector } from "@/components/passenger-selector"
 import { Passenger } from "@/lib/passengers"
 import { BoardingPassScanner } from "../components/boarding-pass-scanner"
 import { allAirports, type Airport } from "@/lib/airports"
+import { PaperNav } from "@/app/components/paper-nav"
+import st from "./add-flight.module.css"
 
 interface FormState {
   passenger_name: string
@@ -56,6 +58,12 @@ interface FormState {
   arrival_longitude?: number | null
   arrival_latitude?: number | null
 }
+
+const BackArrow = () => (
+  <svg viewBox="0 0 16 8" fill="none" aria-hidden="true">
+    <path d="M16 4H2M5.5 1L2 4l3.5 3" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+)
 
 function getFlagEmoji(countryName: string): string {
   const countryToCode: { [key: string]: string } = {
@@ -460,49 +468,55 @@ export default function AddFlightPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
-      {/* Main Background Image */}
-      <div
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: 'url("/plane5.jpg")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          opacity: 0.3,
-        }}
-      />
+    <div className={st.page}>
+      <div className={st.shell}>
+        <PaperNav />
+      </div>
 
-      {/* Content with higher z-index */}
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-8 flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()} className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">Back</span>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Add New Flight</h1>
-              <p className="text-muted-foreground">Record the details of your journey</p>
-            </div>
-          </div>
+      <header className={st.shell}>
+        <div className={st.masthead}>
+          <button type="button" className={`${st.back} ${st.rise}`} onClick={() => router.back()}>
+            <BackArrow />
+            Back
+          </button>
+          <h1 className={`${st.title} ${st.rise}`} style={{ animationDelay: "80ms" }}>
+            Add a <em>new flight</em>
+          </h1>
+          <p className={`${st.lede} ${st.rise}`} style={{ animationDelay: "170ms" }}>
+            Record the details of your journey.
+          </p>
+        </div>
+      </header>
 
+      <main className={st.shell}>
           <Tabs defaultValue="manual" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-background/70 backdrop-blur-sm">
-              <TabsTrigger value="manual" className="flex items-center gap-2">
+            <TabsList className={cn("grid w-full grid-cols-2 mb-6 h-auto rounded-none bg-transparent p-0", st.tabs)}>
+              <TabsTrigger
+                value="manual"
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+                  st.tab
+                )}
+              >
                 <FileText className="h-4 w-4" />
                 Manual Entry
               </TabsTrigger>
-              <TabsTrigger value="scan" className="flex items-center gap-2">
+              <TabsTrigger
+                value="scan"
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+                  st.tab
+                )}
+              >
                 <CreditCard className="h-4 w-4" />
                 Scan Boarding Pass
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="manual">
-              <Card className="border-t-4 border-t-flight shadow-md bg-background/60 backdrop-blur-sm">
-                <CardHeader className="bg-background/80">
-                  <CardTitle className="flex items-center text-flight">
+              <Card className={cn("rounded-none border-0 shadow-none", st.card)}>
+                <CardHeader className={st.cardHead}>
+                  <CardTitle className={cn("flex items-center gap-2 text-[1.375rem] font-medium", st.sheetTitle)}>
                     <Plane className="h-5 w-5 mr-2" />
                     Flight Details
                   </CardTitle>
@@ -519,7 +533,7 @@ export default function AddFlightPage() {
                   <CardContent className="space-y-6">
                     {/* 1. Passenger Information */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <h3 className={cn("flex items-center gap-2", st.section)}>
                         <User className="h-5 w-5 mr-2" />
                         Passenger Information
                       </h3>
@@ -557,7 +571,7 @@ export default function AddFlightPage() {
 
                     {/* 2. Flight Details */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <h3 className={cn("flex items-center gap-2", st.section)}>
                         <Plane className="h-5 w-5 mr-2" />
                         Flight Details
                       </h3>
@@ -623,7 +637,7 @@ export default function AddFlightPage() {
 
                     {/* 3. Departure Information */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <h3 className={cn("flex items-center gap-2", st.section)}>
                         <MapPin className="h-5 w-5 mr-2" />
                         Departure Information
                       </h3>
@@ -654,7 +668,7 @@ export default function AddFlightPage() {
                                 {departureDate ? format(departureDate, "yyyy-MM-dd") : "Pick a date"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="p-0">
+                            <PopoverContent align="start" className="paper-surface p-0">
                               <Calendar
                                 mode="single"
                                 selected={departureDate}
@@ -690,7 +704,7 @@ export default function AddFlightPage() {
 
                     {/* 4. Arrival Information */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <h3 className={cn("flex items-center gap-2", st.section)}>
                         <MapPin className="h-5 w-5 mr-2" />
                         Arrival Information
                       </h3>
@@ -721,7 +735,7 @@ export default function AddFlightPage() {
                                 {arrivalDate ? format(arrivalDate, "yyyy-MM-dd") : "Pick a date"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="p-0">
+                            <PopoverContent align="start" className="paper-surface p-0">
                               <Calendar
                                 mode="single"
                                 selected={arrivalDate}
@@ -758,7 +772,7 @@ export default function AddFlightPage() {
 
                     {/* 5. Booking Information */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold flex items-center text-flight">
+                      <h3 className={cn("flex items-center gap-2", st.section)}>
                         <CreditCard className="h-5 w-5 mr-2" />
                         Booking Information
                       </h3>
@@ -870,9 +884,9 @@ export default function AddFlightPage() {
             </TabsContent>
 
             <TabsContent value="scan">
-              <Card className="border-t-4 border-t-flight shadow-md bg-background/60 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-flight">
+              <Card className={cn("rounded-none border-0 shadow-none", st.card)}>
+                <CardHeader className={st.cardHead}>
+                  <CardTitle className={cn("flex items-center gap-2 text-[1.375rem] font-medium", st.sheetTitle)}>
                     <CreditCard className="h-5 w-5 mr-2" />
                     Scan Boarding Pass
                   </CardTitle>
@@ -886,8 +900,7 @@ export default function AddFlightPage() {
               </Card>
             </TabsContent>
           </Tabs>
-        </div>
-      </div>
+      </main>
 
       {/* Updated global styles */}
       <style jsx global>{`

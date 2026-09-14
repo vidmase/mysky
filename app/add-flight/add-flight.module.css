@@ -1,0 +1,196 @@
+/* ============================================================
+   FILING — /add-flight
+   The blank entry in the logbook. Same press as the landing
+   page and the amendment slip; palette + type come from
+   `.paper-stock`, so the shadcn controls inside only need the
+   dark-theme chrome (rounded corners, drop shadows) taken off.
+   ============================================================ */
+
+.page {
+  min-height: 100vh;
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+}
+
+.shell {
+  width: min(980px, 100% - 3rem);
+  margin-inline: auto;
+}
+
+/* ============================================================
+   MASTHEAD
+   ============================================================ */
+.masthead {
+  padding: clamp(1.75rem, 3.5vw, 2.75rem) 0 clamp(1.25rem, 2.5vw, 1.75rem);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 0.2s;
+}
+
+.back:hover {
+  color: var(--vermillion);
+}
+
+.back svg {
+  width: 14px;
+  height: 8px;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.back:hover svg {
+  transform: translateX(-3px);
+}
+
+.title {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(2.25rem, 4.6vw, 3.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.028em;
+  margin: 0;
+}
+
+.title em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--vermillion);
+}
+
+.lede {
+  max-width: 52ch;
+  margin: 0.9rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   TABS — two ruled tickets, not a pill switch
+   ============================================================ */
+.tabs {
+  gap: 0;
+  border: 1px solid var(--rule-strong);
+}
+
+.tab {
+  padding: 0.85rem 0.75rem;
+  border-left: 1px solid var(--rule-strong);
+  font-family: var(--code);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 0.2s, background 0.2s;
+}
+
+.tab:first-child {
+  border-left: 0;
+}
+
+/* Specificity kept above Tailwind's `data-[state=active]:*` utilities (class +
+   attribute), so the active ticket always inverts — paper text needs the ink
+   behind it. */
+.tabs .tab[data-state="active"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tab:hover[data-state="inactive"] {
+  color: var(--vermillion);
+}
+
+/* ============================================================
+   THE SHEET — the form's card, ruled rather than floating
+   ============================================================ */
+.card {
+  border: 1px solid var(--rule-strong);
+  border-top: 3px solid var(--vermillion);
+  background: rgba(251, 247, 239, 0.6);
+}
+
+.cardHead {
+  border-bottom: 1px solid var(--rule);
+}
+
+.sheetTitle {
+  font-family: var(--display);
+  letter-spacing: -0.015em;
+}
+
+.sheetTitle svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 0;
+  color: var(--vermillion);
+}
+
+/* Section headings inside the sheet: letterpress labels, not blue captions. */
+.section {
+  font-family: var(--code);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.section svg {
+  width: 13px;
+  height: 13px;
+  margin-right: 0;
+  color: var(--vermillion);
+}
+
+/* ============================================================
+   MOTION
+   ============================================================ */
+.rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .page *,
+  .page *::before,
+  .page *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell {
+    width: min(980px, 100% - 2rem);
+  }
+}

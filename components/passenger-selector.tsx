@@ -56,7 +56,7 @@ export function PassengerSelector({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-0" align="start">
+        <PopoverContent className="paper-surface p-0" align="start">
           <Command>
             <CommandInput
               placeholder="Search passengers..."
