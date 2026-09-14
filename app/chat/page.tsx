@@ -153,7 +153,6 @@ export default function ChatPage() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          conversation: messages.slice(-10),
           model
         })
       })
