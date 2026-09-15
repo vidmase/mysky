@@ -11,8 +11,10 @@ import {
   calculateDuration,
   formatTimeToHHMM,
   getAirlineLogo,
+  resolveAirlineCode,
   resolveAirlineName,
 } from "@/app/flights/lib/flight-utils"
+import { buildBcbp } from "@/app/flights/lib/bcbp"
 import { allAirports } from "@/lib/airports"
 import { haversineDistance } from "@/lib/utils"
 
@@ -81,6 +83,9 @@ type Point = [number, number]
 /* Leaflet reaches for window as it loads, and every pass is rendered on the
    server first, so the map is pulled in only in the browser. */
 const PassMap = dynamic(() => import("./PassMap"), { ssr: false })
+
+/* The encoder draws onto a canvas, so it too waits for the browser. */
+const PassCode = dynamic(() => import("./PassCode"), { ssr: false })
 
 /** Where the atlas puts an airport. Null when it does not hold one. */
 function coordsFor(iata?: string | null, airport?: string | null): Point | null {
@@ -201,6 +206,17 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
   const [logoBroken, setLogoBroken] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [turned, setTurned] = useState(false)
+
+  const payload = buildBcbp({
+    passenger: flight.passenger_name,
+    pnr: flight.reservation_number,
+    from: code(flight.departure_iata, flight.departure_airport),
+    to: code(flight.arrival_iata, flight.arrival_airport),
+    carrier: resolveAirlineCode(flight.airline, flight.flight_number),
+    flightNumber: flight.flight_number,
+    departureDate: flight.departure_date,
+    seat: flight.seat,
+  })
 
   const date = flight.departure_date ? new Date(flight.departure_date) : null
   const dateLabel =
@@ -329,11 +345,21 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
           </div>
 
           <div>
-            <span className={s.code} aria-hidden="true">
-              {BARS.map((w, i) => (
-                <span key={i} style={{ width: `${w}px` }} />
-              ))}
-            </span>
+            {/* A row with a reference, a date and a flight number carries the
+                real symbol; one without still needs something at the foot of
+                the stub, and the drawn strip stays there for it. */}
+            {payload ? (
+              <PassCode
+                payload={payload}
+                label={`Booking ${dash(flight.reservation_number)} as a scannable boarding pass code`}
+              />
+            ) : (
+              <span className={s.code} aria-hidden="true">
+                {BARS.map((w, i) => (
+                  <span key={i} style={{ width: `${w}px` }} />
+                ))}
+              </span>
+            )}
             <div className={s.ref}>{dash(flight.reservation_number)}</div>
           </div>
           <span className={`${s.notch} ${s.notchBottom}`} aria-hidden="true" />
