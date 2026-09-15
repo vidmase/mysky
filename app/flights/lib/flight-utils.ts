@@ -231,3 +231,126 @@ export function getAirlineLogo(airline: string | null, flightNumber?: string | n
   logoCache.set(cacheKey, result)
   return result
 }
+
+/**
+ * Where a leg stands against the clock, for the strip along the foot of its
+ * pass: ahead of it, in the air, or behind it.
+ *
+ * The times on a row are local to their airports, so they are read in those
+ * airports' zones where we know them — a flight that leaves Riga at 22:00 is
+ * not behind you at 21:00 in London. A row with no date says nothing at all
+ * rather than guessing, and a cancelled one never flew whatever the clock says.
+ */
+export function legStanding(
+  leg: {
+    departureDate?: string | null
+    departureTime?: string | null
+    arrivalDate?: string | null
+    arrivalTime?: string | null
+    departureIata?: string | null
+    arrivalIata?: string | null
+    cancelled?: boolean | null
+  },
+  now: Date
+): string | null {
+  if (!leg.departureDate) return null
+  if (leg.cancelled) return 'Did not fly'
+
+  const at = (date: string, time?: string | null, iata?: string | null): DateTime | null => {
+    const day = DateTime.fromISO(String(date).slice(0, 10))
+    if (!day.isValid) return null
+    const [hour, minute] = (time ? formatTimeToHHMM(time) : '00:00').split(':').map(Number)
+    const zone = iata ? AIRPORT_TIMEZONES[iata.trim().toUpperCase()] : undefined
+    const stamped = DateTime.fromObject(
+      { year: day.year, month: day.month, day: day.day, hour: hour || 0, minute: minute || 0 },
+      zone ? { zone } : undefined
+    )
+    return stamped.isValid ? stamped : null
+  }
+
+  const departure = at(leg.departureDate, leg.departureTime, leg.departureIata)
+  if (!departure) return null
+
+  let arrival = at(leg.arrivalDate || leg.departureDate, leg.arrivalTime, leg.arrivalIata)
+  // An arrival earlier than its departure and filed without its own date is the
+  // small hours of the next day, which is how an overnight leg is written down.
+  if (arrival && !leg.arrivalDate && arrival < departure) arrival = arrival.plus({ days: 1 })
+
+  const current = DateTime.fromJSDate(now)
+  if (current < departure) {
+    return `Departs ${departure.toRelative({ base: current })}`
+  }
+  if (arrival && current < arrival) return 'In the air now'
+  return `Flown ${departure.toRelative({ base: current })}`
+}
+
+/**
+ * The light a leg left in: the sun's height at the departure airport at the
+ * moment it pushed back. A 06:25 out of Stansted in September left at first
+ * light, and the band on its pass says so.
+ *
+ * The altitude comes from the NOAA approximation, which is a degree or so out —
+ * far inside the tolerance for choosing between four words. Null when the row
+ * does not say when or from where, because a guessed sky is worse than none.
+ */
+export function legLight(leg: {
+  departureDate?: string | null
+  departureTime?: string | null
+  departureIata?: string | null
+}): 'day' | 'dawn' | 'dusk' | 'night' | null {
+  if (!leg.departureDate || !leg.departureTime || !leg.departureIata) return null
+
+  const code = leg.departureIata.trim().toUpperCase()
+  const coordinates = allAirports.find(a => a.iata === code)?.coordinates
+  if (!coordinates) return null
+  const [longitude, latitude] = coordinates
+
+  const day = DateTime.fromISO(String(leg.departureDate).slice(0, 10))
+  if (!day.isValid) return null
+  const [hour, minute] = formatTimeToHHMM(leg.departureTime).split(':').map(Number)
+  const zone = AIRPORT_TIMEZONES[code]
+  const local = DateTime.fromObject(
+    { year: day.year, month: day.month, day: day.day, hour: hour || 0, minute: minute || 0 },
+    zone ? { zone } : undefined
+  )
+  if (!local.isValid) return null
+
+  const rad = Math.PI / 180
+
+  /** How high the sun stands, in degrees, at a moment given in UTC. */
+  const altitude = (moment: DateTime): number => {
+    const utc = moment.toUTC()
+    const dayOfYear = utc.ordinal
+    const gamma =
+      ((2 * Math.PI) / 365) * (dayOfYear - 1 + (utc.hour + utc.minute / 60 - 12) / 24)
+    const equationOfTime =
+      229.18 *
+      (0.000075 +
+        0.001868 * Math.cos(gamma) -
+        0.032077 * Math.sin(gamma) -
+        0.014615 * Math.cos(2 * gamma) -
+        0.040849 * Math.sin(2 * gamma))
+    const declination =
+      0.006918 -
+      0.399912 * Math.cos(gamma) +
+      0.070257 * Math.sin(gamma) -
+      0.006758 * Math.cos(2 * gamma) +
+      0.000907 * Math.sin(2 * gamma) -
+      0.002697 * Math.cos(3 * gamma) +
+      0.00148 * Math.sin(3 * gamma)
+    const trueSolarMinutes =
+      utc.hour * 60 + utc.minute + equationOfTime + 4 * longitude
+    const hourAngle = trueSolarMinutes / 4 - 180
+    const cosZenith =
+      Math.sin(latitude * rad) * Math.sin(declination) +
+      Math.cos(latitude * rad) * Math.cos(declination) * Math.cos(hourAngle * rad)
+    return 90 - Math.acos(Math.min(1, Math.max(-1, cosZenith))) / rad
+  }
+
+  const now = altitude(local)
+  if (now > 6) return 'day'
+  if (now < -6) return 'night'
+  // Between the two the sky is turning, and which way it is turning is the
+  // difference between the light coming up and the light going.
+  return altitude(local.plus({ minutes: 30 })) > now ? 'dawn' : 'dusk'
+}
