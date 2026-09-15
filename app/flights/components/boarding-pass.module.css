@@ -164,7 +164,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.6rem;
-  margin-top: 1.1rem;
+  /* A dl carries a 1em margin below it from the browser, which padded the route
+     out past the stub beside it. */
+  margin: 1.1rem 0 0;
   padding-top: 0.85rem;
   border-top: 1px solid #e2e8f0;
 }
