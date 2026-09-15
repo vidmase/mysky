@@ -98,9 +98,13 @@
   min-width: 0;
 }
 
+/* The two endpoint columns take their width from the airport names, but a long
+   one (Paris Charles de Gaulle) must give way rather than push the arrival off
+   the card: minmax(0, auto) drops the grid's automatic minimum so the name can
+   fall back on the ellipsis .city already asks for. */
 .endpoints {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
   align-items: center;
   gap: 0.75rem;
 }
@@ -166,7 +170,9 @@
 }
 
 .factValue {
-  margin-top: 0.2rem;
+  /* A dd carries a 40px indent from the browser, which ate enough of each cell
+     to cut the date short at every width. */
+  margin: 0.2rem 0 0;
   font-size: 0.9375rem;
   font-weight: 700;
   color: #0f172a;
@@ -367,5 +373,14 @@
   .logoPlate {
     height: 1.9rem;
     max-width: 7rem;
+  }
+}
+
+/* On the narrowest phones a half-width cell no longer holds "Fri, 12 Sep 2025",
+   and a date cut to "Fri, 12 Sep 20…" is worse than one that takes the row to
+   itself, so the date gets the full width and the other three facts pair up. */
+@media (max-width: 22.5rem) {
+  .facts > div:first-child {
+    grid-column: 1 / -1;
   }
 }
