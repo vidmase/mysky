@@ -84,9 +84,23 @@ const clerkAppearance = {
 /** Decorative only — a real code would encode something. */
 const BARS = [10, 4, 7, 3, 9, 4, 5, 8, 3, 6, 10, 4, 7]
 
+/**
+ * Where to go once signed in. A flight opened from the code on the back of a
+ * pass asks to be returned to, but the value arrives in the address bar, so only
+ * a path inside this app is honoured: "//elsewhere" and "https://elsewhere" are
+ * addresses somewhere else wearing a path's clothes.
+ */
+function safeNext(next?: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) {
+    return '/flights'
+  }
+  return next
+}
+
 function AuthPageInner() {
   const searchParams = useSearchParams()
   const defaultTab = searchParams?.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in'
+  const next = safeNext(searchParams?.get('next'))
 
   return (
     <div className={`paper-stock ${s.root}`}>
@@ -117,11 +131,11 @@ function AuthPageInner() {
 
               <div className={s.well}>
                 <TabsContent value="sign-in" className="mt-0 focus-visible:outline-none">
-                  <SignIn routing="hash" forceRedirectUrl="/flights" appearance={clerkAppearance} />
+                  <SignIn routing="hash" forceRedirectUrl={next} appearance={clerkAppearance} />
                 </TabsContent>
 
                 <TabsContent value="sign-up" className="mt-0 focus-visible:outline-none">
-                  <SignUp routing="hash" forceRedirectUrl="/flights" appearance={clerkAppearance} />
+                  <SignUp routing="hash" forceRedirectUrl={next} appearance={clerkAppearance} />
                 </TabsContent>
               </div>
 
