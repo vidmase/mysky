@@ -3,6 +3,7 @@
 import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
 import { Clock, Plane, RotateCw } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useState } from "react"
 
 import {
@@ -13,7 +14,7 @@ import {
   resolveAirlineName,
 } from "@/app/flights/lib/flight-utils"
 import { allAirports } from "@/lib/airports"
-import { getGreatCirclePoints, haversineDistance } from "@/lib/utils"
+import { haversineDistance } from "@/lib/utils"
 
 import s from "./boarding-pass.module.css"
 
@@ -73,19 +74,13 @@ function dash(value?: string | null): string {
   return v && v.toLowerCase() !== "none" ? v : "—"
 }
 
-/* ── the back of the pass ──────────────────────────────────
-   The route as it was flown, drawn from the atlas rather than fetched: the
-   detail page already carries a real map on its own tab, and a pass prints
-   once per leg, so a tile map here would mean a request and a map instance
-   per card to show a picture too small to read. ─────────── */
+/* ── the back of the pass ────────────────────────────────── */
 
 type Point = [number, number]
 
-/** The panel the chart is drawn in. The padding leaves room for the end labels. */
-const CHART = { w: 340, h: 138, pad: 34 }
-
-/** Grid spacings to choose from, coarse enough that a short hop still gets lines. */
-const GRATICULE_STEPS = [1, 2, 5, 10, 20, 30]
+/* Leaflet reaches for window as it loads, and every pass is rendered on the
+   server first, so the map is pulled in only in the browser. */
+const PassMap = dynamic(() => import("./PassMap"), { ssr: false })
 
 /** Where the atlas puts an airport. Null when it does not hold one. */
 function coordsFor(iata?: string | null, airport?: string | null): Point | null {
@@ -95,7 +90,7 @@ function coordsFor(iata?: string | null, airport?: string | null): Point | null 
     if (filed?.coordinates) return filed.coordinates as Point
   }
   // A row with no IATA still names the airport, which is how the duration
-  // resolves its timezone, so the chart reads it the same way.
+  // resolves its timezone, so the map reads it the same way.
   const name = (airport || "").trim().toLowerCase()
   if (!name) return null
   const byName = allAirports.find(
@@ -105,131 +100,21 @@ function coordsFor(iata?: string | null, airport?: string | null): Point | null 
 }
 
 /**
- * The great circle between two airports, fitted to the panel.
- *
- * Longitude is squeezed by the cosine of the route's latitude so a degree east
- * covers the ground it really does, and the fitted box is scaled evenly, so the
- * arc keeps its shape instead of being stretched into the corners. Everything
- * comes back in panel coordinates, ready to draw.
- */
-function plotRoute(from: Point, to: Point) {
-  const k = Math.cos((((from[1] + to[1]) / 2) * Math.PI) / 180) || 1
-  const arc: Point[] = getGreatCirclePoints(from, to, 48).map(([lon, lat]) => [lon * k, -lat])
-
-  const xs = arc.map((p) => p[0])
-  const ys = arc.map((p) => p[1])
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minY = Math.min(...ys)
-  const maxY = Math.max(...ys)
-  // A hop of a few kilometres would otherwise scale up until the grid is
-  // meaningless, so the box never closes below a quarter of a degree.
-  const spanX = Math.max(maxX - minX, 0.25)
-  const spanY = Math.max(maxY - minY, 0.25)
-
-  const innerW = CHART.w - CHART.pad * 2
-  const innerH = CHART.h - CHART.pad * 2
-  const scale = Math.min(innerW / spanX, innerH / spanY)
-  const offX = CHART.pad + (innerW - spanX * scale) / 2 - minX * scale
-  const offY = CHART.pad + (innerH - spanY * scale) / 2 - minY * scale
-  const at = ([x, y]: Point): Point => [x * scale + offX, y * scale + offY]
-
-  const drawn = arc.map(at)
-  const path = drawn.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ")
-
-  // The marker sits at the halfway point, turned along the track it is on there.
-  const half = Math.floor(drawn.length / 2)
-  const [ax, ay] = drawn[Math.max(0, half - 1)]
-  const [bx, by] = drawn[Math.min(drawn.length - 1, half + 1)]
-  const heading = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI
-
-  // The panel shows more ground than the route's own box — the fit is even and
-  // centred — so the grid is drawn across what is on show, not just across the
-  // track, and the spacing is picked to leave about half a dozen lines.
-  const lonAt = (x: number) => (x - offX) / scale / k
-  const latAt = (y: number) => -(y - offY) / scale
-  const lonLo = lonAt(0)
-  const lonHi = lonAt(CHART.w)
-  const latLo = latAt(CHART.h)
-  const latHi = latAt(0)
-  // Both axes share a spacing, as a degree grid does, so the step follows the
-  // shorter of the two spans — pick it off the longer one and the short axis
-  // ends up with a single stray line through it.
-  const step =
-    GRATICULE_STEPS.find((s) => Math.min(lonHi - lonLo, latHi - latLo) / s <= 5) ?? 30
-  const ticks = (lo: number, hi: number) => {
-    const out: number[] = []
-    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(v)
-    return out
-  }
-
-  return {
-    path,
-    start: drawn[0],
-    end: drawn[drawn.length - 1],
-    middle: drawn[half],
-    heading,
-    meridians: ticks(lonLo, lonHi).map((lon) => at([lon * k, 0])[0]),
-    parallels: ticks(latLo, latHi).map((lat) => at([0, -lat])[1]),
-  }
-}
-
-/** The route drawn as a chart: a graticule, the arc, and the two ends. */
-function RouteChart({ from, to, fromCode, toCode }: { from: Point; to: Point; fromCode: string; toCode: string }) {
-  const route = plotRoute(from, to)
-
-  return (
-    <svg
-      className={s.chart}
-      viewBox={`0 0 ${CHART.w} ${CHART.h}`}
-      role="img"
-      aria-label={`The great circle from ${fromCode} to ${toCode}`}
-    >
-      <g className={s.graticule}>
-        {route.meridians.map((x, i) => (
-          <line key={`m${i}`} x1={x} y1="0" x2={x} y2={CHART.h} />
-        ))}
-        {route.parallels.map((y, i) => (
-          <line key={`p${i}`} x1="0" y1={y} x2={CHART.w} y2={y} />
-        ))}
-      </g>
-
-      <path className={s.chartArc} d={route.path} />
-
-      <g transform={`translate(${route.middle[0]} ${route.middle[1]}) rotate(${route.heading})`}>
-        <path className={s.chartPlane} d="M-6 -4.5 L9 0 L-6 4.5 L-2.5 0 Z" />
-      </g>
-
-      {([
-        [route.start, fromCode, route.end[0]],
-        [route.end, toCode, route.start[0]],
-      ] as [Point, string, number][]).map(([[x, y], label, otherX]) => {
-        // Each code sits on the far side of its dot from the other end, so it
-        // never comes to rest on the track running between them.
-        const outward = x <= otherX ? -1 : 1
-        return (
-          <g key={label}>
-            <circle className={s.chartStop} cx={x} cy={y} r="4.5" />
-            <text
-              className={s.chartLabel}
-              x={x + outward * 9}
-              y={y + 4}
-              textAnchor={outward < 0 ? "end" : "start"}
-            >
-              {label}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
-/**
  * The back: what the row knows about the flight itself rather than the boarding
  * of it. Anything the row does not hold is left off rather than guessed at.
  */
-function PassBack({ flight, carrier }: { flight: PassFlight; carrier: string }) {
+function PassBack({
+  flight,
+  carrier,
+  colour,
+  mapReady,
+}: {
+  flight: PassFlight
+  carrier: string
+  colour: string
+  /** The map is built on the first turn, so a pass nobody turns fetches no tiles. */
+  mapReady: boolean
+}) {
   const fromCode = code(flight.departure_iata, flight.departure_airport)
   const toCode = code(flight.arrival_iata, flight.arrival_airport)
   const from = coordsFor(flight.departure_iata, flight.departure_airport)
@@ -262,14 +147,14 @@ function PassBack({ flight, carrier }: { flight: PassFlight; carrier: string }) 
       </header>
 
       <div className={s.backBody}>
-        <div className={s.chartPanel}>
+        <div className={s.mapPanel}>
           {from && to ? (
-            <RouteChart from={from} to={to} fromCode={fromCode} toCode={toCode} />
+            mapReady && <PassMap from={from} to={to} colour={colour} />
           ) : (
             /* The atlas is not complete, and a route drawn from a guess would be
                a lie about where the aeroplane went. */
-            <p className={s.chartMissing}>
-              The atlas has no position for {from ? toCode : fromCode}, so this leg is not charted.
+            <p className={s.mapMissing}>
+              The atlas has no position for {from ? toCode : fromCode}, so this leg is not mapped.
             </p>
           )}
         </div>
@@ -315,6 +200,7 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
   const logo = getAirlineLogo(flight.airline ?? null, flight.flight_number)
   const [logoBroken, setLogoBroken] = useState(false)
   const [flipped, setFlipped] = useState(false)
+  const [turned, setTurned] = useState(false)
 
   const date = flight.departure_date ? new Date(flight.departure_date) : null
   const dateLabel =
@@ -327,7 +213,10 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
     <button
       type="button"
       className={s.flip}
-      onClick={() => setFlipped((was) => !was)}
+      onClick={() => {
+        setFlipped((was) => !was)
+        setTurned(true)
+      }}
       aria-pressed={flipped}
       /* The turned-away face is hidden from the reading order, so its copy of
          the control gives up its tab stop rather than being a focus trap in
@@ -464,7 +353,7 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
         </div>
 
         <div className={`${s.face} ${s.back}`} aria-hidden={!flipped}>
-          <PassBack flight={flight} carrier={carrier} />
+          <PassBack flight={flight} carrier={carrier} colour={brand.band} mapReady={turned} />
           <footer className={s.foot}>
             <span className={s.footItem}>{dash(flight.flight_number)}</span>
             <span className={s.footBrand}>{dateLabel}</span>
