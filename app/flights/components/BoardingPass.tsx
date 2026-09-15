@@ -87,6 +87,9 @@ const PassMap = dynamic(() => import("./PassMap"), { ssr: false })
 /* The encoder draws onto a canvas, so it too waits for the browser. */
 const PassCode = dynamic(() => import("./PassCode"), { ssr: false })
 
+/* The link code reads the address off the page, which only exists there. */
+const PassQr = dynamic(() => import("./PassQr"), { ssr: false })
+
 /** Where the atlas puts an airport. Null when it does not hold one. */
 function coordsFor(iata?: string | null, airport?: string | null): Point | null {
   const code = (iata || "").trim().toUpperCase()
@@ -181,6 +184,9 @@ function PassBack({
             <div className={s.label}>Booked</div>
             <div className={s.factValue}>{bookedLabel || "—"}</div>
           </div>
+          {/* The stub's symbol is the pass's own code and a camera will not act
+              on it; this one is a way back to the flight. */}
+          {mapReady && <PassQr flightId={flight.id} />}
         </aside>
       </div>
 

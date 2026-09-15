@@ -552,3 +552,33 @@
     height: 10rem;
   }
 }
+
+/* ── the code that opens the flight ──────────────────────── */
+
+.qr {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.15rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.qr svg {
+  flex: none;
+  /* Sized so each module stays about three pixels across, which is what a
+     camera needs to read it off a screen; the quiet zone is part of the box, so
+     the symbol inside is smaller than this. */
+  width: 6.5rem;
+  height: 6.5rem;
+  /* Dark ink rather than the carrier's colour: a pale brand on white is the
+     quickest way to make a symbol a camera cannot read. */
+  fill: #0f172a;
+}
+
+.qr figcaption {
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: #64748b;
+}
