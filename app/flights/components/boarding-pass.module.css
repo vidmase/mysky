@@ -4,6 +4,13 @@
    brand table; everything structural lives here.
    ============================================================ */
 
+/* The card turns between two faces, so the depth belongs to the space around it
+   and the paper — the rounding, the shadow, the clipped band — to each face.
+   overflow on the turning element itself would flatten the scene. */
+.scene {
+  perspective: 1600px;
+}
+
 .pass {
   --band: #17130e;
   --on-band: #f2ece1;
@@ -11,12 +18,41 @@
   --on-accent: #ffffff;
 
   position: relative;
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.75s cubic-bezier(0.22, 0.68, 0.24, 1);
+  font-family: var(--body);
+}
+
+.flipped {
+  transform: rotateY(180deg);
+}
+
+/* Both faces share one grid cell, so the card is as tall as the taller of them
+   and nothing jumps as it turns. */
+.face {
+  position: relative;
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border-radius: 14px;
   background: #ffffff;
   color: #0f172a;
   box-shadow: 0 18px 36px -24px rgba(15, 23, 42, 0.55), 0 1px 3px rgba(15, 23, 42, 0.14);
-  font-family: var(--body);
+  backface-visibility: hidden;
+}
+
+.back {
+  transform: rotateY(180deg);
+}
+
+/* The turn is the whole point of the card, but it is decoration: where motion
+   is unwelcome the faces simply swap. */
+@media (prefers-reduced-motion: reduce) {
+  .pass {
+    transition: none;
+  }
 }
 
 /* ── the coloured header band ─────────────────────────────── */
@@ -89,6 +125,7 @@
 /* ── body: route on the left, stub on the right ───────────── */
 
 .body {
+  flex: 1;
   display: grid;
   grid-template-columns: 1fr 15.5rem;
 }
@@ -289,11 +326,13 @@
 /* ── cancelled ────────────────────────────────────────────── */
 
 .cancelled .body,
+.cancelled .backBody,
 .cancelled .foot {
   opacity: 0.5;
 }
 
-.cancelled::after {
+/* On the front only: mirrored on the back it would read as a printing fault. */
+.cancelled .front::after {
   content: "CANCELLED";
   position: absolute;
   top: 55%;
@@ -384,5 +423,137 @@
 @media (max-width: 22.5rem) {
   .facts > div:first-child {
     grid-column: 1 / -1;
+  }
+}
+
+/* ── the back: the route, and what the row knows about the flight ── */
+
+.backTitle {
+  flex: 1;
+  font-size: clamp(0.85rem, 2.6vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.backBody {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 15.5rem;
+}
+
+.chartPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 1.15rem;
+  min-width: 0;
+}
+
+/* The drawing keeps its proportions, so on a wide card it is capped rather than
+   blown up until the route towers over the pass it belongs to. */
+.chart {
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+}
+
+/* The grid is scale, not ornament, so it sits well behind the track. */
+.graticule line {
+  stroke: #cbd5e1;
+  stroke-width: 0.75;
+  stroke-dasharray: 2 4;
+}
+
+.chartArc {
+  fill: none;
+  stroke: var(--band);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+}
+
+.chartPlane {
+  fill: var(--band);
+}
+
+.chartStop {
+  fill: #ffffff;
+  stroke: var(--band);
+  stroke-width: 2.5;
+}
+
+.chartLabel {
+  font-family: var(--code);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  fill: #0f172a;
+}
+
+.chartMissing {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.backFacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 0.8rem 0.6rem;
+  padding: 1.1rem 1.15rem 1rem;
+  border-left: 2px dashed #cbd5e1;
+}
+
+.backNote {
+  padding: 0 1.15rem 0.9rem;
+}
+
+.backNote p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+/* ── the control that turns the card ─────────────────────── */
+
+.flip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.flip:hover {
+  border-color: var(--band);
+  color: var(--band);
+}
+
+.flip:focus-visible {
+  outline: 2px solid var(--band);
+  outline-offset: 2px;
+}
+
+@media (max-width: 40rem) {
+  .backBody {
+    grid-template-columns: 1fr;
+  }
+
+  .backFacts {
+    border-left: 0;
+    border-top: 2px dashed #cbd5e1;
   }
 }
