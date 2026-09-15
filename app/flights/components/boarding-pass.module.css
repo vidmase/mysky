@@ -269,7 +269,21 @@
   text-transform: uppercase;
 }
 
-/* A drawn code, not a scannable one: the reference underneath is the real datum. */
+/* The real symbol. It is drawn at the encoder's own module size and scaled to
+   the stub, so the bars stay whole pixels rather than blurring into each other
+   and refusing to scan. */
+.codeSymbol {
+  display: block;
+  width: 100%;
+  /* The canvas is drawn larger than it is shown and carries its own proportions,
+     so the height follows the symbol rather than being fixed to the old strip's.
+     Smooth scaling is deliberate: sharpening it to whole pixels would widen some
+     bars and narrow others, which is what stops a symbol scanning. */
+  height: auto;
+  margin-top: auto;
+}
+
+/* The fallback strip for a row with no reference to encode. */
 .code {
   display: flex;
   align-items: flex-end;
