@@ -3,8 +3,14 @@
 import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
 import { Clock, Plane } from "lucide-react"
+import { useState } from "react"
 
-import { airlineBrand, formatTimeToHHMM, resolveAirlineName } from "@/app/flights/lib/flight-utils"
+import {
+  airlineBrand,
+  formatTimeToHHMM,
+  getAirlineLogo,
+  resolveAirlineName,
+} from "@/app/flights/lib/flight-utils"
 
 import s from "./boarding-pass.module.css"
 
@@ -65,6 +71,12 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
   const carrier = resolveAirlineName(flight.airline, flight.flight_number) || "Unknown airline"
   const kind = seatKind(flight.seat)
 
+  // The mark is what makes the card read as that airline's ticket, but the
+  // logo host answers for carriers it knows and 404s for the rest, so the
+  // name set in type stays as the fallback rather than an empty band.
+  const logo = getAirlineLogo(flight.airline ?? null, flight.flight_number)
+  const [logoBroken, setLogoBroken] = useState(false)
+
   const date = flight.departure_date ? new Date(flight.departure_date) : null
   const dateLabel =
     date && !isNaN(date.getTime()) ? format(date, "EEE, d MMM yyyy", { locale: enUS }) : "—"
@@ -82,7 +94,15 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
       }
     >
       <header className={s.band}>
-        <span className={s.wordmark}>{carrier}</span>
+        {logo && !logoBroken ? (
+          <span className={s.logoPlate}>
+            {/* On a white plate: these marks are drawn for light stock, and the
+                band underneath is whatever colour the carrier paints it. */}
+            <img src={logo} alt={carrier} onError={() => setLogoBroken(true)} />
+          </span>
+        ) : (
+          <span className={s.wordmark}>{carrier}</span>
+        )}
         <span className={s.bandTitle}>Boarding pass</span>
         <span className={s.tagline}>
           {brand.tagline}
