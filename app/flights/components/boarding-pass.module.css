@@ -441,56 +441,33 @@
   grid-template-columns: 1fr 15.5rem;
 }
 
-.chartPanel {
+.mapPanel {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.9rem 1.15rem;
+  align-items: stretch;
   min-width: 0;
+  padding: 0.9rem 1.15rem;
 }
 
-/* The drawing keeps its proportions, so on a wide card it is capped rather than
-   blown up until the route towers over the pass it belongs to. */
-.chart {
-  width: 100%;
-  max-width: 24rem;
-  height: auto;
+/* The map is a picture on a card, so it is given a fixed box and rounded like
+   one; Leaflet fills whatever it is handed. */
+.map {
+  flex: 1;
+  min-width: 0;
+  height: 12rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e8e5df;
 }
 
-/* The grid is scale, not ornament, so it sits well behind the track. */
-.graticule line {
-  stroke: #cbd5e1;
-  stroke-width: 0.75;
-  stroke-dasharray: 2 4;
+/* Leaflet's credit, sized to the card rather than to a full-page map. */
+.map :global(.leaflet-control-attribution) {
+  font-size: 9px;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
-.chartArc {
-  fill: none;
-  stroke: var(--band);
-  stroke-width: 2.25;
-  stroke-linecap: round;
-}
-
-.chartPlane {
-  fill: var(--band);
-}
-
-.chartStop {
-  fill: #ffffff;
-  stroke: var(--band);
-  stroke-width: 2.5;
-}
-
-.chartLabel {
-  font-family: var(--code);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  fill: #0f172a;
-}
-
-.chartMissing {
-  margin: 0;
+.mapMissing {
+  margin: auto 0;
   font-size: 0.8125rem;
   line-height: 1.5;
   color: #64748b;
@@ -555,5 +532,9 @@
   .backFacts {
     border-left: 0;
     border-top: 2px dashed #cbd5e1;
+  }
+
+  .map {
+    height: 10rem;
   }
 }
