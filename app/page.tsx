@@ -2,7 +2,14 @@ import Link from "next/link"
 
 import { HomeHeartbeat } from "./components/home-heartbeat"
 import { LandingAuthLink } from "./components/landing-auth-link"
+import { ParticleTitle } from "./components/particle-title"
 import s from "./landing.module.css"
+
+/* How fast the hero headline assembles out of particles: 1 = the tuned default,
+   2 = twice as quick, 0.5 = twice as slow. Change it here, set it without a code
+   edit via NEXT_PUBLIC_PARTICLE_SPEED, or try a value live by appending
+   ?pt=<n> to the URL (e.g. /?pt=2). */
+const PARTICLE_SPEED = Number(process.env.NEXT_PUBLIC_PARTICLE_SPEED) || 1
 
 const NAV = [
   { label: "Log", href: "/flights" },
@@ -207,13 +214,28 @@ export default function Home() {
                 <span>Personal flight record · Est. MMXXV</span>
               </p>
 
-              <h1 className={`${s.title} ${s.rise}`} style={{ animationDelay: "120ms" }}>
-                Every flight
-                <span className={s.titleHang}>
-                  you have <em>ever</em>
-                </span>
-                taken, filed.
-              </h1>
+              {/* Runs before the headline is parsed, so the static type never
+                  flashes: the particles own the entrance. `__ptBoot` is the
+                  safety valve — if the client bundle never runs (or the sampler
+                  bails out) the copy comes back on its own. */}
+              <script
+                dangerouslySetInnerHTML={{
+                  __html:
+                    "(function(){try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return}catch(e){}" +
+                    "var d=document.documentElement;d.classList.add('pt-anim');" +
+                    "window.__ptBoot=setTimeout(function(){d.classList.remove('pt-anim')},6000)})();",
+                }}
+              />
+
+              {/* The headline is real, selectable copy at all times — the point
+                  cloud only owns the entrance and hands the frame back. */}
+              <ParticleTitle
+                wrapperClassName={s.ptWrap}
+                className={s.title}
+                hangClassName={s.titleHang}
+                canvasClassName={s.ptCanvas}
+                speed={PARTICLE_SPEED}
+              />
 
               <p className={`${s.lede} ${s.rise}`} style={{ animationDelay: "230ms" }}>
                 A logbook for the whole of your flying — routes drawn on a world map,
