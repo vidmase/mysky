@@ -59,6 +59,14 @@ export function isDarkBasemap(id: BasemapId): boolean {
   return BASEMAPS.find((b) => b.id === id)?.dark ?? false
 }
 
+/** The plate animates only for visitors who have not asked it not to. */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
 /* A pair you fly once is a faint pencil trace; fly it often enough and the
    line darkens all the way to vermillion. Same steps as the printed legend. */
 export const ROUTE_COLORS = {
