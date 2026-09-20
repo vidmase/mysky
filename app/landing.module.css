@@ -227,6 +227,34 @@
   margin-left: -0.06em;
 }
 
+/* ---- particle headline (ported from the HyperFrames `code-particle-assemble`
+   block) ----------------------------------------------------------------
+   The wrapper is the positioning context for the particle canvas, which is a
+   sibling of the <h1> (never a child — the pre-paint hold below drops the
+   headline to opacity 0, and an ancestor's opacity would hide the particles
+   with it). JS sets the canvas' left/top/size to the padded glyph area and
+   keeps the layer transparent, which lets the paper stock and the plate behind
+   it show through while the ink is still in flight. */
+.ptWrap {
+  position: relative;
+}
+
+.ptCanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* Added by the pre-paint boot script, removed the moment the particles land
+   (or by the 6s safety valve). Without it the static headline flashes before
+   the first scattered frame is drawn. */
+:global(html.pt-anim) .title {
+  opacity: 0;
+}
+
 .lede {
   max-width: 30ch;
   margin: 1.9rem 0 0;
