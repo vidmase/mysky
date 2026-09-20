@@ -1,52 +1,70 @@
 import { NextResponse } from 'next/server'
 
 import {
-  describeUpstreamFailure,
-  flightsApiBase,
+  describeAttempts,
+  fetchUpstream,
+  flightsApiCandidates,
   isEphemeralTunnel,
-  upstreamHeaders,
+  UpstreamUnavailable,
+  warnIfEphemeralInProduction,
 } from '@/lib/live-search-upstream'
 
 export const dynamic = 'force-dynamic'
 
+/** A health probe that takes longer than this has already told us what we need. */
+const HEALTH_TIMEOUT_MS = 10_000
+
 export async function GET() {
-  const base = flightsApiBase()
+  const candidates = flightsApiCandidates().map((candidate) => candidate.base)
 
   try {
-    const url = `${base}/api/health`
-
-    let upstream: Response
+    let call: Awaited<ReturnType<typeof fetchUpstream>>
     try {
-      upstream = await fetch(url, {
-        method: 'GET',
-        headers: upstreamHeaders(base),
-        cache: 'no-store',
-      })
+      call = await fetchUpstream('/api/health', { method: 'GET', timeoutMs: HEALTH_TIMEOUT_MS })
     } catch (err) {
-      console.error('live-search health upstream fetch failed:', err)
+      if (!(err instanceof UpstreamUnavailable)) throw err
+      console.error('live-search health upstream fetch failed:', err.message)
       return NextResponse.json(
         {
           ok: false,
           error: 'Live search service unavailable',
-          message: describeUpstreamFailure(err, base),
           // This endpoint exists to be read when something is wrong, so it says
-          // what it tried to reach. The host is deployment config, not a secret.
-          upstream: base,
-          ephemeralTunnel: isEphemeralTunnel(base),
+          // what it tried and how each attempt ended. The addresses are
+          // deployment config, not secrets.
+          message: describeAttempts(err.attempts),
+          attempts: err.attempts,
+          candidates,
         },
         { status: 502 }
       )
     }
 
-    const contentType = upstream.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const data = await upstream.json()
-      return NextResponse.json(data, { status: upstream.status })
-    }
+    const { response: upstream, base, attempts } = call
+    warnIfEphemeralInProduction(base)
 
-    const text = await upstream.text()
+    const contentType = upstream.headers.get('content-type') || ''
+    const payload: unknown = contentType.includes('application/json')
+      ? await upstream.json()
+      : { message: (await upstream.text()).slice(0, 500) }
+
+    const body = (payload && typeof payload === 'object' ? payload : { upstreamBody: payload }) as Record<
+      string,
+      unknown
+    >
+
     return NextResponse.json(
-      { ok: upstream.ok, upstream: base, message: text.slice(0, 500) },
+      {
+        ...body,
+        // The scraper answers with `status: "ok"`; the two together are what the
+        // monitor and the drawer read.
+        ok: upstream.ok && (typeof body.status === 'string' ? body.status === 'ok' : true),
+        upstream: base,
+        ephemeralTunnel: isEphemeralTunnel(base),
+        // Non-empty when the address named in the environment was not the one
+        // that answered, which is the early warning this endpoint is for.
+        failoverFrom: attempts.map((attempt) => attempt.base),
+        candidates,
+      },
       { status: upstream.status }
     )
   } catch (error) {
@@ -56,7 +74,7 @@ export async function GET() {
         ok: false,
         error: 'Internal server error',
         message: error instanceof Error ? error.message : String(error),
-        upstream: base,
+        candidates,
       },
       { status: 500 }
     )

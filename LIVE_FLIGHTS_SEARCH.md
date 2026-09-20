@@ -2,8 +2,11 @@
 
 MySky proxies live Google Flights searches through:
 
-- `POST /api/live-search` → `${FLIGHTS_API_URL}/api/search`
-- `GET /api/live-search/health` → `${FLIGHTS_API_URL}/api/health`
+- `POST /api/live-search` → `<upstream>/api/search`
+- `GET /api/live-search/health` → `<upstream>/api/health`
+
+`<upstream>` is not a single address but the first candidate that answers — see
+**Addresses and failover** below.
 
 ## Configure Vercel (mysky project only)
 
@@ -11,23 +14,61 @@ Set **Project → Settings → Environment Variables**:
 
 | Name | Value |
 |------|--------|
-| `FLIGHTS_API_URL` | Base URL of the durable gfscrape FastAPI host, no trailing slash |
+| `FLIGHTS_API_URL` | Preferred base URL of the durable gfscrape FastAPI host, no trailing slash |
+| `FLIGHTS_API_URLS` | Optional: more base URLs, comma-separated, tried in order after `FLIGHTS_API_URL` |
+| `FLIGHTS_API_TIMEOUT_MS` | Optional: ceiling for one upstream call (default 90000; the health probe uses 10000) |
 
-With the variable unset the code falls back to `http://72.62.212.33:8000`, the
-VPS this ran on originally. Treat that as a fallback, not the answer: it is a
-bare IP over plain HTTP, and it breaks the day the IP changes.
+With both unset the code falls back to `DURABLE_UPSTREAMS` in
+`lib/live-search-upstream.ts` — currently `http://72.62.212.33:8000`, the VPS this
+ran on originally. Treat that as a fallback, not the answer: it is a bare IP over
+plain HTTP, and it breaks the day the IP changes.
 
-Do **not** point production at:
+Do **not** leave production pointed *only* at:
 
 - the gfscrape Vercel frontend — it is a proxy/mock layer, not the scraper, so
   it either returns fixtures or forwards to its own `FLIGHTS_API_URL`
 - ephemeral tunnels: `*.trycloudflare.com` quick tunnels, `*.loca.lt`, free
   `*.ngrok-free.app`. Their hostname is generated per run and stops resolving
-  the moment the tunnel closes, which takes production down with no warning.
+  the moment the tunnel closes.
 
-`lib/live-search-upstream.ts` recognises those hosts: it warns on every request
-in production and, when one stops resolving, says so in the error the search
-drawer shows instead of a bare 502.
+## Addresses and failover
+
+A single address is a single point of failure, and that is exactly how live
+search broke: `FLIGHTS_API_URL` sat on a quick tunnel whose hostname stopped
+resolving, and every search returned a 502 until someone noticed. So the proxy
+treats the upstream as a candidate list and does the obvious thing with it:
+
+1. Try the candidates in order — `FLIGHTS_API_URL`, then `FLIGHTS_API_URLS`, then
+   the durable fallbacks.
+2. Remember the one that answered and prefer it for the next ten minutes, so the
+   common path is one call to the healthy host.
+3. Bench a candidate that fails at the network level (or a tunnel host answering
+   with a 5xx, which is what a closed quick tunnel looks like once something else
+   holds its hostname) for two minutes, so one dead address does not add its
+   failure to every request. When *every* candidate is benched the bench is
+   treated as the stale opinion and the list is tried again from the top.
+4. Report what happened rather than swallowing it: the 502 body carries one line
+   per attempt (which is what the search drawer shows), `/api/live-search/health`
+   adds `upstream`, `candidates` and `failoverFrom`, and every proxied response
+   carries `x-live-search-upstream`.
+
+Nothing here needs a redeploy when an address changes: add or replace it in the
+environment, or point `FLIGHTS_API_URLS` at a second host so there are two.
+
+## Monitoring
+
+`GET /api/live-search/health` is the one endpoint worth watching — it answers
+`ok: true/false`, and `failoverFrom` being non-empty means the address in the
+environment is *not* the one serving traffic:
+
+```bash
+curl -s https://mysky.daugvila.lt/api/live-search/health | jq '{ok, upstream, failoverFrom}'
+```
+
+A daily check is enough (a dead scraper does not self-heal, and the VPS needs a
+reboot when it does). Any scheduler will do — a GitHub Actions workflow with a
+`curl --fail`, Uptime Kuma, or a cron entry — and the failure mode to alarm on is
+`ok: false`, not a non-200, since a reachable-but-erroring scraper also matters.
 
 ## Giving gfscrape a permanent address
 
