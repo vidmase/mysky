@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { BASEMAPS, routeColor, type BasemapId } from './atlas-config'
+import { BASEMAPS, prefersReducedMotion, routeColor, type BasemapId } from './atlas-config'
+import { flyRoute } from './route-flight'
 
 export type AtlasAirport = {
   iata: string
@@ -69,6 +70,32 @@ type RouteLayers = {
   base: { haloWeight: number; lineWeight: number; color: string }
 }
 
+/* One rule for how a pair is inked, so hover, highlight and the arriving flight
+   cannot disagree about a line's weight or colour. `hold` is the flight's claim
+   on a pair: its arc stays back until the plane has drawn it. */
+function styleRoute(
+  layers: RouteLayers,
+  { on, hold, dark }: { on: boolean; hold: boolean; dark: boolean }
+) {
+  layers.line.setStyle({
+    weight: on ? 2.6 : layers.base.lineWeight,
+    opacity: hold ? 0 : on ? 1 : 0.85,
+    color: on ? routeColor(5, dark) : layers.base.color,
+  })
+  layers.halo.setStyle({
+    weight: on ? 9 : layers.base.haloWeight,
+    // The faint impression in the stock is held back with the ink: the plane is
+    // meant to draw the pair, not trace a line that was already there.
+    opacity: hold ? 0 : dark ? 0.35 : 0.09,
+  })
+  layers.dash.setStyle({ opacity: hold ? 0 : on ? 0.85 : 0.55 })
+  if (on) {
+    layers.halo.bringToFront()
+    layers.line.bringToFront()
+    layers.dash.bringToFront()
+  }
+}
+
 type Props = {
   className?: string
   airports: AtlasAirport[]
@@ -77,6 +104,9 @@ type Props = {
   basemap: BasemapId
   highlighted: string | null
   onHighlight: (key: string | null) => void
+  /** the pair the plate flies in on; bump `flightToken` to fly it again */
+  flightKey?: string | null
+  flightToken?: number
 }
 
 export default function RouteAtlas({
@@ -87,6 +117,8 @@ export default function RouteAtlas({
   basemap,
   highlighted,
   onHighlight,
+  flightKey = null,
+  flightToken = 0,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -100,6 +132,17 @@ export default function RouteAtlas({
   highlightRef.current = onHighlight
 
   const dark = BASEMAPS.find((b) => b.id === basemap)?.dark ?? false
+
+  // The flight reads these instead of depending on them: a refetch or a basemap
+  // switch must not teleport a plane that is already in the air. `flightActive`
+  // is the pair the flight has claimed, held back from the plate until it lands.
+  const routesRef = useRef(routes)
+  routesRef.current = routes
+  const darkRef = useRef(dark)
+  darkRef.current = dark
+  const highlightedRef = useRef(highlighted)
+  highlightedRef.current = highlighted
+  const flightActiveRef = useRef<string | null>(null)
 
   // --- MAP INITIALISATION ---
   useEffect(() => {
@@ -270,22 +313,45 @@ export default function RouteAtlas({
 
   // --- HIGHLIGHT (restyle in place; rebuilding every arc on hover is wasteful) ---
   useEffect(() => {
+    const flying = flightActiveRef.current
     for (const [key, layers] of routeLayersRef.current) {
-      const on = key === highlighted
-      layers.line.setStyle({
-        weight: on ? 2.6 : layers.base.lineWeight,
-        opacity: on ? 1 : 0.85,
-        color: on ? routeColor(5, dark) : layers.base.color,
-      })
-      layers.halo.setStyle({ weight: on ? 9 : layers.base.haloWeight })
-      layers.dash.setStyle({ opacity: on ? 0.85 : 0.55 })
-      if (on) {
-        layers.halo.bringToFront()
-        layers.line.bringToFront()
-        layers.dash.bringToFront()
-      }
+      styleRoute(layers, { on: key === highlighted, hold: key === flying, dark })
     }
   }, [highlighted, dark, routes])
+
+  // --- THE ARRIVING FLIGHT ---
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !flightKey || prefersReducedMotion()) return
+
+    const route = routesRef.current.find((r) => r.key === flightKey)
+    if (!route) return
+
+    // The plane draws this pair's arc, so the plate holds its own ink back for
+    // the length of the hop — and gets it straight back if the flight is called
+    // off half way.
+    const held = routeLayersRef.current.get(flightKey)
+    const release = () => {
+      flightActiveRef.current = null
+      if (held) {
+        styleRoute(held, {
+          on: highlightedRef.current === flightKey,
+          hold: false,
+          dark: darkRef.current,
+        })
+      }
+    }
+
+    flightActiveRef.current = flightKey
+    if (held) styleRoute(held, { on: false, hold: true, dark: darkRef.current })
+
+    const flight = flyRoute(map, route, { dark: darkRef.current, onDone: release })
+
+    return () => {
+      flight.cancel()
+      release()
+    }
+  }, [flightKey, flightToken])
 
   // --- AIRPORTS ---
   useEffect(() => {

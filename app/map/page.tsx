@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useToast } from '@/hooks/use-toast'
-import { MapPin } from 'lucide-react'
-import { getGreatCirclePoints } from '@/lib/utils'
+import { MapPin, PlaneTakeoff } from 'lucide-react'
+import { getGreatCirclePoints, haversineDistance } from '@/lib/utils'
 import { PaperNav } from '@/app/components/paper-nav'
 import {
   BASEMAPS,
   ROUTE_COLORS,
   ROUTE_STEPS,
   isDarkBasemap,
+  prefersReducedMotion,
   routeColor,
   type BasemapId,
 } from './atlas-config'
@@ -75,6 +76,13 @@ function toLeafletPath(points: [number, number][]): [number, number][] {
   return path
 }
 
+/** Great-circle length of a pair — only used to break ties between equal counts. */
+function routeSpanKm(route: AtlasRoute): number {
+  const [lat1, lng1] = route.path[0]
+  const [lat2, lng2] = route.path[route.path.length - 1]
+  return haversineDistance([lng1, lat1], [lng2, lat2])
+}
+
 // --- COMPONENT ---
 export default function MapPage() {
   const [loading, setLoading] = useState(true)
@@ -85,6 +93,15 @@ export default function MapPage() {
   const [showAirports, setShowAirports] = useState(true)
   const [basemap, setBasemap] = useState<BasemapId>('paper')
   const { toast } = useToast()
+
+  // The arriving flight: which pair the plane flies in on, and a token so the
+  // same pair can be flown again without the state looking unchanged.
+  const [flightKey, setFlightKey] = useState<string | null>(null)
+  const [flightToken, setFlightToken] = useState(0)
+  const fly = useCallback((key: string) => {
+    setFlightKey(key)
+    setFlightToken((token) => token + 1)
+  }, [])
 
   const dark = isDarkBasemap(basemap)
 
@@ -201,6 +218,42 @@ export default function MapPage() {
     })
   }, [routes])
 
+  // --- THE ARRIVING FLIGHT ---
+  /* The pair the plate flies in on: the one you fly most, with the longest hop
+     as the tie-break, so even a fresh log gets a line worth watching. */
+  const signatureRoute = useMemo((): AtlasRoute | null => {
+    if (atlasRoutes.length === 0) return null
+    return [...atlasRoutes].sort(
+      (a, b) => b.count - a.count || routeSpanKm(b) - routeSpanKm(a)
+    )[0]
+  }, [atlasRoutes])
+
+  // Flown once per session, unasked — after that the plane is on call from the
+  // control in the corner and from any pair in the index. The short wait lets
+  // the plate finish settling to your airports before the plane leaves.
+  useEffect(() => {
+    if (!signatureRoute || flightKey || prefersReducedMotion()) return
+    let seen = false
+    try {
+      seen = window.sessionStorage.getItem('atlas-flight') === '1'
+    } catch {
+      // No session storage to remember it by: fly it rather than not at all.
+      seen = false
+    }
+    if (seen) return
+
+    const timer = window.setTimeout(() => {
+      fly(signatureRoute.key)
+      try {
+        window.sessionStorage.setItem('atlas-flight', '1')
+      } catch {
+        /* nothing to remember it by */
+      }
+    }, 700)
+
+    return () => window.clearTimeout(timer)
+  }, [signatureRoute, flightKey, fly])
+
   // --- RENDER ---
   const topRoutes = [...routes].sort((a, b) => b.count - a.count).slice(0, 20)
   const legendColors = dark ? ROUTE_COLORS.dark : ROUTE_COLORS.light
@@ -246,6 +299,171 @@ export default function MapPage() {
           to {
             stroke-dashoffset: -20;
           }
+        }
+
+        /* ---- The arriving flight (ported from the nyc-paris-flight block).
+           Every moving part is an inner element: Leaflet writes the marker's own
+           transform to place it there, so an animation on the marker element
+           itself would fight the map for the plane's position. ---- */
+        .atlas-flight-glow {
+          filter: blur(3px);
+        }
+        .atlas-plane,
+        .atlas-tick,
+        .atlas-doodle,
+        .atlas-pop,
+        .atlas-stamp {
+          background: none;
+          border: 0;
+        }
+        .atlas-plane-tilt,
+        .atlas-plane-scale {
+          display: block;
+          width: 100%;
+          height: 100%;
+          transform-origin: 50% 50%;
+          will-change: transform;
+        }
+        .atlas-plane svg {
+          display: block;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+          filter: drop-shadow(0 3px 3px rgba(23, 19, 14, 0.26));
+        }
+        .atlas-plane-hull {
+          fill: var(--flight-plate);
+          stroke: rgba(23, 19, 14, 0.5);
+          stroke-width: 2;
+        }
+        .atlas-canvas[data-basemap='midnight'] .atlas-plane-hull,
+        .atlas-canvas[data-basemap='satellite'] .atlas-plane-hull {
+          stroke: rgba(242, 236, 225, 0.45);
+        }
+        .atlas-plane-core {
+          fill: var(--flight-ink);
+        }
+        .atlas-plane-dot {
+          fill: var(--flight-plate);
+          opacity: 0.95;
+        }
+        .atlas-plane.is-landing .atlas-plane-scale {
+          animation: atlas-touchdown 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+        }
+        @keyframes atlas-touchdown {
+          0% {
+            transform: scale(1);
+          }
+          30% {
+            transform: scale(1.24);
+          }
+          58% {
+            transform: scale(0.92);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+        .atlas-plane.is-fading,
+        .atlas-doodle.is-fading,
+        .atlas-pop.is-fading {
+          opacity: 0;
+          transition: opacity 620ms ease;
+        }
+
+        /* The ticks the plane prints as it passes */
+        .atlas-tick span {
+          display: block;
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          background: var(--paper);
+          border: 1.5px solid var(--tick-ink, #ce3b1e);
+          box-shadow: 0 1px 2px rgba(23, 19, 14, 0.18);
+          transform-origin: 50% 50%;
+        }
+
+        /* The doodle ring: two scratches of the same pen, closed on arrival */
+        .atlas-doodle svg {
+          display: block;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+        .atlas-doodle path {
+          fill: none;
+          stroke: var(--flight-ring);
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+        .atlas-ring-main {
+          stroke-width: 5.6;
+          filter: drop-shadow(0 1px 2px rgba(23, 19, 14, 0.14));
+        }
+        .atlas-ring-echo {
+          stroke-width: 2.6;
+          opacity: 0.82;
+        }
+
+        .atlas-pop span {
+          display: block;
+          width: 100%;
+          height: 100%;
+          border-radius: 999px;
+          border: 3px solid var(--flight-ring, #ce3b1e);
+          animation: atlas-circle-pop 900ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+        }
+        @keyframes atlas-circle-pop {
+          0% {
+            transform: scale(0.42);
+            opacity: 0.85;
+          }
+          100% {
+            transform: scale(1.25);
+            opacity: 0;
+          }
+        }
+
+        /* Arrival is stamped, not announced */
+        .atlas-stamp-inner {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 6px 4px;
+          background: var(--paper);
+          border: 1px solid var(--vermillion);
+          box-shadow: 2px 2px 0 rgba(23, 19, 14, 0.14);
+          font-family: var(--code);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--ink);
+          white-space: nowrap;
+          transform: translate(22px, -52px) rotate(-3.5deg);
+          transform-origin: 0 50%;
+        }
+        .atlas-stamp-rule {
+          width: 10px;
+          height: 2px;
+          flex: none;
+          background: var(--vermillion);
+        }
+        .atlas-stamp.is-in .atlas-stamp-inner {
+          animation: atlas-stamp-in 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+        }
+        @keyframes atlas-stamp-in {
+          0% {
+            transform: translate(16px, -38px) rotate(-3.5deg) scale(0.84);
+          }
+          100% {
+            transform: translate(22px, -52px) rotate(-3.5deg) scale(1);
+          }
+        }
+        .atlas-stamp.is-out .atlas-stamp-inner {
+          animation: none;
+          opacity: 0;
+          transition: opacity 620ms ease;
         }
 
         /* IATA labels, set as the plate sets them */
@@ -446,6 +664,8 @@ export default function MapPage() {
             basemap={basemap}
             highlighted={highlightedRoute}
             onHighlight={setHighlightedRoute}
+            flightKey={flightKey}
+            flightToken={flightToken}
           />
 
           {loading && (
@@ -495,6 +715,21 @@ export default function MapPage() {
               <MapPin />
               Airports
             </button>
+
+            <button
+              type="button"
+              onClick={() => signatureRoute && fly(signatureRoute.key)}
+              disabled={!signatureRoute}
+              className={`${s.control} ${s.controlQuiet}`}
+              title={
+                signatureRoute
+                  ? `Fly ${signatureRoute.from} → ${signatureRoute.to} again`
+                  : 'No pairs filed yet'
+              }
+            >
+              <PlaneTakeoff />
+              Fly again
+            </button>
           </div>
 
           {/* Routes index — bottom right */}
@@ -516,6 +751,8 @@ export default function MapPage() {
                       onMouseLeave={() => setHighlightedRoute(null)}
                       onFocus={() => setHighlightedRoute(key)}
                       onBlur={() => setHighlightedRoute(null)}
+                      onClick={() => fly(key)}
+                      title={`Fly ${route.from} → ${route.to}`}
                     >
                       <span
                         className={s.indexTick}
