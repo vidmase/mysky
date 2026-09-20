@@ -5,11 +5,12 @@ import { LandingAuthLink } from "./components/landing-auth-link"
 import { ParticleTitle } from "./components/particle-title"
 import s from "./landing.module.css"
 
-/* How fast the hero headline assembles out of particles: 1 = the tuned default,
-   2 = twice as quick, 0.5 = twice as slow. Change it here, set it without a code
-   edit via NEXT_PUBLIC_PARTICLE_SPEED, or try a value live by appending
-   ?pt=<n> to the URL (e.g. /?pt=2). */
-const PARTICLE_SPEED = Number(process.env.NEXT_PUBLIC_PARTICLE_SPEED) || 1
+/* How fast the hero headline assembles out of particles: 1 = the component's
+   base pacing, 2 = twice as quick, 0.5 = twice as slow (the current setting — a
+   slower, more deliberate assembly). Change it here, set it without a code edit
+   via NEXT_PUBLIC_PARTICLE_SPEED, or try a value live by appending ?pt=<n> to
+   the URL (e.g. /?pt=1). */
+const PARTICLE_SPEED = Number(process.env.NEXT_PUBLIC_PARTICLE_SPEED) || 0.5
 
 const NAV = [
   { label: "Log", href: "/flights" },
