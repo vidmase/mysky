@@ -4,13 +4,15 @@ import { format } from "date-fns"
 import { enUS } from "date-fns/locale"
 import { Clock, Plane, RotateCw } from "lucide-react"
 import dynamic from "next/dynamic"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   airlineBrand,
   calculateDuration,
   formatTimeToHHMM,
   getAirlineLogo,
+  legLight,
+  legStanding,
   resolveAirlineCode,
   resolveAirlineName,
 } from "@/app/flights/lib/flight-utils"
@@ -62,14 +64,22 @@ function code(iata?: string | null, airport?: string | null): string {
   return (airport || "").trim().slice(0, 3).toUpperCase() || "???"
 }
 
+/** The letter off a seat: 14A -> A. Null when the row never filed one. */
+function seatLetter(seat?: string | null): string | null {
+  return (seat || "").trim().toUpperCase().match(/([A-F])$/)?.[1] ?? null
+}
+
 /** A window/aisle read off the seat letter. A/F are windows, C/D aisles on a 3-3. */
 function seatKind(seat?: string | null): string | null {
-  const letter = (seat || "").trim().toUpperCase().match(/([A-F])$/)?.[1]
+  const letter = seatLetter(seat)
   if (!letter) return null
   if (letter === "A" || letter === "F") return "Window"
   if (letter === "C" || letter === "D") return "Aisle"
   return "Middle"
 }
+
+/** The six across a narrow-body row, which is the shape the seat letter implies. */
+const ROW_LETTERS = ["A", "B", "C", "D", "E", "F"]
 
 function dash(value?: string | null): string {
   const v = (value || "").trim()
@@ -86,6 +96,9 @@ const PassMap = dynamic(() => import("./PassMap"), { ssr: false })
 
 /* The encoder draws onto a canvas, so it too waits for the browser. */
 const PassCode = dynamic(() => import("./PassCode"), { ssr: false })
+
+/* The link code reads the address off the page, which only exists there. */
+const PassQr = dynamic(() => import("./PassQr"), { ssr: false })
 
 /** Where the atlas puts an airport. Null when it does not hold one. */
 function coordsFor(iata?: string | null, airport?: string | null): Point | null {
@@ -181,6 +194,9 @@ function PassBack({
             <div className={s.label}>Booked</div>
             <div className={s.factValue}>{bookedLabel || "—"}</div>
           </div>
+          {/* The stub's symbol is the pass's own code and a camera will not act
+              on it; this one is a way back to the flight. */}
+          {mapReady && <PassQr flightId={flight.id} />}
         </aside>
       </div>
 
@@ -198,6 +214,7 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
   const brand = airlineBrand(flight.airline, flight.flight_number)
   const carrier = resolveAirlineName(flight.airline, flight.flight_number) || "Unknown airline"
   const kind = seatKind(flight.seat)
+  const letter = seatLetter(flight.seat)
 
   // The mark is what makes the card read as that airline's ticket, but the
   // logo host answers for carriers it knows and 404s for the rest, so the
@@ -206,6 +223,15 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
   const [logoBroken, setLogoBroken] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [turned, setTurned] = useState(false)
+  const [standing, setStanding] = useState<string | null>(null)
+
+  /* The sky the leg left in. It comes off the row alone, so unlike the strip
+     below it there is no clock to disagree about between server and browser. */
+  const light = legLight({
+    departureDate: flight.departure_date,
+    departureTime: flight.departure_time,
+    departureIata: flight.departure_iata,
+  })
 
   const payload = buildBcbp({
     passenger: flight.passenger_name,
@@ -217,6 +243,40 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
     departureDate: flight.departure_date,
     seat: flight.seat,
   })
+
+  /* What the clock says about this leg. "Now" is not the same on the server as
+     in the browser, so it is read after the card has mounted rather than
+     rendered twice and disagreeing with itself, and kept current while the page
+     stays open — "departs in 3 hours" goes stale sitting there. */
+  useEffect(() => {
+    const read = () =>
+      setStanding(
+        legStanding(
+          {
+            departureDate: flight.departure_date,
+            departureTime: flight.departure_time,
+            arrivalDate: flight.arrival_date,
+            arrivalTime: flight.arrival_time,
+            departureIata: flight.departure_iata,
+            arrivalIata: flight.arrival_iata,
+            cancelled: flight.cancelled,
+          },
+          new Date()
+        )
+      )
+
+    read()
+    const tick = window.setInterval(read, 60_000)
+    return () => window.clearInterval(tick)
+  }, [
+    flight.departure_date,
+    flight.departure_time,
+    flight.arrival_date,
+    flight.arrival_time,
+    flight.departure_iata,
+    flight.arrival_iata,
+    flight.cancelled,
+  ])
 
   const date = flight.departure_date ? new Date(flight.departure_date) : null
   const dateLabel =
@@ -248,6 +308,7 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
     <div className={s.scene}>
       <article
         className={`${s.pass} ${flipped ? s.flipped : ""} ${flight.cancelled ? s.cancelled : ""}`}
+        data-light={light ?? undefined}
         style={
           {
             "--band": brand.band,
@@ -332,7 +393,25 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
             <div>
               <div className={s.label}>Seat</div>
               <div className={s.factValue}>{dash(flight.seat)}</div>
-              {kind && <span className={s.chip}>{kind}</span>}
+              {/* The row drawn rather than the word printed: six across with the
+                  gangway between C and D, which is what the letter already
+                  says. The word itself goes to anyone who cannot see it. */}
+              {letter && kind && (
+                <span
+                  className={s.seatPlan}
+                  role="img"
+                  aria-label={`${kind} seat, ${letter} of six across`}
+                >
+                  {ROW_LETTERS.map((l) => (
+                    <span
+                      key={l}
+                      className={`${s.seatCell} ${l === letter ? s.seatCellFlown : ""} ${
+                        l === "C" ? s.seatCellAisle : ""
+                      }`}
+                    />
+                  ))}
+                </span>
+              )}
             </div>
             <div>
               <div className={s.label}>Fare</div>
@@ -367,11 +446,12 @@ export function BoardingPass({ flight }: { flight: PassFlight }) {
       </div>
 
       <footer className={s.foot}>
-        {/* A real pass prints the bag allowance here; the log does not hold it,
-            so the strip carries only what is true of every departure. */}
+        {/* A real pass prints the bag allowance here. The log does not hold it,
+            but it does know where the leg sits against the clock, which is true
+            of this flight rather than of every departure. */}
         <span className={s.footItem}>
           <Clock size={14} aria-hidden="true" />
-          Be at the gate before departure
+          {standing ?? "Be at the gate before departure"}
         </span>
         <span className={s.footBrand}>{brand.tagline}</span>
         {flip("front")}

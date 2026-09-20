@@ -326,9 +326,19 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     const fetchFlightData = async () => {
+      let leaving = false
       try {
         setLoading(true)
         const response = await fetch(`/api/flights/${id}`)
+        // A flight can be opened by someone who is not signed in here — the code
+        // on the back of the pass is meant to be scanned on a phone that never
+        // has been — so the visitor is sent to sign in and brought back to this
+        // flight, rather than shown the status code and a way back to nowhere.
+        if (response.status === 401) {
+          leaving = true
+          router.replace(`/auth?next=${encodeURIComponent(`/flights/${id}`)}`)
+          return
+        }
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -339,12 +349,14 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
         console.error('Error:', err)
         setError(err instanceof Error ? err.message : 'Failed to load flight')
       } finally {
-        setLoading(false)
+        // The page keeps loading while the browser is on its way to the sign-in
+        // form; letting it finish would flash "Flight not found" on the way out.
+        if (!leaving) setLoading(false)
       }
     }
 
     fetchFlightData()
-  }, [id])
+  }, [id, router])
 
   // A return is filed as one row per leg sharing a reservation reference, so the
   // other legs come from the same list the logbook reads and are grouped by the
