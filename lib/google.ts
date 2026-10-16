@@ -5,24 +5,41 @@ import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-serv
 
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
+/** Resolve Gmail OAuth redirect URI. Never use localhost while running on Vercel. */
+export function resolveGmailRedirectUri(explicit?: string): string {
+  if (explicit) return explicit
+
+  const onVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV)
+  const envUri = process.env.GOOGLE_REDIRECT_URI?.trim()
+  const envIsLocalhost = !!envUri && /localhost|127\.0\.0\.1/i.test(envUri)
+
+  // Prefer explicit env, but ignore localhost redirects on Vercel deploys
+  if (envUri && !(onVercel && envIsLocalhost)) {
+    return envUri
+  }
+
+  const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.replace(/^https?:\/\//, '')
+  if (productionHost) {
+    return `https://${productionHost}/api/gmail/callback`
+  }
+
+  if (onVercel && process.env.VERCEL_ENV === 'production') {
+    return 'https://mysky.vercel.app/api/gmail/callback'
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/gmail/callback`
+  }
+
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  return `${baseUrl.replace(/\/+$/, '')}/api/gmail/callback`
+}
+
 export function createOAuth2Client(redirectUri?: string): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
 
-  // Determine redirect URI based on environment
-  let redirect = redirectUri
-  if (!redirect) {
-    // First try to use the explicit redirect URI from environment
-    if (process.env.GOOGLE_REDIRECT_URI) {
-      redirect = process.env.GOOGLE_REDIRECT_URI
-    } else {
-      // Fallback to dynamic calculation
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXTAUTH_URL || 'http://localhost:3000'
-      redirect = `${baseUrl}/api/gmail/callback`
-    }
-  }
+  const redirect = resolveGmailRedirectUri(redirectUri)
 
   // Log the redirect URI for debugging (remove in production)
   console.log('Google OAuth Redirect URI:', redirect)
