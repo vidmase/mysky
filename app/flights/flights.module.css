@@ -1266,3 +1266,259 @@
     font-size: 0.625rem;
   }
 }
+
+/* ============================================================
+   LIGHT — the flights page in the light logbook design
+   (design/light-logbook). Everything above still describes the
+   layout; this block only re-skins it: the palette is swapped on
+   .page, so every var() above follows, and the few shapes that
+   carried the paper look (hairline ledger, underline search,
+   square table) become white rounded surfaces. Scoped to .page,
+   so the rest of the app keeps the paper stock.
+   ============================================================ */
+.page {
+  --paper: #f6f7f9;
+  --paper-2: #ffffff;
+  --paper-3: #f1f3f6;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #94a3b8;
+  --rule: #e6e9ef;
+  --rule-strong: #d5dae3;
+  /* one accent: the old vermillion's decorative uses become blue */
+  --vermillion: #2563eb;
+  --vermillion-dk: #1d4ed8;
+  --wash-accent: rgba(37, 99, 235, 0.08);
+  --wash-accent-2: rgba(37, 99, 235, 0.16);
+  --display: var(--body);
+  /* status colours keep their meaning instead of following the accent */
+  --late: #b91c1c;
+  --late-soft: #fdecec;
+  --warn: #b45309;
+  --warn-soft: #fdf3e4;
+  --lt-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --lt-shadow-lift: 0 12px 32px -12px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --lt-radius: 20px;
+
+  /* shadcn guests inside the page (filter panel, selects) */
+  --background: 220 20% 97%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 220 20% 95%;
+  --muted-foreground: 215 19% 35%;
+  --accent: 220 20% 95%;
+  --accent-foreground: 222 47% 11%;
+  --border: 220 20% 92%;
+  --input: 220 20% 90%;
+  --ring: 221 83% 53%;
+
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ---- type: sans headings, readable micro-labels ---- */
+.page .title {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.page .title em {
+  font-style: normal;
+  font-weight: 700;
+  /* one accent, used sparingly: not on the headline */
+  color: inherit;
+}
+.page .lede {
+  font-size: 1.0625rem;
+}
+.page .tag,
+.page .ledgerLabel,
+.page .table thead th,
+.page .cardField dt,
+.page .stubLabel {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+}
+
+/* ---- buttons: pills ---- */
+.page .btnPrimary,
+.page .btnOutline {
+  border-radius: 999px;
+  min-height: 44px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+.page .btnPrimary {
+  color: #fff;
+}
+.page .btnPrimary:hover {
+  background: var(--vermillion-dk);
+  box-shadow: 0 8px 20px -8px rgba(37, 99, 235, 0.55);
+}
+.page .btnOutline {
+  background: var(--paper-2);
+  border-color: var(--rule);
+}
+.page .btnOutline:hover {
+  background: var(--paper-2);
+  box-shadow: var(--lt-shadow);
+}
+
+/* ---- ledger → stat tiles ---- */
+.page .ledger {
+  gap: 1rem;
+  border: 0;
+}
+.page .ledgerCell,
+.page .ledgerCell:first-child {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--lt-radius);
+  box-shadow: var(--lt-shadow);
+  padding: 1.25rem 1.5rem;
+}
+.page .ledgerValue {
+  margin-top: 0.4rem;
+}
+
+/* ---- search: a pill field ---- */
+.page .search {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0 1rem;
+  min-height: 44px;
+  align-items: center;
+}
+.page .search:focus-within {
+  border-color: var(--vermillion);
+  box-shadow: 0 0 0 3px var(--wash-accent);
+}
+.page .filing :global(.rounded-lg),
+.page .filing :global(.rounded-md),
+.page .filing :global(.rounded-xl) {
+  border-radius: 14px;
+}
+/* the filter panel's hard-coded Tailwind "flight" red */
+.page .filing :global(.border-t-flight) {
+  border-top-color: var(--vermillion);
+}
+.page .filing :global(.text-flight) {
+  color: var(--ink-3);
+}
+.page .filing :global(button),
+.page .filing :global(input),
+.page .filing :global([role="combobox"]) {
+  border-radius: 999px;
+}
+
+/* ---- table: a white rounded surface ---- */
+.page .tableWrap {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--lt-radius);
+  box-shadow: var(--lt-shadow);
+}
+.page .table thead th {
+  background: var(--paper-3);
+  border-bottom-color: var(--rule);
+}
+.page .table thead th:first-child,
+.page .row td:first-child {
+  padding-left: 1.5rem;
+}
+.page .table thead th:last-child,
+.page .row td:last-child {
+  padding-right: 1.5rem;
+}
+.page .row:hover {
+  background: #fafbfc;
+}
+.page .logo,
+.page .ref {
+  background: var(--paper-3);
+}
+
+/* ---- delay chips: status colours, not the accent ---- */
+.page .chip {
+  border-radius: 999px;
+}
+.page .chipLate {
+  color: var(--late);
+  background: var(--late-soft);
+  border-color: transparent;
+}
+.page .chipEarly,
+.page .chipOnTime {
+  border-color: transparent;
+}
+
+/* ---- phone cards: the boarding pass, on white ---- */
+.page .card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--lt-radius);
+  box-shadow: var(--lt-shadow);
+  overflow: hidden;
+}
+.page .card:hover {
+  box-shadow: var(--lt-shadow-lift);
+}
+.page .cardMain {
+  border-right-color: var(--rule-strong);
+}
+.page .cardHead {
+  border-bottom-color: var(--rule);
+}
+.page .cardStub {
+  background: var(--paper-3);
+}
+.page .notch {
+  box-shadow: none;
+}
+.page .barcode {
+  opacity: 0.35;
+}
+
+/* ---- cancelled: amber, so it never reads as the accent ---- */
+.page .cancelledTag {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 999px;
+}
+.page .cancelled::after {
+  color: var(--warn);
+  border-color: var(--warn);
+  border-radius: 8px;
+}
+.page .cancelledPaid {
+  color: var(--warn);
+}
+
+/* ---- pagination + icon buttons ---- */
+.page .pageBtn,
+.page .iconBtn {
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.page .pageBtnActive {
+  background: var(--ink);
+}
+
+@media (max-width: 640px) {
+  /* the mobile ledger rule above strips the tile; put it back */
+  .page .ledger {
+    gap: 0.75rem;
+  }
+  .page .ledgerCell,
+  .page .ledgerCell:first-child {
+    border: 1px solid var(--rule);
+    padding: 1rem 1.25rem;
+  }
+}
