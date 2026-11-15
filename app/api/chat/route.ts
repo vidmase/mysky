@@ -2,12 +2,13 @@ import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, modelCanUseTools, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { SCAN_EMAIL_TOOL, describeScanForModel, scanEmailForFlights, type ScanOutcome } from '@/lib/chat-email-scan'
-import { flightKey } from '@/lib/flight-validity'
 import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { NextResponse } from 'next/server'
 import { getUserStats } from "../../../src/lib/services/stats"
 
 export const dynamic = 'force-dynamic'
+// An email scan can read a few hundred emails before the model answers.
+export const maxDuration = 60
 
 interface UserStats {
   totalFlights: number
@@ -262,7 +263,7 @@ A flight marked CANCELLED was paid for but never flown. Leave its fare out of an
 
 The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.${modelCanUseTools(selectedModel) ? `
 
-You can also look through the user's Gmail for flights that are not in the record yet, with the scan_email_for_flights tool. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.` : ''}`
+You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations in Gmail, with the scan_email_for_flights tool, to find flights that are not in the record yet. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.` : ''}`
 
     // --- LOGGING for debugging ---
 
@@ -374,11 +375,7 @@ You can also look through the user's Gmail for flights that are not in the recor
     if (toolCall?.function?.name === 'scan_email_for_flights') {
       let args: Record<string, unknown> = {}
       try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { }
-      scan = await scanEmailForFlights(
-        request,
-        args,
-        new Set(allFlights.map((f: any) => flightKey(f.departure_date, f.flight_number)))
-      )
+      scan = await scanEmailForFlights(userId, args)
       const followUp = await callDeepSeek([
         ...baseMessages,
         data.choices[0].message,
