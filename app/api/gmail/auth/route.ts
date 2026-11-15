@@ -5,6 +5,6 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function GET() {
-  const url = getAuthUrl()
+  const url = await getAuthUrl()
   return NextResponse.redirect(url)
 }

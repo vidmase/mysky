@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createOAuth2Client, saveRefreshTokenToUser } from '@/lib/google'
+import { createOAuth2Client, decodeOAuthState, safeReturnOrigin, saveRefreshTokenToUser } from '@/lib/google'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -8,8 +8,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
-  if (error) return NextResponse.redirect(new URL('/add-flight?gmail=error', url.origin))
-  if (!code) return NextResponse.redirect(new URL('/add-flight?gmail=missing_code', url.origin))
+  // Who is connecting and where they started, carried through Google in the
+  // sealed state, so this works without a session on the callback's domain.
+  const state = decodeOAuthState(url.searchParams.get('state'))
+  const back = safeReturnOrigin(state?.returnOrigin, url.origin)
+  if (error) return NextResponse.redirect(new URL('/add-flight?gmail=error', back))
+  if (!code) return NextResponse.redirect(new URL('/add-flight?gmail=missing_code', back))
 
   try {
     const oAuth2 = createOAuth2Client()
@@ -29,10 +33,10 @@ export async function GET(request: Request) {
           // ignore
         }
       }
-      await saveRefreshTokenToUser(refresh, email)
+      await saveRefreshTokenToUser(refresh, email, state?.dbUserId)
     }
     // Redirect back; if no refresh token returned (already granted), user can still fetch messages
-    return NextResponse.redirect(new URL('/add-flight?gmail=connected', url.origin))
+    return NextResponse.redirect(new URL('/add-flight?gmail=connected', back))
   } catch (e: any) {
     console.error('[Gmail OAuth Callback] Token exchange failed:', e?.message || e)
 
@@ -49,6 +53,6 @@ export async function GET(request: Request) {
       // ignore
     }
 
-    return NextResponse.redirect(new URL('/add-flight?gmail=exchange_failed', url.origin))
+    return NextResponse.redirect(new URL('/add-flight?gmail=exchange_failed', back))
   }
 }
