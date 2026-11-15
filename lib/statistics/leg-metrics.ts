@@ -3,6 +3,7 @@
 // hours and currency wherever it is counted.
 
 import { allAirports } from '@/lib/airports'
+import { calculateTZDurationMinutes } from './calculator'
 
 export const AIRPORT_BY_IATA = new Map(
   allAirports.map((a) => [a.iata.toUpperCase(), a])
@@ -21,6 +22,8 @@ export function countryForIata(iata?: string | null, fallback?: string | null): 
 export function parseDurationHours(raw?: string | null): number | null {
   if (!raw) return null
   const s = String(raw).trim()
+  // "-19h -50m" is an arrival clock time earlier than the departure's, not nineteen hours aloft.
+  if (s.startsWith('-')) return null
   const hm = s.match(/(\d+)\s*h(?:ours?)?\s*(\d+)?\s*m?/i)
   if (hm) {
     const h = Number(hm[1]) || 0
@@ -34,18 +37,40 @@ export function parseDurationHours(raw?: string | null): number | null {
   return null
 }
 
-export function detectMoneyPrefix(receipts: Array<string | null | undefined>): string {
-  let gbp = 0, eur = 0, usd = 0
-  for (const r of receipts) {
-    if (!r) continue
-    if (r.includes("£") || /gbp/i.test(r)) gbp++
-    else if (r.includes("€") || /eur/i.test(r)) eur++
-    else if (r.includes("$") || /usd/i.test(r)) usd++
+/**
+ * The legs that were actually flown, each once. The log holds rows, and a row
+ * is not always a flight: a cancelled leg stays on file for its fare, and one
+ * flight can be filed several times over — a second receipt for bags or seats
+ * bought later, or a companion's booking on the same aircraft. Counting rows
+ * would put flights, kilometres and hours into the totals that never happened.
+ * Fares are a separate matter and are still read from every row.
+ */
+export function flownLegs<
+  T extends {
+    id: string | number
+    cancelled?: boolean | null
+    flight_number?: string | null
+    departure_date?: string | null
+    departure_iata?: string | null
+    arrival_iata?: string | null
   }
-  if (gbp >= eur && gbp >= usd && gbp > 0) return "£"
-  if (eur >= usd && eur > 0) return "€"
-  if (usd > 0) return "$"
-  return "£" // MySky default
+>(flights: T[]): T[] {
+  const seen = new Set<string>()
+  const legs: T[] = []
+  for (const f of flights) {
+    if (f.cancelled === true) continue
+    const number = (f.flight_number || '').replace(/\s+/g, '').toUpperCase()
+    const date = (f.departure_date || '').slice(0, 10)
+    // Without a flight number and a date there is nothing to tell two flights on
+    // the same route apart, so such a row always stands as its own leg.
+    const key = number && date
+      ? `${date}|${number}|${(f.departure_iata || '').toUpperCase()}|${(f.arrival_iata || '').toUpperCase()}`
+      : `row:${f.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    legs.push(f)
+  }
+  return legs
 }
 
 export const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
@@ -64,13 +89,32 @@ export type LegHours = {
   implausible: number | null
 }
 
-/** Recorded duration when it is plausible, otherwise the great-circle estimate. */
+/**
+ * Hours aloft for one leg. The departure and arrival times are each local to
+ * their own airport, so the elapsed time is worked out across the two time
+ * zones: Bristol 06:15 to Kaunas 11:00 is 2h45, not the 4h45 on the clocks.
+ * A duration stored on the row was filed as that plain clock difference, so it
+ * is only read when a time or a time zone is missing; an implausible result
+ * from either falls back to the great-circle estimate.
+ */
 export function legHours(
-  durations: { flight_duration?: string | null; calculated_duration?: string | null },
+  leg: {
+    flight_duration?: string | null
+    calculated_duration?: string | null
+    departure_iata?: string | null
+    arrival_iata?: string | null
+    departure_date?: string | null
+    arrival_date?: string | null
+    departure_time?: string | null
+    arrival_time?: string | null
+  },
   distanceKm: number | null
 ): LegHours {
+  const elapsed = calculateTZDurationMinutes(leg)
   const recorded =
-    parseDurationHours(durations.flight_duration) ?? parseDurationHours(durations.calculated_duration)
+    elapsed != null
+      ? elapsed / 60
+      : parseDurationHours(leg.flight_duration) ?? parseDurationHours(leg.calculated_duration)
   const plausible = recorded != null && recorded > 0 && recorded <= MAX_LEG_HOURS ? recorded : null
   return {
     hours: plausible ?? (distanceKm != null ? deriveDurationHours(distanceKm) : null),

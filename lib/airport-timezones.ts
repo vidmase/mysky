@@ -128,4 +128,15 @@ export const AIRPORT_TIMEZONES: Record<string, string> = {
 
   // Iceland
   KEF: "Atlantic/Reykjavik",
+  // Airports that appear in logs but were missing here; without a zone a leg's
+  // duration silently falls back to the plain clock difference.
+  SEN: "Europe/London",
+  LBA: "Europe/London",
+  TFS: "Atlantic/Canary",
+  LPA: "Atlantic/Canary",
+  GRO: "Europe/Madrid",
+  CIA: "Europe/Rome",
+  PFO: "Asia/Nicosia",
+  CFU: "Europe/Athens",
+  HRG: "Africa/Cairo",
 }

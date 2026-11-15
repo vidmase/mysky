@@ -112,7 +112,14 @@ function calculateNaiveDurationMinutes(departureTime: string, arrivalTime: strin
  * Calculate timezone-aware duration in minutes using IATA timezones and dates.
  * Falls back to naive minutes when data insufficient.
  */
-function calculateTZDurationMinutes(f: FlightData): number | undefined {
+export function calculateTZDurationMinutes(f: {
+  departure_iata?: string | null
+  arrival_iata?: string | null
+  departure_date?: string | null
+  arrival_date?: string | null
+  departure_time?: string | null
+  arrival_time?: string | null
+}): number | undefined {
   try {
     const depIata = f.departure_iata?.toUpperCase() || undefined
     const arrIata = f.arrival_iata?.toUpperCase() || undefined

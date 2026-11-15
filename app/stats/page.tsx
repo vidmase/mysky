@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useToast } from '@/hooks/use-toast'
 import Link from "next/link"
 import { RefreshCcw, Sparkles } from "lucide-react"
@@ -19,11 +19,11 @@ import {
   Area,
 } from "recharts"
 import { PaperNav } from "@/app/components/paper-nav"
-import { groupFlightsIntoBookings } from "@/lib/statistics/booking-spend"
+import { formatMoney, groupFlightsIntoBookings, MONEY_SYMBOL, type ReceiptCurrency } from "@/lib/statistics/booking-spend"
 import {
   AIRPORT_BY_IATA,
   countryForIata,
-  detectMoneyPrefix,
+  flownLegs,
   legHours,
 } from "@/lib/statistics/leg-metrics"
 import s from "./stats.module.css"
@@ -44,6 +44,8 @@ type Flight = {
   arrival_longitude?: number | string | null
   departure_time?: string | null
   arrival_time?: string | null
+  arrival_date?: string | null
+  flight_number?: string | null
   reservation_number?: string | null
   total_receipt?: string | null
   extras_receipt?: string | null
@@ -202,6 +204,7 @@ export default function StatsPage() {
             arrival_country: countryForIata(arrIata, f.arrival_country),
             departure_date: f.departure_date || null,
             airline: f.airline || null,
+            flight_number: f.flight_number || null,
             departure_iata: depIata,
             arrival_iata: arrIata,
             departure_airport: f.departure_airport || depMeta?.name || null,
@@ -212,6 +215,7 @@ export default function StatsPage() {
             arrival_longitude: arrLon != null && !Number.isNaN(arrLon) ? arrLon : null,
             departure_time: f.departure_time || null,
             arrival_time: f.arrival_time || null,
+            arrival_date: f.arrival_date || null,
             reservation_number: f.reservation_number || null,
             total_receipt: f.total_receipt || null,
             extras_receipt: f.extras_receipt || null,
@@ -246,11 +250,14 @@ export default function StatsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Counts, distance and hours are of legs flown; fares are read from every row filed.
+  const legs = useMemo(() => flownLegs(flights), [flights])
+
   // Process chart data
   const chartData = useMemo(() => {
     // Airlines
     const byAirline = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       const k = f.airline || "Unknown"
       byAirline.set(k, (byAirline.get(k) || 0) + 1)
     }
@@ -276,7 +283,7 @@ export default function StatsPage() {
 
     // Years
     const byYear = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (!f.departure_date) continue
       try {
         const date = new Date(f.departure_date)
@@ -293,7 +300,7 @@ export default function StatsPage() {
 
     // Months
     const byMonth = new Map<number, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (!f.departure_date) continue
       try {
         const date = new Date(f.departure_date)
@@ -312,7 +319,7 @@ export default function StatsPage() {
 
     // Countries
     const countryCounts = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_country) countryCounts.set(f.departure_country, (countryCounts.get(f.departure_country) || 0) + 1)
       if (f.arrival_country) countryCounts.set(f.arrival_country, (countryCounts.get(f.arrival_country) || 0) + 1)
     }
@@ -323,7 +330,7 @@ export default function StatsPage() {
 
     // Top airports
     const airportCounts = new Map<string, { count: number; name: string }>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata) {
         const prev = airportCounts.get(f.departure_iata) || { count: 0, name: f.departure_airport || '' }
         airportCounts.set(f.departure_iata, { count: prev.count + 1, name: prev.name || f.departure_airport || '' })
@@ -340,7 +347,7 @@ export default function StatsPage() {
 
     // Top routes
     const routeCounts = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata && f.arrival_iata) {
         const key = `${f.departure_iata} → ${f.arrival_iata}`
         routeCounts.set(key, (routeCounts.get(key) || 0) + 1)
@@ -361,65 +368,78 @@ export default function StatsPage() {
       (b): b is typeof b & { total: number } => b.total != null && !b.cancelled
     )
 
-    // Spending by year
-    const spendingByYear = new Map<string, { total: number; count: number }>()
+    // Fares are filed in pounds, euros and, before the euro, litas and lats.
+    // They are different money, so each currency keeps its own ledger and its
+    // own figures, and nothing is ever added across them.
+    const bookingsByCurrency = new Map<ReceiptCurrency, typeof pricedBookings>()
     for (const b of pricedBookings) {
-      if (!b.departure_date) continue
-      const date = new Date(b.departure_date)
-      if (isNaN(date.getTime())) continue
-      const y = date.getFullYear().toString()
-      const existing = spendingByYear.get(y) || { total: 0, count: 0 }
-      spendingByYear.set(y, { total: existing.total + b.total, count: existing.count + 1 })
+      const group = bookingsByCurrency.get(b.currency)
+      if (group) group.push(b)
+      else bookingsByCurrency.set(b.currency, [b])
     }
-    const spendingByYearData = Array.from(spendingByYear.entries())
-      .map(([year, data]) => ({ year, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
-      .sort((a, b) => a.year.localeCompare(b.year))
 
-    // Spending by airline
-    const spendingByAirline = new Map<string, { total: number; count: number }>()
-    for (const b of pricedBookings) {
-      const airline = b.airline
-      if (!airline) continue
-      const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
-      spendingByAirline.set(airline, { total: existing.total + b.total, count: existing.count + 1 })
-    }
-    const spendingByAirlineData = Array.from(spendingByAirline.entries())
-      .map(([airline, data]) => ({ airline, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10)
-
-    // Calculate total spending
-    let totalSpent = 0
-    let minPrice = Infinity
-    let maxPrice = 0
-    // Extras are a slice of totalSpent, not a sum alongside it: the fare on the
-    // confirmation already includes the seats and bags. So this is counted to be
-    // reported as "of which", and never added to the total.
-    let totalExtras = 0
-    let bookingsWithExtras = 0
-
-    for (const b of pricedBookings) {
-      totalSpent += b.total
-      minPrice = Math.min(minPrice, b.total)
-      maxPrice = Math.max(maxPrice, b.total)
-      if (b.extras != null) {
-        totalExtras += b.extras
-        bookingsWithExtras++
+    const spendingStats = Array.from(bookingsByCurrency.entries()).map(([currency, bookings]) => {
+      // Spending by year
+      const spendingByYear = new Map<string, { total: number; count: number }>()
+      for (const b of bookings) {
+        if (!b.departure_date) continue
+        const date = new Date(b.departure_date)
+        if (isNaN(date.getTime())) continue
+        const y = date.getFullYear().toString()
+        const existing = spendingByYear.get(y) || { total: 0, count: 0 }
+        spendingByYear.set(y, { total: existing.total + b.total, count: existing.count + 1 })
       }
-    }
-    const bookingsWithPrice = pricedBookings.length
+      const spendingByYearData = Array.from(spendingByYear.entries())
+        .map(([year, data]) => ({ year, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
+        .sort((a, b) => a.year.localeCompare(b.year))
 
-    const spendingStats = {
-      totalSpent: Math.round(totalSpent * 100) / 100,
-      totalExtras: Math.round(totalExtras * 100) / 100,
-      bookingsWithExtras,
-      bookingsWithPrice,
-      avgPerBooking: bookingsWithPrice > 0 ? Math.round((totalSpent / bookingsWithPrice) * 100) / 100 : 0,
-      minPrice: minPrice === Infinity ? 0 : Math.round(minPrice * 100) / 100,
-      maxPrice: Math.round(maxPrice * 100) / 100,
-      spendingByYear: spendingByYearData,
-      spendingByAirline: spendingByAirlineData
-    }
+      // Spending by airline
+      const spendingByAirline = new Map<string, { total: number; count: number }>()
+      for (const b of bookings) {
+        const airline = b.airline
+        if (!airline) continue
+        const existing = spendingByAirline.get(airline) || { total: 0, count: 0 }
+        spendingByAirline.set(airline, { total: existing.total + b.total, count: existing.count + 1 })
+      }
+      const spendingByAirlineData = Array.from(spendingByAirline.entries())
+        .map(([airline, data]) => ({ airline, total: Math.round(data.total * 100) / 100, count: data.count, avg: Math.round((data.total / data.count) * 100) / 100 }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10)
+
+      // Calculate total spending
+      let totalSpent = 0
+      let minPrice = Infinity
+      let maxPrice = 0
+      // Extras are a slice of totalSpent, not a sum alongside it: the fare on the
+      // confirmation already includes the seats and bags. So this is counted to be
+      // reported as "of which", and never added to the total.
+      let totalExtras = 0
+      let bookingsWithExtras = 0
+
+      for (const b of bookings) {
+        totalSpent += b.total
+        minPrice = Math.min(minPrice, b.total)
+        maxPrice = Math.max(maxPrice, b.total)
+        if (b.extras != null) {
+          totalExtras += b.extras
+          bookingsWithExtras++
+        }
+      }
+      const bookingsWithPrice = bookings.length
+
+      return {
+        currency,
+        totalSpent: Math.round(totalSpent * 100) / 100,
+        totalExtras: Math.round(totalExtras * 100) / 100,
+        bookingsWithExtras,
+        bookingsWithPrice,
+        avgPerBooking: bookingsWithPrice > 0 ? Math.round((totalSpent / bookingsWithPrice) * 100) / 100 : 0,
+        minPrice: minPrice === Infinity ? 0 : Math.round(minPrice * 100) / 100,
+        maxPrice: Math.round(maxPrice * 100) / 100,
+        spendingByYear: spendingByYearData,
+        spendingByAirline: spendingByAirlineData
+      }
+    }).sort((a, b) => b.bookingsWithPrice - a.bookingsWithPrice)
 
     return {
       airlineData,
@@ -431,11 +451,11 @@ export default function StatsPage() {
       topRoutes,
       spendingStats,
     }
-  }, [flights])
+  }, [flights, legs])
 
   // Calculate stats
   const calculatedStats = useMemo(() => {
-    if (!flights.length) return null
+    if (!legs.length) return null
 
     const num = (v: unknown) => (v == null ? undefined : Number(v))
     const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -454,7 +474,7 @@ export default function StatsPage() {
     let totalKm = 0
     let totalHours = 0
 
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata) airportSet.add(f.departure_iata)
       if (f.arrival_iata) airportSet.add(f.arrival_iata)
       if (f.departure_country) countrySet.add(f.departure_country)
@@ -490,7 +510,7 @@ export default function StatsPage() {
     }
 
     // Calculate years of flying
-    const years = flights
+    const years = legs
       .map(f => {
         if (!f.departure_date) return 0
         try {
@@ -504,7 +524,7 @@ export default function StatsPage() {
     const yearsFlying = years.length ? Math.max(...years) - Math.min(...years) + 1 : 0
 
     return {
-      totalFlights: flights.length,
+      totalFlights: legs.length,
       totalAirports: airportSet.size,
       totalCountries: countrySet.size,
       totalRoutes: routeSet.size,
@@ -513,7 +533,7 @@ export default function StatsPage() {
       yearsFlying,
       earthCircumnavigations: totalKm / 40075
     }
-  }, [flights])
+  }, [flights, legs])
 
   const viewStats = stats ?? calculatedStats
 
@@ -530,13 +550,7 @@ export default function StatsPage() {
     return `${h}h ago`
   }
 
-  const moneyPrefix = useMemo(
-    () => detectMoneyPrefix(flights.map((f) => f.total_receipt)),
-    [flights]
-  )
-
-  const money = (v: number) =>
-    `${moneyPrefix}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const money = formatMoney
 
   // Every figure hands its hover state to the same printed card.
   const LegTooltip = ({ active, payload, label }: any) => {
@@ -550,15 +564,15 @@ export default function StatsPage() {
     )
   }
 
-  const SpendTooltip = ({ active, payload }: any) => {
+  const SpendTooltip = ({ active, payload, currency }: any) => {
     if (!active || !payload?.length) return null
     const d = payload[0].payload as { year: string; total: number; count: number; avg: number }
     return (
       <div className={s.tip}>
         <div className={s.tipLabel}>{d.year}</div>
-        <div className={s.tipValue}>{money(d.total)}</div>
+        <div className={s.tipValue}>{money(d.total, currency)}</div>
         <div className={s.tipNote}>
-          {d.count} {d.count === 1 ? 'booking' : 'bookings'} · {money(d.avg)} each
+          {d.count} {d.count === 1 ? 'booking' : 'bookings'} · {money(d.avg, currency)} each
         </div>
       </div>
     )
@@ -566,7 +580,6 @@ export default function StatsPage() {
 
   const spend = chartData.spendingStats
   const maxAirport = chartData.topAirports[0]?.count || 1
-  const maxAirlineSpend = spend.spendingByAirline[0]?.total || 1
   const maxCountry = chartData.countryData[0]?.visits || 1
 
   return (
@@ -586,7 +599,7 @@ export default function StatsPage() {
               What it all <em>adds up to</em>
             </h1>
             <p className={`${s.lede} ${s.rise}`} style={{ animationDelay: '200ms' }}>
-              {viewStats?.yearsFlying || 0} years of flying, {flights.length} legs filed.
+              {viewStats?.yearsFlying || 0} years of flying, {legs.length} legs flown.
               Distance uses great-circle airport coordinates. Hours prefer recorded
               flight duration when available, otherwise a distance-based estimate.
             </p>
@@ -826,56 +839,58 @@ export default function StatsPage() {
             </div>
 
             {/* ── SPENDING ────────────────────────────────── */}
-            {spend.bookingsWithPrice > 0 && (
-              <>
+            {spend.map((sp) => {
+              const tag = spend.length > 1 ? ` · ${sp.currency}` : ''
+              return (
+              <Fragment key={sp.currency}>
                 <dl className={s.money}>
                   <div className={s.moneyCell}>
-                    <dt className={s.moneyLabel}>Total spent</dt>
-                    <dd className={s.moneyValue}>{money(spend.totalSpent)}</dd>
+                    <dt className={s.moneyLabel}>Total spent{tag}</dt>
+                    <dd className={s.moneyValue}>{money(sp.totalSpent, sp.currency)}</dd>
                     {/* Extras come out of this figure, not on top of it, so they read
                         as a share of it rather than as a fifth column of their own. */}
-                    {spend.totalExtras > 0 && (
+                    {sp.totalExtras > 0 && (
                       <dd className={s.moneyOfWhich}>
-                        of which <strong>{money(spend.totalExtras)}</strong> on extras
+                        of which <strong>{money(sp.totalExtras, sp.currency)}</strong> on extras
                         <span className={s.moneyShare}>
-                          {((spend.totalExtras / spend.totalSpent) * 100).toFixed(1)}%
+                          {((sp.totalExtras / sp.totalSpent) * 100).toFixed(1)}%
                         </span>
                       </dd>
                     )}
                     <dd className={s.moneyNote}>
-                      across {spend.bookingsWithPrice} {spend.bookingsWithPrice === 1 ? 'booking' : 'bookings'} with a fare on record
-                      {spend.bookingsWithExtras > 0 &&
-                        `; extras filed on ${spend.bookingsWithExtras} of them`}
+                      across {sp.bookingsWithPrice} {sp.bookingsWithPrice === 1 ? 'booking' : 'bookings'} with a fare on record
+                      {sp.bookingsWithExtras > 0 &&
+                        `; extras filed on ${sp.bookingsWithExtras} of them`}
                     </dd>
                   </div>
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Average booking</dt>
-                    <dd className={s.moneyValue}>{money(spend.avgPerBooking)}</dd>
+                    <dd className={s.moneyValue}>{money(sp.avgPerBooking, sp.currency)}</dd>
                     <dd className={s.moneyNote}>mean of every priced booking</dd>
                   </div>
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Cheapest</dt>
-                    <dd className={s.moneyValue}>{money(spend.minPrice)}</dd>
+                    <dd className={s.moneyValue}>{money(sp.minPrice, sp.currency)}</dd>
                     <dd className={s.moneyNote}>the best you have done</dd>
                   </div>
                   <div className={s.moneyCell}>
                     <dt className={s.moneyLabel}>Dearest</dt>
-                    <dd className={s.moneyValue}>{money(spend.maxPrice)}</dd>
+                    <dd className={s.moneyValue}>{money(sp.maxPrice, sp.currency)}</dd>
                     <dd className={s.moneyNote}>single highest booking filed</dd>
                   </div>
                 </dl>
 
                 <div className={`${s.grid} ${s.grid2}`}>
-                  {spend.spendingByYear.length > 0 && (
-                    <Figure n="Fig. 8" title="What it cost, by year">
+                  {sp.spendingByYear.length > 0 && (
+                    <Figure n="Fig. 8" title={`What it cost, by year${tag}`}>
                       <div className={s.chart}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={spend.spendingByYear} margin={{ top: 4, right: 8, left: -6, bottom: 0 }}>
+                          <AreaChart data={sp.spendingByYear} margin={{ top: 4, right: 8, left: -6, bottom: 0 }}>
                             <CartesianGrid stroke={RULE} strokeDasharray="2 4" vertical={false} />
                             <XAxis dataKey="year" {...AXIS} />
-                            <YAxis tickFormatter={(v) => `€${v}`} {...AXIS} />
+                            <YAxis tickFormatter={(v) => `${MONEY_SYMBOL[sp.currency] ?? ''}${v}`} {...AXIS} />
                             <Tooltip
-                              content={<SpendTooltip />}
+                              content={<SpendTooltip currency={sp.currency} />}
                               cursor={{ stroke: INK, strokeWidth: 1, strokeDasharray: '3 3' }}
                             />
                             <Area
@@ -894,10 +909,10 @@ export default function StatsPage() {
                     </Figure>
                   )}
 
-                  {spend.spendingByAirline.length > 0 && (
-                    <Figure n="Fig. 9" title="What it cost, by carrier">
+                  {sp.spendingByAirline.length > 0 && (
+                    <Figure n="Fig. 9" title={`What it cost, by carrier${tag}`}>
                       <div className={s.ranks}>
-                        {spend.spendingByAirline.slice(0, 6).map((item, idx) => (
+                        {sp.spendingByAirline.slice(0, 6).map((item, idx) => (
                           <div key={item.airline} className={s.rank}>
                             <div className={s.rankHead}>
                               <span className={s.rankNo}>{idx + 1}</span>
@@ -905,12 +920,12 @@ export default function StatsPage() {
                               <span className={s.rankSub}>
                                 {item.count} {item.count === 1 ? 'booking' : 'bookings'}
                               </span>
-                              <span className={s.rankValue}>{money(item.total)}</span>
+                              <span className={s.rankValue}>{money(item.total, sp.currency)}</span>
                             </div>
                             <div className={s.rankBarTrack}>
                               <div
                                 className={s.rankBar}
-                                style={{ width: `${(item.total / maxAirlineSpend) * 100}%` }}
+                                style={{ width: `${(item.total / (sp.spendingByAirline[0]?.total || 1)) * 100}%` }}
                               />
                             </div>
                           </div>
@@ -919,8 +934,9 @@ export default function StatsPage() {
                     </Figure>
                   )}
                 </div>
-              </>
-            )}
+              </Fragment>
+              )
+            })}
 
             {/* ── COUNTRIES ───────────────────────────────── */}
             {chartData.countryData.length > 0 && (

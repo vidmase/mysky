@@ -28,6 +28,12 @@ export type Booking<T extends BookingFlight = BookingFlight> = {
    * addition to it, so a caller reporting both says "of which", not "plus".
    */
   extras: number | null
+  /**
+   * The currency the fare was filed in, read off the first leg that carries one.
+   * Fares in different currencies are different money: callers total each
+   * currency on its own and never add across them.
+   */
+  currency: ReceiptCurrency
   /** Every leg was cancelled, so the fare is real but the trip never happened. */
   cancelled: boolean
   departure_date: string | null
@@ -40,6 +46,26 @@ export function parseReceiptAmount(raw?: string | null): number | null {
   if (!raw) return null
   const value = parseFloat(String(raw).replace(/[^0-9.-]/g, ''))
   return !isNaN(value) && value > 0 ? value : null
+}
+
+export type ReceiptCurrency = 'GBP' | 'EUR' | 'USD' | 'LTL' | 'LVL'
+
+/** The currency written on a receipt; an unmarked amount is taken as pounds, the MySky default. */
+export function receiptCurrency(raw?: string | null): ReceiptCurrency {
+  const r = raw || ''
+  if (/ltl/i.test(r)) return 'LTL'
+  if (/lvl/i.test(r)) return 'LVL'
+  if (r.includes('€') || /eur/i.test(r)) return 'EUR'
+  if (r.includes('$') || /usd/i.test(r)) return 'USD'
+  return 'GBP'
+}
+
+// Litas and lats have no symbol a reader would know, so they print as a code.
+export const MONEY_SYMBOL: Partial<Record<ReceiptCurrency, string>> = { GBP: '£', EUR: '€', USD: '$' }
+
+export function formatMoney(v: number, currency: ReceiptCurrency): string {
+  const n = v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return MONEY_SYMBOL[currency] ? `${MONEY_SYMBOL[currency]}${n}` : `${n} ${currency}`
 }
 
 /**
@@ -104,6 +130,7 @@ export function groupFlightsIntoBookings<T extends BookingFlight>(flights: T[]):
       key,
       total,
       extras,
+      currency: receiptCurrency(legs.find((leg) => parseReceiptAmount(leg.total_receipt) !== null)?.total_receipt),
       cancelled,
       departure_date: isFinite(time(outbound)) ? outbound.departure_date ?? null : null,
       airline: outbound?.airline || null,

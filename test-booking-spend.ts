@@ -50,4 +50,17 @@ assert.equal(outboundFirst.legs[0].departure_date, '2026-08-27')
 assert.equal(outboundFirst.legs[1].departure_date, '2026-08-31')
 assert.equal(outboundFirst.key, 'ref:37CSCF')
 
+// Fares are filed in whatever the airline charged: pounds, euros, and before the
+// euro, litas and lats. A 3026 LTL charter is not a £3026 one, so every booking
+// must carry its own currency for the totals to be kept apart.
+const currencies = groupFlightsIntoBookings([
+  { id: 20, reservation_number: 'GBPREF', total_receipt: 'GBP 239.20' },
+  { id: 21, reservation_number: 'EURREF', total_receipt: '380.52 EUR' },
+  { id: 22, reservation_number: 'LTLREF', total_receipt: '3026 LTL' },
+  { id: 23, reservation_number: 'LVLREF', total_receipt: 'LVL41.10' },
+  { id: 24, reservation_number: 'RETREF', total_receipt: null, departure_date: '2024-01-01' },
+  { id: 25, reservation_number: 'RETREF', total_receipt: '€99.00', departure_date: '2024-01-08' },
+]).map((b) => b.currency)
+assert.deepEqual(currencies, ['GBP', 'EUR', 'LTL', 'LVL', 'EUR'])
+
 console.log('booking-spend: all assertions passed')
