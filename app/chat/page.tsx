@@ -12,6 +12,8 @@ import { Loader2, Send, Bot, User, Plane, MapPin, Clock, BarChart3, Trash2, Pin,
 import { cn } from '@/lib/utils'
 import { DEEPSEEK_MODELS, DEFAULT_DEEPSEEK_MODEL, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { ApiKeyDialog, type KeyStatus } from './components/ApiKeyDialog'
+import { ChatMarkdown } from './components/ChatMarkdown'
+import { containsToolMarkup } from '@/lib/chat-history'
 import { EmailScanCard } from './components/EmailScanCard'
 import type { ScanOutcome } from '@/lib/chat-email-scan'
 import jsPDF from 'jspdf'
@@ -547,8 +549,14 @@ export default function ChatPage() {
                           )}
                           id={message.role === 'assistant' ? `assistant-msg-${message.id}` : undefined}
                         >
-                          <div className="text-sm whitespace-pre-wrap break-words">
-                            {highlightText(message.content, searchKeyword)}
+                          <div className={cn("text-sm break-words", (message.role !== 'assistant' || searchKeyword) && "whitespace-pre-wrap")}>
+                            {message.role !== 'assistant'
+                              ? highlightText(message.content, searchKeyword)
+                              : containsToolMarkup(message.content)
+                                ? <span className="italic opacity-70">(An email scan was requested here but did not run.)</span>
+                                : searchKeyword
+                                  ? highlightText(message.content, searchKeyword)
+                                  : <ChatMarkdown text={message.content} />}
                             {message.isStreaming && (
                               <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1" />
                             )}

@@ -3,6 +3,7 @@ import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-serv
 import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, modelCanUseTools, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { SCAN_EMAIL_TOOL, describeScanForModel, scanEmailForFlights, type ScanOutcome } from '@/lib/chat-email-scan'
 import { resolveDeepSeekKey } from '@/lib/deepseek'
+import { completedExchanges, containsToolMarkup, parseLeakedToolCall } from '@/lib/chat-history'
 import { NextResponse } from 'next/server'
 import { getUserStats } from "../../../src/lib/services/stats"
 
@@ -261,7 +262,11 @@ Answer only from the record above, and never invent a flight. When you are asked
 
 A flight marked CANCELLED was paid for but never flown. Leave its fare out of any spending total, the same way the rest of the app does, and mention what was paid only if the user asks about that booking.
 
-The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.${modelCanUseTools(selectedModel) ? `
+The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.
+
+Answer the user's latest message, and only that. Earlier turns are context for resolving follow-ups; do not go back to an earlier topic unless the latest message asks about it.
+
+Lead with the answer itself (the flight, date, fare or number asked for), then at most a short line of supporting detail. Fares can be in different currencies: compare fares only within one currency, always name the currency, and if the cheapest depends on the currency, give the cheapest in each. "The last N months" counts back from the current timestamp. Format with plain Markdown only: **bold**, short bullet lists. No tables, no headings.${modelCanUseTools(selectedModel) ? `
 
 You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations in Gmail, with the scan_email_for_flights tool, to find flights that are not in the record yet. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.` : ''}`
 
@@ -271,7 +276,7 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
     // stored, so the question does not appear twice. Ten messages is five
     // exchanges — enough for "and the return leg?" to resolve, without pushing
     // the flight data out of the model's context.
-    const HISTORY_MESSAGES = 10
+    const HISTORY_MESSAGES = 20
     const { data: priorMessages, error: historyError } = await supabase
       .from('chat_messages')
       .select('role, content')
@@ -285,10 +290,9 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
       console.error('Chat: could not load conversation history:', historyError.message)
     }
 
-    const history = (priorMessages ?? [])
-      .reverse()
-      .filter((m) => typeof m.content === 'string' && m.content.trim().length > 0)
-      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+    // Answered questions only, at most the last five exchanges. See
+    // completedExchanges for why unanswered questions must not be replayed.
+    const history = completedExchanges((priorMessages ?? []).reverse()).slice(-10)
 
     console.log(`Chat: ${allFlights.length} flights, ${history.length} prior messages to ${selectedModel}`)
 
@@ -318,8 +322,11 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
         body: JSON.stringify({
           model: selectedModel,
           messages,
-          max_tokens: 1000,
-          temperature: 0.7,
+          // 1000 cut answers off mid-sentence once the model reasoned over the
+          // whole flight record first.
+          max_tokens: 4000,
+          // Answers are read off the record; there is nothing to be creative about.
+          temperature: 0.3,
           ...(withTools ? { tools: [SCAN_EMAIL_TOOL] } : {})
         })
       })
@@ -372,6 +379,10 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
     // model write the reply from it.
     let scan: ScanOutcome | null = null
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]
+    // Sometimes the model writes the call into its reply as DeepSeek markup
+    // instead of returning it in tool_calls. Left alone, that markup was shown
+    // as the answer and the scan never ran, so no "Add these flights" card.
+    const leaked = useTools && !toolCall ? parseLeakedToolCall(data.choices?.[0]?.message?.content || '') : null
     if (toolCall?.function?.name === 'scan_email_for_flights') {
       let args: Record<string, unknown> = {}
       try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { }
@@ -383,9 +394,30 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
       ], false)
       if (!followUp.ok) return deepseekFailure(followUp)
       data = await followUp.json()
+    } else if (leaked?.name === 'scan_email_for_flights') {
+      scan = await scanEmailForFlights(userId, leaked.args)
+      // No tool_call id to answer, so the result goes back as a plain turn.
+      const followUp = await callDeepSeek([
+        ...baseMessages,
+        { role: 'user', content: `Result of scanning my email:\n${describeScanForModel(scan)}\n\nNow answer my last message using this result.` }
+      ], false)
+      if (!followUp.ok) return deepseekFailure(followUp)
+      data = await followUp.json()
     }
 
-    const responseText = data.choices?.[0]?.message?.content || '';
+    let responseText: string = (data.choices?.[0]?.message?.content || '').trim()
+
+    // Markup that still slipped through is not an answer.
+    if (containsToolMarkup(responseText)) {
+      console.error('DeepSeek reply still holds tool markup:', responseText.slice(0, 300))
+      responseText = ''
+    }
+
+    // Out of tokens: say so rather than store a reply that stops mid-sentence.
+    if (responseText && data.choices?.[0]?.finish_reason === 'length') {
+      console.error(`DeepSeek ${selectedModel} hit max_tokens; reply truncated`)
+      responseText += '\n\n_(The answer was cut short. Ask a narrower question, or ask me to continue.)_'
+    }
 
     // An empty body is not an answer; storing it would leave a blank bubble in
     // the transcript that the user cannot tell from a real reply.
