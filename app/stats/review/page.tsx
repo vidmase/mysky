@@ -20,6 +20,7 @@ import {
   type ReviewMap,
   type YearReview,
 } from "@/lib/year-review"
+import { MONEY_SYMBOL } from "@/lib/statistics/booking-spend"
 import { renderShareCard } from "./share-card"
 import s from "./review.module.css"
 
@@ -529,7 +530,7 @@ function buildSlides(r: YearReview, years: number[], onYear: (y: number) => void
           <Tag>{tag} · The bill</Tag>
           <Rise delay={120}><h2 className={s.headline}>What the sky cost you</h2></Rise>
           <p className={`${s.giant} ${s.giantMoney} ${s.rise}`} style={{ animationDelay: "200ms" }}>
-            {r.currency}<CountUp value={sp.total} decimals={2} />
+            {MONEY_SYMBOL[r.currency]}<CountUp value={sp.total} decimals={2} />{!MONEY_SYMBOL[r.currency] && ` ${r.currency}`}
           </p>
           <Rise delay={600} className={s.split}>
             <div className={s.splitCell}>
@@ -553,6 +554,9 @@ function buildSlides(r: YearReview, years: number[], onYear: (y: number) => void
             <p className={s.note}>
               {sp.bookings} {sp.bookings === 1 ? "booking" : "bookings"} with a fare on record, each fare counted once.
               Shown as filed, not converted.
+              {sp.others.map((o) => (
+                ` Plus ${fmtMoney(o.total, o.currency)} across ${o.bookings} ${o.bookings === 1 ? "booking" : "bookings"} filed in ${o.currency}.`
+              ))}
             </p>
           </Rise>
         </div>

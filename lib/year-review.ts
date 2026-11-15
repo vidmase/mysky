@@ -7,11 +7,10 @@
  * /stats uses — so the two surfaces never disagree about a flight.
  */
 
-import { groupFlightsIntoBookings } from '@/lib/statistics/booking-spend'
+import { formatMoney, groupFlightsIntoBookings, type ReceiptCurrency } from '@/lib/statistics/booking-spend'
 import {
   AIRPORT_BY_IATA,
   countryForIata,
-  detectMoneyPrefix,
   legHours,
 } from '@/lib/statistics/leg-metrics'
 
@@ -86,8 +85,8 @@ export type YearReview = {
   nightLegs: number
   first: Leg | null
   last: Leg | null
-  /** currency symbol detected across the whole log, as /stats shows it */
-  currency: string
+  /** the currency `spend` is in: the one most of the year's bookings were filed in */
+  currency: ReceiptCurrency
   /** fares counted once per booking reference, attributed to the outbound's year */
   spend: {
     total: number
@@ -95,6 +94,8 @@ export type YearReview = {
     average: number
     cheapest: { amount: number; from: string; to: string } | null
     per100km: number | null
+    /** the year's fares in any other currency, kept apart rather than added in */
+    others: { currency: ReceiptCurrency; total: number; bookings: number }[]
   } | null
   map: ReviewMap | null
   persona: Persona
@@ -258,13 +259,30 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
   // A return trip repeats one fare on every leg, so money is counted per booking and
   // belongs to the year its outbound departed — exactly how /stats files spend by year.
   const legById = new Map(allLegs.map((l) => [l.id, l]))
-  const bookings = groupFlightsIntoBookings(flights)
+  const yearBookings = groupFlightsIntoBookings(flights)
     .map((b) => ({ ...b, date: parseDate(b.departure_date) }))
     // A cancelled booking keeps its fare on the ticket but never reached a
     // spending figure: the trip did not happen.
     .filter((b): b is typeof b & { total: number; date: string } =>
       b.total != null && !b.cancelled && !!b.date && b.date.startsWith(prefix) && b.date <= todayISO()
     )
+  // Fares in different currencies are different money and are never added
+  // together: the headline figures are the currency most of the year's bookings
+  // were filed in, and every other currency is reported beside them.
+  const perCurrency = new Map<ReceiptCurrency, typeof yearBookings>()
+  for (const b of yearBookings) {
+    const group = perCurrency.get(b.currency)
+    if (group) group.push(b)
+    else perCurrency.set(b.currency, [b])
+  }
+  const ranked = Array.from(perCurrency.entries()).sort((a, b) => b[1].length - a[1].length)
+  const currency: ReceiptCurrency = ranked[0]?.[0] ?? 'GBP'
+  const bookings = ranked[0]?.[1] ?? []
+  const others = ranked.slice(1).map(([c, group]) => ({
+    currency: c,
+    total: Math.round(group.reduce((s, b) => s + b.total, 0) * 100) / 100,
+    bookings: group.length,
+  }))
   const total = bookings.reduce((s, b) => s + b.total, 0)
   const cheapest = [...bookings].sort((a, b) => a.total - b.total)[0]
   const cheapestLeg = cheapest ? legById.get(cheapest.legs[0].id) : undefined
@@ -314,7 +332,7 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
     nightLegs,
     first: legs[0] ?? null,
     last: legs.length > 1 ? legs[legs.length - 1] : null,
-    currency: detectMoneyPrefix(flights.map((f) => f.total_receipt)),
+    currency,
     spend: bookings.length
       ? {
           total: Math.round(total * 100) / 100,
@@ -328,6 +346,7 @@ export function buildYearReview(allLegs: Leg[], flights: ReviewFlight[], year: n
               }
             : null,
           per100km: measuredKm > 0 ? (measuredFare / measuredKm) * 100 : null,
+          others,
         }
       : null,
     map: projectMap(legs),
@@ -480,5 +499,4 @@ export const fmtDate = (iso: string, opts: Intl.DateTimeFormatOptions = { day: '
 export const fmtTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 
-export const fmtMoney = (v: number, currency: string) =>
-  `${currency}${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+export const fmtMoney = formatMoney

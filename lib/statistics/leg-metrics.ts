@@ -34,20 +34,6 @@ export function parseDurationHours(raw?: string | null): number | null {
   return null
 }
 
-export function detectMoneyPrefix(receipts: Array<string | null | undefined>): string {
-  let gbp = 0, eur = 0, usd = 0
-  for (const r of receipts) {
-    if (!r) continue
-    if (r.includes("£") || /gbp/i.test(r)) gbp++
-    else if (r.includes("€") || /eur/i.test(r)) eur++
-    else if (r.includes("$") || /usd/i.test(r)) usd++
-  }
-  if (gbp >= eur && gbp >= usd && gbp > 0) return "£"
-  if (eur >= usd && eur > 0) return "€"
-  if (usd > 0) return "$"
-  return "£" // MySky default
-}
-
 export const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
 
 /* A leg's recorded duration is worked out from its dates, so a single

@@ -19,7 +19,7 @@ import {
   Area,
 } from "recharts"
 import { PaperNav } from "@/app/components/paper-nav"
-import { groupFlightsIntoBookings, type ReceiptCurrency } from "@/lib/statistics/booking-spend"
+import { formatMoney, groupFlightsIntoBookings, MONEY_SYMBOL, type ReceiptCurrency } from "@/lib/statistics/booking-spend"
 import {
   AIRPORT_BY_IATA,
   countryForIata,
@@ -542,13 +542,7 @@ export default function StatsPage() {
     return `${h}h ago`
   }
 
-  // Litas and lats have no symbol a reader would know, so they print as a code.
-  const MONEY_SYMBOL: Partial<Record<ReceiptCurrency, string>> = { GBP: '£', EUR: '€', USD: '$' }
-
-  const money = (v: number, currency: ReceiptCurrency) => {
-    const n = v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    return MONEY_SYMBOL[currency] ? `${MONEY_SYMBOL[currency]}${n}` : `${n} ${currency}`
-  }
+  const money = formatMoney
 
   // Every figure hands its hover state to the same printed card.
   const LegTooltip = ({ active, payload, label }: any) => {

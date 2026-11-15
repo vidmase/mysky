@@ -60,6 +60,14 @@ export function receiptCurrency(raw?: string | null): ReceiptCurrency {
   return 'GBP'
 }
 
+// Litas and lats have no symbol a reader would know, so they print as a code.
+export const MONEY_SYMBOL: Partial<Record<ReceiptCurrency, string>> = { GBP: '£', EUR: '€', USD: '$' }
+
+export function formatMoney(v: number, currency: ReceiptCurrency): string {
+  const n = v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return MONEY_SYMBOL[currency] ? `${MONEY_SYMBOL[currency]}${n}` : `${n} ${currency}`
+}
+
 /**
  * One figure for the whole booking. Identical amounts across the legs are one
  * charge repeated on each row; amounts that differ were filed per leg and do add
