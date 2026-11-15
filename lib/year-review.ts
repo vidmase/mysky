@@ -21,6 +21,8 @@ export type ReviewFlight = {
   calculated_duration?: string | null
   departure_date?: string | null
   departure_time?: string | null
+  arrival_time?: string | null
+  arrival_date?: string | null
   airline?: string | null
   flight_number?: string | null
   departure_iata?: string | null

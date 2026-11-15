@@ -43,6 +43,7 @@ type Flight = {
   arrival_longitude?: number | string | null
   departure_time?: string | null
   arrival_time?: string | null
+  arrival_date?: string | null
   reservation_number?: string | null
   total_receipt?: string | null
   extras_receipt?: string | null
@@ -211,6 +212,7 @@ export default function StatsPage() {
             arrival_longitude: arrLon != null && !Number.isNaN(arrLon) ? arrLon : null,
             departure_time: f.departure_time || null,
             arrival_time: f.arrival_time || null,
+            arrival_date: f.arrival_date || null,
             reservation_number: f.reservation_number || null,
             total_receipt: f.total_receipt || null,
             extras_receipt: f.extras_receipt || null,

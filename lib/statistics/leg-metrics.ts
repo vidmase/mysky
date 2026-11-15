@@ -3,6 +3,7 @@
 // hours and currency wherever it is counted.
 
 import { allAirports } from '@/lib/airports'
+import { calculateTZDurationMinutes } from './calculator'
 
 export const AIRPORT_BY_IATA = new Map(
   allAirports.map((a) => [a.iata.toUpperCase(), a])
@@ -21,6 +22,8 @@ export function countryForIata(iata?: string | null, fallback?: string | null): 
 export function parseDurationHours(raw?: string | null): number | null {
   if (!raw) return null
   const s = String(raw).trim()
+  // "-19h -50m" is an arrival clock time earlier than the departure's, not nineteen hours aloft.
+  if (s.startsWith('-')) return null
   const hm = s.match(/(\d+)\s*h(?:ours?)?\s*(\d+)?\s*m?/i)
   if (hm) {
     const h = Number(hm[1]) || 0
@@ -50,13 +53,32 @@ export type LegHours = {
   implausible: number | null
 }
 
-/** Recorded duration when it is plausible, otherwise the great-circle estimate. */
+/**
+ * Hours aloft for one leg. The departure and arrival times are each local to
+ * their own airport, so the elapsed time is worked out across the two time
+ * zones: Bristol 06:15 to Kaunas 11:00 is 2h45, not the 4h45 on the clocks.
+ * A duration stored on the row was filed as that plain clock difference, so it
+ * is only read when a time or a time zone is missing; an implausible result
+ * from either falls back to the great-circle estimate.
+ */
 export function legHours(
-  durations: { flight_duration?: string | null; calculated_duration?: string | null },
+  leg: {
+    flight_duration?: string | null
+    calculated_duration?: string | null
+    departure_iata?: string | null
+    arrival_iata?: string | null
+    departure_date?: string | null
+    arrival_date?: string | null
+    departure_time?: string | null
+    arrival_time?: string | null
+  },
   distanceKm: number | null
 ): LegHours {
+  const elapsed = calculateTZDurationMinutes(leg)
   const recorded =
-    parseDurationHours(durations.flight_duration) ?? parseDurationHours(durations.calculated_duration)
+    elapsed != null
+      ? elapsed / 60
+      : parseDurationHours(leg.flight_duration) ?? parseDurationHours(leg.calculated_duration)
   const plausible = recorded != null && recorded > 0 && recorded <= MAX_LEG_HOURS ? recorded : null
   return {
     hours: plausible ?? (distanceKm != null ? deriveDurationHours(distanceKm) : null),
