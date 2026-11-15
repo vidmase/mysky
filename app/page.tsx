@@ -14,9 +14,9 @@ import s from "./landing.module.css"
 const PARTICLE_SPEED = Number(process.env.NEXT_PUBLIC_PARTICLE_SPEED) || 0.5
 
 const NAV = [
-  { label: "Log", href: "/flights" },
-  { label: "Atlas", href: "/map" },
-  { label: "Numbers", href: "/stats" },
+  { label: "Flights", href: "/flights" },
+  { label: "Map", href: "/map" },
+  { label: "Stats", href: "/stats" },
   { label: "Delays", href: "/delays" },
   { label: "Pricing", href: "/pricing" },
 ]
@@ -531,7 +531,7 @@ export default function Home() {
               My<em>Sky</em>
             </span>
             <nav className={s.footerNav}>
-              {[...NAV, { label: "Calendar", href: "/calendar" }, { label: "Chat", href: "/chat" }].map(
+              {[...NAV, { label: "Calendar", href: "/calendar" }, { label: "Assistant", href: "/chat" }].map(
                 (item) => (
                   <Link key={item.href} href={item.href} className={s.navLink}>
                     {item.label}

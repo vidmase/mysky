@@ -18,12 +18,12 @@ import { NavDrawer } from "./nav-drawer"
  * looks identical on every surface without each page's module restating it.
  */
 const LINKS = [
-  { label: "Log", href: "/flights" },
-  { label: "Atlas", href: "/map" },
-  { label: "Numbers", href: "/stats" },
+  { label: "Flights", href: "/flights" },
+  { label: "Map", href: "/map" },
+  { label: "Stats", href: "/stats" },
   { label: "Delays", href: "/delays" },
-  { label: "Month", href: "/calendar" },
-  { label: "Ask", href: "/chat" },
+  { label: "Calendar", href: "/calendar" },
+  { label: "Assistant", href: "/chat" },
 ]
 
 export function PaperNav({ className }: { className?: string }) {
