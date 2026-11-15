@@ -1,3 +1,5 @@
+import { flightKey, flightParseProblem } from '@/lib/flight-validity'
+
 // The chat assistant's one tool: look through the user's Gmail for flights
 // that are not in their log yet. It only finds and proposes; nothing is written
 // here. The chat page shows what was found and the user adds it with a click,
@@ -36,7 +38,7 @@ export type ProposedFlight = {
 }
 
 export type ScanOutcome =
-    | { ok: true; flights: ProposedFlight[]; alreadyInLog: number }
+    | { ok: true; flights: ProposedFlight[]; alreadyInLog: number; unreadable: { subject: string; problem: string }[] }
     | { ok: false; reason: 'gmail_not_connected'; authUrl?: string }
     | { ok: false; reason: 'bad_dates' | 'scan_failed'; detail: string }
 
@@ -49,7 +51,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
  */
 export async function scanEmailForFlights(
     request: Request,
-    args: { start?: unknown; end?: unknown }
+    args: { start?: unknown; end?: unknown },
+    /** flightKey() of every flight already in the user's log */
+    inLog: Set<string> = new Set()
 ): Promise<ScanOutcome> {
     const start = typeof args.start === 'string' ? args.start : ''
     const end = typeof args.end === 'string' ? args.end : ''
@@ -71,11 +75,23 @@ export async function scanEmailForFlights(
         return { ok: false, reason: 'scan_failed', detail: body?.message || body?.error || `HTTP ${res.status}` }
     }
 
-    const items: any[] = body.items
-    const fresh = items.filter((i) => !i.duplicate && i.parsed)
+    // Three outcomes per email: a misread parse is reported, never offered; a
+    // flight already in the log (same date and flight number) is counted; only
+    // the rest can be added.
+    const items: any[] = body.items.filter((i: any) => i?.parsed)
+    const unreadable: { subject: string; problem: string }[] = []
+    const fresh: any[] = []
+    let alreadyInLog = 0
+    for (const i of items) {
+        const problem = flightParseProblem(i.parsed)
+        if (problem) unreadable.push({ subject: String(i.subject ?? 'email'), problem })
+        else if (i.duplicate || inLog.has(flightKey(i.parsed.departure_date, i.parsed.flight_number))) alreadyInLog++
+        else fresh.push(i)
+    }
     return {
         ok: true,
-        alreadyInLog: items.length - fresh.length,
+        alreadyInLog,
+        unreadable,
         flights: fresh.map((i) => {
             const p = i.parsed
             const s = (v: unknown) => (v == null || v === '' ? null : String(v))
@@ -102,15 +118,18 @@ export function describeScanForModel(outcome: ScanOutcome): string {
         }
         return `The scan did not run: ${outcome.detail}. Tell the user plainly.`
     }
+    const unreadable = outcome.unreadable.length
+        ? `\n${outcome.unreadable.length} email(s) could not be read reliably and were left out (${outcome.unreadable.map((u) => `"${u.subject}": ${u.problem}`).join('; ')}). Say so briefly; they cannot be added from here.`
+        : ''
     if (outcome.flights.length === 0) {
-        return `No new flights found. ${outcome.alreadyInLog} flight email(s) in that range are already in the log.`
+        return `No new flights found. ${outcome.alreadyInLog} flight(s) in that range are already in the log.${unreadable}\nDo not mention an add button: there is nothing to add.`
     }
     const lines = outcome.flights.map(
         (f) => `${f.date ?? '?'} ${f.flightNumber ?? '?'} ${f.from ?? '?'}-${f.to ?? '?'} ${f.departs ?? ''}-${f.arrives ?? ''} ref ${f.reference ?? '?'} fare ${f.fare ?? '?'}`
     )
     return (
         `${outcome.flights.length} new flight email(s) found (not added yet); ${outcome.alreadyInLog} already in the log:\n` +
-        lines.join('\n') +
+        lines.join('\n') + unreadable +
         '\nSummarise these for the user and tell them to press "Add these flights" under your reply to add them. Do not say they were added.'
     )
 }

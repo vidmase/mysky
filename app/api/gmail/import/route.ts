@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { flightKey, flightParseProblem } from '@/lib/flight-validity'
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { getAuthUrl, getGmailClient, getUserOAuth2Client } from '@/lib/google'
@@ -117,6 +118,10 @@ export async function POST(req: Request) {
       (existingFlights ?? []).map((f: any) => `${(f.flight_number || '').trim()}|${(f.reservation_number || '').trim()}|${new Date(f.departure_date).toISOString().slice(0, 10)}`)
     )
 
+    // The same flight by date and flight number, whatever its reference says:
+    // a misread reference never matches the one already filed.
+    const existingFlightKeys = new Set((existingFlights ?? []).map((f: any) => flightKey(f.departure_date, f.flight_number)))
+
     let pageToken: string | undefined = undefined
     const maxToProcess = 50
     const parsedResults: any[] = []
@@ -177,6 +182,14 @@ export async function POST(req: Request) {
             seat: (parsed as any).seat || null,
             notes: (parsed as any).notes || `Imported from Gmail message ${id}`,
           }
+          // A misread email (airports "DTD" to "DTD", 15:00-15:00) must not
+          // become a flight in the log.
+          const problem = flightParseProblem(row)
+          if (problem) {
+            errors.push({ id, reason: `unreadable: ${problem}` })
+            continue
+          }
+          if (existingFlightKeys.has(flightKey(row.departure_date, row.flight_number))) continue
           insertRows.push(row)
         } catch (e: any) {
           errors.push({ id, reason: e?.message || 'fetch_error' })
@@ -242,6 +255,14 @@ export async function POST(req: Request) {
               seat: (parsed as any).seat || null,
               notes: (parsed as any).notes || `Imported from Gmail message ${id}`,
             }
+            // A misread email (airports "DTD" to "DTD", 15:00-15:00) must not
+            // become a flight in the log, whichever page asked for the import.
+            const problem = flightParseProblem(row)
+            if (problem) {
+              errors.push({ id, reason: `unreadable: ${problem}` })
+              continue
+            }
+            if (existingFlightKeys.has(flightKey(row.departure_date, row.flight_number))) continue
             insertRows.push(row)
           } catch (e: any) {
             errors.push({ id, reason: e?.message || 'fetch_error' })
