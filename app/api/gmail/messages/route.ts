@@ -37,7 +37,7 @@ export async function GET() {
   try {
     const { client, hasToken } = await getUserOAuth2Client()
     if (!hasToken) {
-      const url = getAuthUrl()
+      const url = await getAuthUrl()
       return NextResponse.json({ error: 'not_connected', authUrl: url }, { status: 401 })
     }
 
@@ -73,7 +73,7 @@ export async function GET() {
     const message = e?.message || 'Unknown error'
     console.error('GET /api/gmail/messages error:', e)
     if (message.includes('invalid_grant') || message.includes('unauthorized_client')) {
-      return NextResponse.json({ error: 'reauthorize', authUrl: getAuthUrl() }, { status: 401 })
+      return NextResponse.json({ error: 'reauthorize', authUrl: await getAuthUrl() }, { status: 401 })
     }
     return NextResponse.json({ error: 'server_error', message }, { status: 500 })
   }

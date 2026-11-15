@@ -19,7 +19,7 @@ export async function GET() {
     const redirectUri = `${baseUrl}/api/gmail/callback`
     
     // Generate the auth URL to see what's actually being sent
-    const authUrl = getAuthUrl()
+    const authUrl = await getAuthUrl()
     
     return NextResponse.json({
       environment: {
