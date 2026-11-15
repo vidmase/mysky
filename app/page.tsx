@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { HomeHeartbeat } from "./components/home-heartbeat"
 import { LandingAuthLink } from "./components/landing-auth-link"
+import { NavDrawer } from "./components/nav-drawer"
 import { ParticleTitle } from "./components/particle-title"
 import s from "./landing.module.css"
 
@@ -153,6 +154,7 @@ export default function Home() {
               </Link>
             ))}
             <LandingAuthLink className={s.navCta} />
+            <NavDrawer links={NAV} toggleClassName={s.navToggle} />
           </div>
         </nav>
       </div>

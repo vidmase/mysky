@@ -547,3 +547,38 @@
     width: min(1080px, 100% - 2rem);
   }
 }
+
+/* Phones and small tablets: the ruled fields stay ruled, but each one is a
+   44px tap target, labels are legible, and input type reaches 16px so iOS
+   does not zoom the page on focus. Desktop sizes above are untouched. */
+@media (max-width: 767px) {
+  .label {
+    font-size: 0.625rem;
+  }
+
+  .input,
+  .dateTrigger {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .textarea {
+    font-size: 1rem;
+  }
+
+  .back {
+    min-height: 44px;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .btnPrimary,
+  .btnGhost {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

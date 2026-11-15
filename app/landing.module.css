@@ -156,6 +156,10 @@
   .navLinks .navLink {
     display: none;
   }
+  /* the links move into <NavDrawer /> */
+  .navLinks .navToggle {
+    display: inline-flex;
+  }
 }
 
 /* ============================================================

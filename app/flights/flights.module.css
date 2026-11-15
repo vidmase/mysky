@@ -1224,3 +1224,45 @@
   letter-spacing: 0.1em;
   color: var(--ink-1);
 }
+
+/* ============================================================
+   TOUCH — phones and small tablets only. Desktop sizes above are
+   untouched; here every control grows to a 44px tap target and
+   type that iOS would otherwise zoom into reaches 16px.
+   ============================================================ */
+@media (max-width: 767px) {
+  .btnPrimary,
+  .btnOutline {
+    min-height: 44px;
+  }
+
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pageBtn {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .searchInput {
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .searchClear {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .filing :global(button),
+  .filing :global(input),
+  .filing :global([role="combobox"]) {
+    min-height: 44px;
+  }
+
+  .filing :global(label) {
+    font-size: 0.625rem;
+  }
+}

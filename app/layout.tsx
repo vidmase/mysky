@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 
@@ -22,6 +22,14 @@ export const metadata: Metadata = {
   generator: 'v0.dev'
 }
 
+// Next emits this as the page's only viewport tag. Pinch-zoom stays enabled
+// (WCAG 1.4.4); viewport-fit=cover lets env(safe-area-inset-*) apply on notched phones.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,10 +39,6 @@ export default function RootLayout({
     <ClerkProvider>
 
       <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${paperFontVars}`} suppressHydrationWarning style={{ colorScheme: 'light' }}>
-        <head>
-          {/* Add this to ensure proper mobile viewport */}
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        </head>
         <body className="bg-background text-foreground">
           <Heartbeat>
             <AuthProvider>

@@ -475,9 +475,9 @@ export default function AddFlightPage() {
 
       {/* Content with higher z-index */}
       <div className="relative z-10 container mx-auto px-4 py-8">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-3xl max-md:[&_input]:min-h-11 max-md:[&_[role=combobox]]:min-h-11 max-md:[&_[role=tab]]:min-h-11">
           <div className="mb-8 flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.back()} className="h-8 w-8">
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="h-11 w-11 md:h-8 md:w-8">
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Button>
@@ -838,7 +838,7 @@ export default function AddFlightPage() {
                       />
                     </div>
                   </CardContent>
-                  <CardFooter className="flex justify-between">
+                  <CardFooter className="flex flex-col-reverse gap-3 md:flex-row md:justify-between [&>button]:w-full [&>button]:h-11 md:[&>button]:w-auto md:[&>button]:h-10">
                     <Button
                       variant="outline"
                       type="button"

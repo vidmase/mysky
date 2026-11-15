@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 
 import { UserMenu } from "@/components/user-menu"
 
+import { NavDrawer } from "./nav-drawer"
+
 /**
  * The masthead used by the paper-stock surfaces. The landing page inlines its
  * own copy (it is a fully self-contained poster); every other paper page —
@@ -56,6 +58,12 @@ export function PaperNav({ className }: { className?: string }) {
         <span className="paper-navuser">
           <UserMenu />
         </span>
+
+        <NavDrawer links={LINKS}>
+          <Link href="/add-flight" className="paper-navcta paper-drawer-cta">
+            File a flight
+          </Link>
+        </NavDrawer>
       </div>
     </nav>
   )

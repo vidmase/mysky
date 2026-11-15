@@ -278,7 +278,7 @@ export function FiltersPanel(props: FiltersPanelProps) {
                 </SelectContent>
               </Select>
               <Select value={selectedCurrency} onValueChange={setSelectedCurrency as any}>
-                <SelectTrigger className="w-[100px]">
+                <SelectTrigger className="w-[6.25rem] shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="paper-surface">
