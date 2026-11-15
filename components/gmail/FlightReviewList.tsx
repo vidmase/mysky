@@ -74,6 +74,12 @@ export function FlightReviewList({
 
   return (
     <div className="space-y-3 text-sm">
+      {legs.length > 0 && addable.length === 0 && (
+        <p>
+          Nothing new to add: {legs.length === 1 ? 'the flight' : `all ${legs.length} flights`} found in your email for these dates{' '}
+          {legs.length === 1 ? 'is' : 'are'} already in your log.
+        </p>
+      )}
       {legs.length > 0 && (
         <ul className="space-y-1">
           {legs.map((l, i) => {

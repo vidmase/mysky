@@ -111,11 +111,26 @@ export function openRow(token: string, ownerId: string, now = Date.now()): Fligh
  * recently received email is the booking as it stands.
  */
 export function planLegs(ownerId: string, reads: ReadEmail[], log: LogRow[], start: string, end: string): PlannedLeg[] {
+  const time = (r: ReadEmail) => new Date(r.receivedAt).getTime()
   const latest = new Map<string, ReadEmail>()
+  const earliest = new Map<string, ReadEmail>()
   for (const r of reads) {
     const key = `${r.booking.airline}|${ref(r.booking.reservation_number)}`
-    const prev = latest.get(key)
-    if (!prev || new Date(r.receivedAt).getTime() > new Date(prev.receivedAt).getTime()) latest.set(key, r)
+    const last = latest.get(key)
+    if (!last || time(r) > time(last)) latest.set(key, r)
+    const first = earliest.get(key)
+    if (!first || time(r) < time(first)) earliest.set(key, r)
+  }
+
+  // Ryanair resends the itinerary after every purchase on a booking, and each
+  // resend shows only that purchase ("29.99" for a bag), not the booking. The
+  // flights come from the latest email; the price is the original booking's.
+  // Wizz Air and easyJet resends list every payment, so their latest is right.
+  for (const [key, read] of latest) {
+    const first = earliest.get(key)!
+    if (read.booking.airline === 'Ryanair' && first !== read && first.booking.total_receipt) {
+      latest.set(key, { ...read, booking: { ...read.booking, total_receipt: first.booking.total_receipt } })
+    }
   }
 
   const inLog = new Set(log.map((f) => flightKey(f.departure_date, f.flight_number)))
