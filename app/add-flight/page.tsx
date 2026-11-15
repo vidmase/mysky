@@ -1,5 +1,6 @@
 "use client"
 
+import { useReadOnly } from '@/lib/use-read-only'
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -107,6 +108,11 @@ function getFlagEmoji(countryName: string): string {
 
 export default function AddFlightPage() {
   const router = useRouter()
+  // Family members only view; this page changes the log.
+  const readOnly = useReadOnly()
+  useEffect(() => {
+    if (readOnly) router.replace('/flights')
+  }, [readOnly, router])
   const { user } = useAuth()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [selectedPassengers, setSelectedPassengers] = useState<Passenger[]>([])

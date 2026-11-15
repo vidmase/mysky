@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { createSupabaseServer, resolveSupabaseUserId, resolveReadAccess } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -11,7 +11,7 @@ export async function GET(
     const { id } = await params
 
     // Check if user is authenticated via Clerk
-    const userId = await resolveSupabaseUserId()
+    const userId = (await resolveReadAccess())?.ownerId ?? null
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

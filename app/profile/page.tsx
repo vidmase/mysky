@@ -6,11 +6,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
+import { FamilyAccess } from "@/components/family/FamilyAccess"
+import { useReadOnly } from "@/lib/use-read-only"
 
 const ProfilePage = () => {
   const router = useRouter()
   const { user: clerkUser, isLoaded } = useUser()
   const { signOut } = useAuth()
+  const readOnly = useReadOnly()
 
   const fullName = clerkUser?.fullName || null
   const nickname = clerkUser?.username || null
@@ -63,6 +66,7 @@ const ProfilePage = () => {
           Sign Out
         </Button>
       </div>
+      {readOnly === false && <FamilyAccess />}
     </div>
   )
 }

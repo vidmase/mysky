@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { auth } from '@clerk/nextjs/server'
-import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { createSupabaseServer, resolveReadAccess } from '@/lib/supabase-server'
 import { CalendarClient } from './CalendarClient'
 import type { Flight } from "@/types/flight"
 
@@ -12,7 +12,7 @@ export default async function CalendarPage() {
   const { userId: clerkId } = await auth()
   if (!clerkId) redirect('/auth')
 
-  const userId = await resolveSupabaseUserId()
+  const userId = (await resolveReadAccess())?.ownerId ?? null
   if (!userId) throw new Error('No flight profile is linked to this account. Signed in with Clerk, but no matching row in the Supabase profiles table.')
 
   const supabase = createSupabaseServer()

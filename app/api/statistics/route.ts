@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { createSupabaseServer, resolveReadAccess } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { unstable_cache } from 'next/cache'
 import {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   try {
     const supabase = createSupabaseServer()
 
-    const userId = await resolveSupabaseUserId()
+    const userId = (await resolveReadAccess())?.ownerId ?? null
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

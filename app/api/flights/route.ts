@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { createSupabaseServer, resolveSupabaseUserId, resolveReadAccess } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { format } from 'date-fns'
@@ -27,7 +27,7 @@ export async function GET() {
     const supabase = createSupabaseServer()
 
     // Get the current user from Clerk
-    const userId = await resolveSupabaseUserId()
+    const userId = (await resolveReadAccess())?.ownerId ?? null
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

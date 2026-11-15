@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { UserMenu } from "@/components/user-menu"
+import { useReadOnly } from "@/lib/use-read-only"
 
 import { NavDrawer } from "./nav-drawer"
 
@@ -27,6 +28,9 @@ const LINKS = [
 
 export function PaperNav({ className }: { className?: string }) {
   const pathname = usePathname()
+  // Family members can look but not file flights or use the assistant.
+  const canEdit = useReadOnly() === false
+  const links = LINKS.filter((item) => canEdit || item.href !== "/chat")
 
   return (
     <nav className={`paper-nav ${className ?? ""}`}>
@@ -37,7 +41,7 @@ export function PaperNav({ className }: { className?: string }) {
       </Link>
 
       <div className="paper-navlinks">
-        {LINKS.map((item) => {
+        {links.map((item) => {
           const active = pathname === item.href || !!pathname?.startsWith(`${item.href}/`)
           return (
             <Link
@@ -51,18 +55,22 @@ export function PaperNav({ className }: { className?: string }) {
           )
         })}
 
-        <Link href="/add-flight" className="paper-navcta">
-          File a flight
-        </Link>
+        {canEdit && (
+          <Link href="/add-flight" className="paper-navcta">
+            File a flight
+          </Link>
+        )}
 
         <span className="paper-navuser">
           <UserMenu />
         </span>
 
-        <NavDrawer links={LINKS}>
-          <Link href="/add-flight" className="paper-navcta paper-drawer-cta">
-            File a flight
-          </Link>
+        <NavDrawer links={links}>
+          {canEdit && (
+            <Link href="/add-flight" className="paper-navcta paper-drawer-cta">
+              File a flight
+            </Link>
+          )}
         </NavDrawer>
       </div>
     </nav>
