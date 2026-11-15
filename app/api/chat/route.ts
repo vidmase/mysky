@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, modelCanUseTools, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { SCAN_EMAIL_TOOL, describeScanForModel, scanEmailForFlights, type ScanOutcome } from '@/lib/chat-email-scan'
+import { flightKey } from '@/lib/flight-validity'
 import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { NextResponse } from 'next/server'
 import { getUserStats } from "../../../src/lib/services/stats"
@@ -373,7 +374,11 @@ You can also look through the user's Gmail for flights that are not in the recor
     if (toolCall?.function?.name === 'scan_email_for_flights') {
       let args: Record<string, unknown> = {}
       try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { }
-      scan = await scanEmailForFlights(request, args)
+      scan = await scanEmailForFlights(
+        request,
+        args,
+        new Set(allFlights.map((f: any) => flightKey(f.departure_date, f.flight_number)))
+      )
       const followUp = await callDeepSeek([
         ...baseMessages,
         data.choices[0].message,
