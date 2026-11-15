@@ -4,6 +4,7 @@ import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-serv
 import { getAuthUrl, getGmailClient, getUserOAuth2Client } from '@/lib/google'
 import { extractFlightsFromTextLLM } from '@/lib/llm-extract'
 import { parseEmail } from '@/lib/gmail-parser'
+import { itineraryToFlights, parseRyanairItinerary } from '@/lib/ryanair-itinerary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -250,6 +251,16 @@ export async function GET(req: Request) {
         const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
         const bodyText = extractPlainText(msg.data.payload)
         const combined = `${subject}\n\n${bodyText}`
+
+        // A Ryanair itinerary is read with its exact layout, one item per leg,
+        // so the return flight is not dropped and nothing is guessed.
+        const itinerary = parseRyanairItinerary(combined)
+        if (itinerary) {
+          return itineraryToFlights(itinerary, dateHeader).map((parsed) => {
+            const key = `${parsed.flight_number}|${parsed.reservation_number}|${parsed.departure_date}`
+            return { id, subject, received_at: dateHeader, duplicate: existingKeys.has(key), key, parsed }
+          })
+        }
 
         // Choose extraction strategy
         let chosen: any = null
@@ -667,7 +678,7 @@ export async function GET(req: Request) {
         }
       }))
       for (const r of results) {
-        if (r.status === 'fulfilled' && r.value) previews.push(r.value)
+        if (r.status === 'fulfilled' && r.value) previews.push(...(Array.isArray(r.value) ? r.value : [r.value]))
       }
     }
 

@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { getAuthUrl, getGmailClient, getUserOAuth2Client } from '@/lib/google'
 import { extractFlightsFromTextLLM } from '@/lib/llm-extract'
+import { itineraryToFlights, parseRyanairItinerary } from '@/lib/ryanair-itinerary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -138,85 +139,19 @@ export async function POST(req: Request) {
           const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
           const bodyText = extractPlainText(msg.data.payload)
           const combined = `${subject}\n\n${bodyText}`
-          const flights = await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
-          const parsed = flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]
-          if (!parsed) {
+          // A Ryanair itinerary is read with its exact layout, every leg of it;
+          // other emails fall back to the general reader, one flight each.
+          const itinerary = parseRyanairItinerary(combined)
+          const candidates: any[] = itinerary
+            ? itineraryToFlights(itinerary, dateHeader)
+            : await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
+                .then((flights) => [flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]].filter(Boolean))
+          if (!candidates.length) {
             errors.push({ id, reason: 'parse_failed' })
             continue
           }
 
-          // Basic validation to insert
-          const depDate = parsed.departure_date ? new Date(parsed.departure_date) : null
-          const depISO = depDate ? depDate.toISOString().slice(0, 10) : null
-          const key = `${(parsed.flight_number || '').trim()}|${(parsed.reservation_number || '').trim()}|${depISO || ''}`
-          if (!parsed.flight_number || !parsed.reservation_number || !depISO) {
-            errors.push({ id, reason: 'missing_required_fields' })
-            continue
-          }
-          if (existingKeys.has(key)) {
-            // skip duplicates
-            continue
-          }
-
-          parsedResults.push({ id, parsed })
-
-          // Build DB row with safe fallbacks
-          const row = {
-            owner_id: userId,
-            passenger_name: (parsed as any).passenger_name || 'Unknown',
-            reservation_number: (parsed as any).reservation_number,
-            flight_number: (parsed as any).flight_number,
-            departure_airport: (parsed as any).departure_airport || (parsed as any).departure_iata || 'Unknown',
-            arrival_airport: (parsed as any).arrival_airport || (parsed as any).arrival_iata || 'Unknown',
-            departure_date: depISO,
-            arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0, 10) : depISO),
-            departure_time: (parsed as any).departure_time || '00:00',
-            arrival_time: (parsed as any).arrival_time || '00:00',
-            total_receipt: (parsed as any).total_receipt || '0',
-            purchased_date: (parsed as any).purchased_date || depISO,
-            purchase_time: (parsed as any).purchase_time || '00:00',
-            airline: (parsed as any).airline || 'Ryanair',
-            arrival_country: (parsed as any).arrival_country || null,
-            arrival_iata: (parsed as any).arrival_iata || null,
-            departure_iata: (parsed as any).departure_iata || null,
-            seat: (parsed as any).seat || null,
-            notes: (parsed as any).notes || `Imported from Gmail message ${id}`,
-          }
-          // A misread email (airports "DTD" to "DTD", 15:00-15:00) must not
-          // become a flight in the log.
-          const problem = flightParseProblem(row)
-          if (problem) {
-            errors.push({ id, reason: `unreadable: ${problem}` })
-            continue
-          }
-          if (existingFlightKeys.has(flightKey(row.departure_date, row.flight_number))) continue
-          insertRows.push(row)
-        } catch (e: any) {
-          errors.push({ id, reason: e?.message || 'fetch_error' })
-        }
-      }
-    } else {
-      while (parsedResults.length + errors.length < maxToProcess) {
-        const listResp: any = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50, pageToken })
-        const ids = (listResp.data.messages as Array<{ id?: string | null }> | undefined)?.map((m) => m.id as string).filter(Boolean) as string[] || []
-        pageToken = (listResp.data.nextPageToken as string | undefined) || undefined
-        if (!ids.length) break
-
-        for (const id of ids) {
-          if (parsedResults.length + errors.length >= maxToProcess) break
-          try {
-            const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
-            const headers = (msg.data.payload?.headers as Array<{ name?: string | null; value?: string | null }> | undefined) || []
-            const subject = (headers.find((h) => (h.name ?? '').toLowerCase() === 'subject')?.value as string | undefined) || ''
-            const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
-            const bodyText = extractPlainText(msg.data.payload)
-            const combined = `${subject}\n\n${bodyText}`
-            const flights = await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
-            const parsed = flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]
-            if (!parsed) {
-              errors.push({ id, reason: 'parse_failed' })
-              continue
-            }
+          for (const parsed of candidates) {
 
             // Basic validation to insert
             const depDate = parsed.departure_date ? new Date(parsed.departure_date) : null
@@ -256,14 +191,102 @@ export async function POST(req: Request) {
               notes: (parsed as any).notes || `Imported from Gmail message ${id}`,
             }
             // A misread email (airports "DTD" to "DTD", 15:00-15:00) must not
-            // become a flight in the log, whichever page asked for the import.
+            // become a flight in the log.
             const problem = flightParseProblem(row)
             if (problem) {
               errors.push({ id, reason: `unreadable: ${problem}` })
               continue
             }
-            if (existingFlightKeys.has(flightKey(row.departure_date, row.flight_number))) continue
+            // The same itinerary is often emailed more than once: save each leg once.
+            const legKey = flightKey(row.departure_date, row.flight_number)
+            if (existingFlightKeys.has(legKey)) continue
+            existingFlightKeys.add(legKey)
             insertRows.push(row)
+          }
+        } catch (e: any) {
+          errors.push({ id, reason: e?.message || 'fetch_error' })
+        }
+      }
+    } else {
+      while (parsedResults.length + errors.length < maxToProcess) {
+        const listResp: any = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 50, pageToken })
+        const ids = (listResp.data.messages as Array<{ id?: string | null }> | undefined)?.map((m) => m.id as string).filter(Boolean) as string[] || []
+        pageToken = (listResp.data.nextPageToken as string | undefined) || undefined
+        if (!ids.length) break
+
+        for (const id of ids) {
+          if (parsedResults.length + errors.length >= maxToProcess) break
+          try {
+            const msg = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })
+            const headers = (msg.data.payload?.headers as Array<{ name?: string | null; value?: string | null }> | undefined) || []
+            const subject = (headers.find((h) => (h.name ?? '').toLowerCase() === 'subject')?.value as string | undefined) || ''
+            const dateHeader = (headers.find((h) => (h.name ?? '').toLowerCase() === 'date')?.value as string | undefined) || ''
+            const bodyText = extractPlainText(msg.data.payload)
+            const combined = `${subject}\n\n${bodyText}`
+            // A Ryanair itinerary is read with its exact layout, every leg of it;
+            // other emails fall back to the general reader, one flight each.
+            const itinerary = parseRyanairItinerary(combined)
+            const candidates: any[] = itinerary
+              ? itineraryToFlights(itinerary, dateHeader)
+              : await extractFlightsFromTextLLM(combined, { subject, receivedAt: dateHeader })
+                  .then((flights) => [flights.find(f => f.booking_type === 'OUTBOUND') || flights[0]].filter(Boolean))
+            if (!candidates.length) {
+              errors.push({ id, reason: 'parse_failed' })
+              continue
+            }
+
+            for (const parsed of candidates) {
+
+              // Basic validation to insert
+              const depDate = parsed.departure_date ? new Date(parsed.departure_date) : null
+              const depISO = depDate ? depDate.toISOString().slice(0, 10) : null
+              const key = `${(parsed.flight_number || '').trim()}|${(parsed.reservation_number || '').trim()}|${depISO || ''}`
+              if (!parsed.flight_number || !parsed.reservation_number || !depISO) {
+                errors.push({ id, reason: 'missing_required_fields' })
+                continue
+              }
+              if (existingKeys.has(key)) {
+                // skip duplicates
+                continue
+              }
+
+              parsedResults.push({ id, parsed })
+
+              // Build DB row with safe fallbacks
+              const row = {
+                owner_id: userId,
+                passenger_name: (parsed as any).passenger_name || 'Unknown',
+                reservation_number: (parsed as any).reservation_number,
+                flight_number: (parsed as any).flight_number,
+                departure_airport: (parsed as any).departure_airport || (parsed as any).departure_iata || 'Unknown',
+                arrival_airport: (parsed as any).arrival_airport || (parsed as any).arrival_iata || 'Unknown',
+                departure_date: depISO,
+                arrival_date: ((parsed as any).arrival_date ? new Date((parsed as any).arrival_date).toISOString().slice(0, 10) : depISO),
+                departure_time: (parsed as any).departure_time || '00:00',
+                arrival_time: (parsed as any).arrival_time || '00:00',
+                total_receipt: (parsed as any).total_receipt || '0',
+                purchased_date: (parsed as any).purchased_date || depISO,
+                purchase_time: (parsed as any).purchase_time || '00:00',
+                airline: (parsed as any).airline || 'Ryanair',
+                arrival_country: (parsed as any).arrival_country || null,
+                arrival_iata: (parsed as any).arrival_iata || null,
+                departure_iata: (parsed as any).departure_iata || null,
+                seat: (parsed as any).seat || null,
+                notes: (parsed as any).notes || `Imported from Gmail message ${id}`,
+              }
+              // A misread email (airports "DTD" to "DTD", 15:00-15:00) must not
+              // become a flight in the log, whichever page asked for the import.
+              const problem = flightParseProblem(row)
+              if (problem) {
+                errors.push({ id, reason: `unreadable: ${problem}` })
+                continue
+              }
+              // The same itinerary is often emailed more than once: save each leg once.
+              const legKey = flightKey(row.departure_date, row.flight_number)
+              if (existingFlightKeys.has(legKey)) continue
+              existingFlightKeys.add(legKey)
+              insertRows.push(row)
+            }
           } catch (e: any) {
             errors.push({ id, reason: e?.message || 'fetch_error' })
           }
