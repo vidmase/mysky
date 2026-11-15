@@ -72,6 +72,14 @@ process.env.API_KEY_ENCRYPTION_SECRET = 'test-secret-with-enough-entropy-0123456
   assert.equal(planned[0].token, undefined, 'a flight already filed can never be saved again from a scan')
   assert.match(planned[1].note!, /2026-03-05 FR2 BRS-KUN/)
 
+  // Ryanair's resend after buying a bag shows only the bag's price; the booking's price is the first email's.
+  const resent = planLegs(owner, [
+    read('r1', '2026-10-11T10:00:00Z', { ...ry('B8ZRWN', [['2026-11-02', 'FR8682', 'KUN', 'BRS']]), total_receipt: 'EUR 334.38' }),
+    read('r2', '2026-11-08T10:00:00Z', { ...ry('B8ZRWN', [['2026-11-02', 'FR8682', 'KUN', 'BRS']]), total_receipt: 'EUR 29.99' }),
+  ], [], '2026-11-01', '2026-11-30')
+  assert.equal(resent[0].display.fare, 'EUR 334.38')
+  assert.match(openRow(resent[0].token!, owner)!.notes, /email r2/, 'the flights still come from the latest email')
+
   // ---- Saving exactly what was shown, for this user only ----
 
   const token = planned[2].token!
