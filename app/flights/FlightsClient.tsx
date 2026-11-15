@@ -7,12 +7,9 @@ import { DateRange } from "react-day-picker"
 import { isWithinInterval, isSameDay } from "date-fns"
 import { enUS } from "date-fns/locale"
 import { useNotification } from "@/contexts/notification-context"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Pencil, Trash2, Mail, Loader2, Upload, Download, Settings, ChevronDown, Search, RotateCcw } from "lucide-react"
+import { ArrowRight, Pencil, Trash2, Mail, Upload, Download, Settings, ChevronDown, Search, RotateCcw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
 import { PaginationControls } from "@/app/flights/components/PaginationControls"
 import { FiltersPanel } from "@/app/flights/components/FiltersPanel"
 import { FlightsTable } from "@/app/flights/components/FlightsTable"
@@ -21,10 +18,7 @@ import { DeleteFlightDialog } from "@/app/flights/components/DeleteFlightDialog"
 import { CsvImportDialog } from "@/app/flights/components/CsvImportDialog"
 import { CsvExportDialog } from "@/app/flights/components/CsvExportDialog"
 import { Flightradar24ExportDialog } from "@/app/flights/components/Flightradar24ExportDialog"
-import { ImportProgressIndicator } from "@/app/flights/components/ImportProgressIndicator"
-import { PreviewProgressIndicator } from "@/app/flights/components/PreviewProgressIndicator"
-import { ModernSpinner } from "@/app/flights/components/ModernSpinner"
-import { EnhancedGmailImport } from "@/components/EnhancedGmailImport"
+import { GmailImportDialog } from "@/components/gmail/GmailImportDialog"
 import { LiveSearchDrawer } from "@/components/live-search/LiveSearchDrawer"
 import { defaultSearchDate } from "@/components/live-search/mapOfferToFlight"
 import { format } from "date-fns"
@@ -79,21 +73,7 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
     return result
   }
 
-  // Gmail preview and selection dialog state
-  type GmailPreviewItem = {
-    id: string
-    subject: string
-    received_at?: string
-    duplicate?: boolean
-    key?: string
-    parsed: any
-  }
-  // Gmail import state
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [gmailItems, setGmailItems] = useState<GmailPreviewItem[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
-  const [isImportingSelected, setIsImportingSelected] = useState(false)
+  const [isGmailImportOpen, setIsGmailImportOpen] = useState(false)
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
   const [isFlightradar24ExportDialogOpen, setIsFlightradar24ExportDialogOpen] = useState(false)
@@ -116,220 +96,6 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   }
 
 
-  // Enhanced loading states
-  const [importProgress, setImportProgress] = useState<{
-    step: string
-    current: number
-    total: number
-    message: string
-  } | null>(null)
-  const [previewProgress, setPreviewProgress] = useState<{
-    step: string
-    message: string
-  } | null>(null)
-  const [loadingButton, setLoadingButton] = useState<'30days' | '90days' | 'next60days' | 'next90days' | null>(null)
-
-  // Gmail date range (YYYY-MM-DD)
-  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const defaultStartISO = useMemo(() => {
-    const d = new Date()
-    d.setUTCDate(d.getUTCDate() - 30)
-    return d.toISOString().slice(0, 10)
-  }, [])
-  const [gmailStart, setGmailStart] = useState<string>(defaultStartISO)
-  const [gmailEnd, setGmailEnd] = useState<string>(todayISO)
-  // Use all items returned from backend (already filtered by departure date)
-  const filteredGmailItems = gmailItems
-
-  // When list changes, preselect all (user can adjust afterwards)
-  // This mirrors the old behavior of preselecting non-duplicates
-  // but now includes all items returned from backend.
-  useEffect(() => {
-    setSelectedIds(new Set(gmailItems.map(i => i.id)))
-  }, [gmailItems])
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const selectAll = () => setSelectedIds(new Set(gmailItems.map(i => i.id)))
-  const clearAll = () => setSelectedIds(new Set())
-
-  const openImportDialog = () => {
-    // Open dialog without auto-loading previews.
-    // User will explicitly choose Last 30/90 days to fetch.
-    setIsDialogOpen(true)
-    setGmailItems([])
-    setSelectedIds(new Set())
-  }
-
-  const exportCsv = async () => {
-    try {
-      const params = new URLSearchParams()
-      if (dateRange?.from) params.set('start', format(dateRange.from, 'yyyy-MM-dd'))
-      if (dateRange?.to) params.set('end', format(dateRange.to, 'yyyy-MM-dd'))
-      const qs = params.toString()
-      const res = await fetch(`/api/flights/export${qs ? `?${qs}` : ''}`)
-      if (!res.ok) throw new Error('Export failed')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'flights.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-      showSuccess('Exported flights CSV')
-    } catch (e) {
-      showError('Failed to export CSV')
-    }
-  }
-
-  const loadPreview = async (override?: { start?: string; end?: string }, buttonId?: '30days' | '90days' | 'next60days' | 'next90days') => {
-    setIsLoadingPreview(true)
-    setLoadingButton(buttonId || null)
-    setPreviewProgress({ step: 'connecting', message: 'Connecting to Gmail...' })
-
-    try {
-      const params = new URLSearchParams()
-      const startQ = override?.start ?? gmailStart
-      const endQ = override?.end ?? gmailEnd
-      if (startQ) params.set('start', startQ)
-      if (endQ) params.set('end', endQ)
-
-      setPreviewProgress({ step: 'searching', message: 'Searching for Ryanair emails...' })
-      const res = await fetch(`/api/gmail/preview?${params.toString()}`)
-
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.authUrl) {
-          window.location.href = data.authUrl
-          return
-        }
-        showError('Gmail not connected')
-        return
-      }
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        showError(data?.message || data?.error || 'Failed to load Gmail previews')
-        return
-      }
-
-      setPreviewProgress({ step: 'processing', message: 'Processing flight data...' })
-      const data = await res.json()
-      const items: GmailPreviewItem[] = data.items || []
-
-      setPreviewProgress({ step: 'complete', message: `Found ${items.length} flight emails` })
-      setGmailItems(items)
-      setSelectedIds(new Set(items.filter(i => !i.duplicate).map(i => i.id)))
-
-      // Clear progress after a short delay
-      setTimeout(() => setPreviewProgress(null), 3000)
-
-    } catch (e) {
-      showError('Failed to load Gmail previews')
-    } finally {
-      setIsLoadingPreview(false)
-      setLoadingButton(null)
-      setPreviewProgress(null)
-    }
-  }
-
-  // Helpers for month range selection (UTC-safe to avoid TZ drift)
-  const toISO = (d: Date) => d.toISOString().slice(0, 10)
-  const getMonthRangeISO = (year: number, monthZeroBased: number) => {
-    const start = new Date(Date.UTC(year, monthZeroBased, 1))
-    const end = new Date(Date.UTC(year, monthZeroBased + 1, 0))
-    return { startISO: toISO(start), endISO: toISO(end) }
-  }
-  const setMonthRangeAndLoad = (year: number, monthZeroBased: number, buttonId?: '30days' | '90days') => {
-    const { startISO, endISO } = getMonthRangeISO(year, monthZeroBased)
-    setGmailStart(startISO)
-    setGmailEnd(endISO)
-    void loadPreview({ start: startISO, end: endISO }, buttonId)
-  }
-
-  const importSelected = async () => {
-    if (!selectedIds.size) {
-      showError('Select at least one flight to import')
-      return
-    }
-    setIsImportingSelected(true)
-    setImportProgress({
-      step: 'preparing',
-      current: 0,
-      total: selectedIds.size,
-      message: 'Preparing to import flights...'
-    })
-
-    try {
-      const ids = Array.from(selectedIds)
-
-      setImportProgress({
-        step: 'connecting',
-        current: 0,
-        total: ids.length,
-        message: 'Connecting to Gmail...'
-      })
-
-      const res = await fetch('/api/gmail/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids })
-      })
-
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.authUrl) {
-          window.location.href = data.authUrl
-          return
-        }
-        showError('Gmail not connected')
-        return
-      }
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        showError(data?.message || data?.error || 'Import failed')
-        return
-      }
-
-      setImportProgress({
-        step: 'processing',
-        current: ids.length,
-        total: ids.length,
-        message: 'Processing imported flights...'
-      })
-
-      const data = await res.json()
-
-      setImportProgress({
-        step: 'complete',
-        current: ids.length,
-        total: ids.length,
-        message: `Successfully imported ${data.inserted} flights`
-      })
-
-      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`)
-      setIsDialogOpen(false)
-      await refetch()
-
-      // Clear progress after a short delay
-      setTimeout(() => setImportProgress(null), 3000)
-
-    } catch (e) {
-      showError('Import error')
-    } finally {
-      setIsImportingSelected(false)
-      setImportProgress(null)
-    }
-  }
-
   const [searchTerm, setSearchTerm] = useState("")
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [airline, setAirline] = useState("all")
@@ -342,40 +108,6 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 7
 
-  // Bulk import from Gmail (Ryanair itineraries)
-  const [isImporting, setIsImporting] = useState(false)
-  const [showEnhancedGmailImport, setShowEnhancedGmailImport] = useState(false)
-  const importFromGmail = async () => {
-    setIsImporting(true)
-    try {
-      const res = await fetch('/api/gmail/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: gmailStart, end: gmailEnd }),
-      })
-      if (res.status === 401) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.authUrl) {
-          window.location.href = data.authUrl
-          return
-        }
-        showError('Gmail not connected')
-        return
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        showError(data?.message || data?.error || 'Import failed')
-        return
-      }
-      const data = await res.json()
-      showSuccess(`Imported ${data.inserted} flights (${data.skipped_duplicates} duplicates skipped)`)
-      await refetch()
-    } catch (e) {
-      showError('Import error')
-    } finally {
-      setIsImporting(false)
-    }
-  }
 
   // FiltersPanel extra state/props
   const initialDate = useMemo(() => new Date(), [])
@@ -628,23 +360,9 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 Export for Flightradar24
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={openImportDialog}
-                className="gap-2"
-              >
-                {isLoadingPreview ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4" />
-                )}
-                Import from Gmail (Legacy)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setShowEnhancedGmailImport(true)}
-                className="gap-2"
-              >
+              <DropdownMenuItem onClick={() => setIsGmailImportOpen(true)} className="gap-2">
                 <Mail className="h-4 w-4" />
-                Enhanced Gmail Import ✨
+                Import from Gmail
               </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -762,331 +480,12 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         isDeleting={isDeleting}
       />
 
-      {/* Gmail selection dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] sm:w-[90vw] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Import from Gmail</DialogTitle>
-            <DialogDescription>
-              Preview Ryanair itineraries from your Gmail. Select a date range below - past flights (Last 30/90 days) or future flights (Next 60/90 days).
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Quick actions */}
-          <div className="mb-3 space-y-3">
-            {/* Preview Progress Indicator */}
-            <PreviewProgressIndicator
-              progress={previewProgress}
-              isVisible={isLoadingPreview}
-            />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const d = new Date()
-                  const endISO = d.toISOString().slice(0, 10)
-                  const dStart = new Date(d)
-                  dStart.setUTCDate(dStart.getUTCDate() - 30)
-                  const startISO = dStart.toISOString().slice(0, 10)
-                  setGmailStart(startISO)
-                  setGmailEnd(endISO)
-                  void loadPreview({ start: startISO, end: endISO }, '30days')
-                }}
-                disabled={loadingButton === '30days'}
-              >
-                {loadingButton === '30days' ? (
-                  <>
-                    <ModernSpinner size="sm" className="mr-2" />
-                    Loading...
-                  </>
-                ) : (
-                  'Last 30 days'
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const d = new Date()
-                  const endISO = d.toISOString().slice(0, 10)
-                  const dStart = new Date(d)
-                  dStart.setUTCDate(dStart.getUTCDate() - 90)
-                  const startISO = dStart.toISOString().slice(0, 10)
-                  setGmailStart(startISO)
-                  setGmailEnd(endISO)
-                  void loadPreview({ start: startISO, end: endISO }, '90days')
-                }}
-                disabled={loadingButton === '90days'}
-              >
-                {loadingButton === '90days' ? (
-                  <>
-                    <ModernSpinner size="sm" className="mr-2" />
-                    Loading...
-                  </>
-                ) : (
-                  'Last 90 days'
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const d = new Date()
-                  const startISO = d.toISOString().slice(0, 10)
-                  const dEnd = new Date(d)
-                  dEnd.setUTCDate(dEnd.getUTCDate() + 60)
-                  const endISO = dEnd.toISOString().slice(0, 10)
-                  setGmailStart(startISO)
-                  setGmailEnd(endISO)
-                  void loadPreview({ start: startISO, end: endISO }, 'next60days')
-                }}
-                disabled={loadingButton === 'next60days'}
-              >
-                {loadingButton === 'next60days' ? (
-                  <>
-                    <ModernSpinner size="sm" className="mr-2" />
-                    Loading...
-                  </>
-                ) : (
-                  'Next 60 days'
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const d = new Date()
-                  const startISO = d.toISOString().slice(0, 10)
-                  const dEnd = new Date(d)
-                  dEnd.setUTCDate(dEnd.getUTCDate() + 90)
-                  const endISO = dEnd.toISOString().slice(0, 10)
-                  setGmailStart(startISO)
-                  setGmailEnd(endISO)
-                  void loadPreview({ start: startISO, end: endISO }, 'next90days')
-                }}
-                disabled={loadingButton === 'next90days'}
-              >
-                {loadingButton === 'next90days' ? (
-                  <>
-                    <ModernSpinner size="sm" className="mr-2" />
-                    Loading...
-                  </>
-                ) : (
-                  'Next 90 days'
-                )}
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-muted-foreground">
-                {gmailItems.length} found · {Array.from(selectedIds).length} selected
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={selectAll}>Select All</Button>
-                <Button variant="ghost" size="sm" onClick={clearAll}>Clear</Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-                  <tr className="text-xs uppercase text-muted-foreground tracking-wide">
-                    <th className="text-left p-3 w-12">Select</th>
-                    <th className="text-left p-3 w-24">Date</th>
-                    <th className="text-left p-3 w-32">Passenger</th>
-                    <th className="text-left p-3 w-28">Reservation</th>
-                    <th className="text-left p-3 w-48">Flight Details</th>
-                    <th className="text-left p-3 w-36">Departure</th>
-                    <th className="text-left p-3 w-36">Arrival</th>
-                    <th className="text-left p-3 w-20">Duration</th>
-                    <th className="text-left p-3 w-32">Purchase</th>
-                    <th className="text-left p-3 w-32">Received</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {gmailItems.map((item, index) => {
-                    const p = item.parsed || {}
-                    console.log('FlightsClient - Item parsed data:', {
-                      departure_date: p.departure_date,
-                      purchased_date: p.purchased_date,
-                      received_at: item.received_at,
-                      flight_number: p.flight_number
-                    })
-                    const depAirport = p.departure_airport || p.departure_iata || '—'
-                    const arrAirport = p.arrival_airport || p.arrival_iata || '—'
-                    const depDate = p.departure_date ? new Date(p.departure_date) : null
-                    const depDateStr = depDate ? format(depDate, 'MMM d', { locale: enUS }) : '—'
-                    const depTimeRaw = p.departure_time || ''
-                    const arrTimeRaw = p.arrival_time || ''
-                    const depTime = depTimeRaw ? (formatTimeToHHMM(depTimeRaw) || depTimeRaw || '—') : '—'
-                    const arrTime = arrTimeRaw ? (formatTimeToHHMM(arrTimeRaw) || arrTimeRaw || '—') : '—'
-                    const duration = (depTimeRaw && arrTimeRaw ? (
-                      calculateDuration(
-                        depTimeRaw,
-                        arrTimeRaw,
-                        {
-                          departureDate: p.departure_date,
-                          arrivalDate: p.arrival_date,
-                          departureIata: p.departure_iata || p.departure_airport,
-                          arrivalIata: p.arrival_iata || p.arrival_airport,
-                          departureAirportName: p.departure_airport,
-                          arrivalAirportName: p.arrival_airport,
-                        }
-                      ) || p.flight_duration || '—'
-                    ) : (p.flight_duration || '—'))
-                    // Use purchased_date if available, otherwise fall back to received date
-                    const purchaseDate = p.purchased_date ? new Date(p.purchased_date) : (item.received_at ? new Date(item.received_at) : null)
-                    const purchaseDateStr = purchaseDate ? format(purchaseDate, 'MMM d', { locale: enUS }) : '—'
-                    const purchaseTimeStr = p.purchase_time ? formatTimeToHHMM(p.purchase_time) : (purchaseDate ? format(purchaseDate, 'HH:mm') : '')
-                    const purchase = purchaseTimeStr ? `${purchaseDateStr} ${purchaseTimeStr}` : purchaseDateStr
-                    const receipt = p.total_receipt ? ` · ${p.total_receipt}` : ''
-                    const receivedStr = item.received_at ? format(new Date(item.received_at), 'MMM d HH:mm', { locale: enUS }) : '—'
-                    const disabled = !!item.duplicate
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`transition-colors ${disabled ? 'opacity-60' : 'hover:bg-accent/5'} ${index % 2 === 0 ? 'bg-background/30' : 'bg-background/10'}`}
-                      >
-                        <td className="p-3">
-                          <Checkbox
-                            checked={selectedIds.has(item.id)}
-                            onCheckedChange={() => toggleSelect(item.id)}
-                          />
-                        </td>
-                        <td className="p-3 text-sm font-mono tabular-nums">{depDateStr}</td>
-                        <td className="p-3 text-sm truncate max-w-32">{p.passenger_name || '—'}</td>
-                        <td className="p-3 text-sm">
-                          <Badge variant="outline" className="bg-muted/30 text-foreground text-xs font-mono">{p.reservation_number || '—'}</Badge>
-                        </td>
-                        <td className="p-3 text-sm">
-                          <div className="flex items-center gap-2 mb-1">
-                            {(() => {
-                              const logo = getAirlineLogo(p.airline || '')
-                              return logo ? <img src={logo} alt="logo" className="h-4 w-4 rounded-sm flex-shrink-0" /> : null
-                            })()}
-                            <span className="font-mono font-semibold">{p.flight_number || 'Unknown'}</span>
-                            <span className="text-muted-foreground">·</span>
-                            <span className="truncate text-xs">{p.airline || 'Ryanair'}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
-                          {disabled && (
-                            <Badge
-                              variant="secondary"
-                              className="mt-1 bg-[var(--wash-accent)] text-[var(--vermillion-dk)] border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] text-xs"
-                            >
-                              Duplicate
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 text-sm">
-                          <div className="space-y-1">
-                            {p.departure_iata && (
-                              <div className="inline-flex items-center rounded bg-[var(--wash-accent)] text-[var(--vermillion)] px-2 py-1 text-xs font-bold border border-[color-mix(in_srgb,var(--vermillion)_30%,transparent)]">
-                                {p.departure_iata}
-                              </div>
-                            )}
-                            <div className="font-medium text-sm truncate">{depAirport}</div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12,6 12,12 16,14" />
-                              </svg>
-                              <span className="font-mono">{depTime}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3 text-sm">
-                          <div className="space-y-1">
-                            {p.arrival_iata && (
-                              <div className="inline-flex items-center rounded bg-[var(--wash-jade)] text-[var(--jade)] px-2 py-1 text-xs font-bold border border-[color-mix(in_srgb,var(--jade)_30%,transparent)]">
-                                {p.arrival_iata}
-                              </div>
-                            )}
-                            <div className="font-medium text-sm truncate">{arrAirport}</div>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12,6 12,12 16,14" />
-                              </svg>
-                              <span className="font-mono">{arrTime}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3 text-sm">
-                          <div className="flex items-center gap-1 text-sm font-medium">
-                            <svg className="h-3 w-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="10" />
-                              <polyline points="12,6 12,12 16,14" />
-                            </svg>
-                            <span className="font-mono tabular-nums">{duration}</span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-sm truncate max-w-32">{purchase}{receipt}</td>
-                        <td className="p-3 text-sm font-mono tabular-nums">{receivedStr}</td>
-                      </tr>
-                    )
-                  })}
-                  {gmailItems.length === 0 && !isLoadingPreview && (
-                    <tr>
-                      <td colSpan={10} className="p-8 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <Mail className="h-12 w-12 text-muted-foreground/50" />
-                          <div className="text-sm text-muted-foreground font-medium">
-                            No matching Ryanair emails found.
-                          </div>
-                          <div className="text-xs text-muted-foreground/70 max-w-md">
-                            <p className="mb-2">This could mean:</p>
-                            <ul className="text-left list-disc list-inside space-y-1">
-                              <li>No booking confirmations in the selected date range</li>
-                              <li>Gmail might not be properly connected</li>
-                              <li>The email search didn&apos;t find relevant messages</li>
-                            </ul>
-                            <p className="mt-3 text-center">
-                              Try selecting a different date range or check your Gmail connection.
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={importSelected} disabled={isImportingSelected || selectedIds.size === 0}>
-              {isImportingSelected ? (
-                <>
-                  <ModernSpinner size="sm" className="mr-2" />
-                  Importing...
-                </>
-              ) : (
-                `Import Selected (${selectedIds.size})`
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Enhanced Gmail Import Dialog */}
-      {showEnhancedGmailImport && (
-        <Dialog open={showEnhancedGmailImport} onOpenChange={setShowEnhancedGmailImport}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Enhanced Gmail Import with Future Flights</DialogTitle>
-              <DialogDescription>
-                Import flight bookings from Gmail with advanced reliability features and future flight support.
-              </DialogDescription>
-            </DialogHeader>
-            <EnhancedGmailImport />
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Gmail import: scan, review, confirm */}
+      <GmailImportDialog
+        open={isGmailImportOpen}
+        onOpenChange={setIsGmailImportOpen}
+        onAdded={async () => { await refetch() }}
+      />
 
       {/* Import Progress Indicator */}
 
@@ -1097,10 +496,6 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         initialTo={liveSearchInitial.to}
         initialDate={liveSearchInitial.date}
         onPlannedAdded={async () => { await originalRefetch() }}
-      />
-      <ImportProgressIndicator
-        progress={importProgress}
-        isVisible={isImportingSelected}
       />
     </div>
   )

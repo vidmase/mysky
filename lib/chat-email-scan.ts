@@ -1,19 +1,17 @@
-import { flightKey, flightParseProblem } from '@/lib/flight-validity'
+import { scanGmailForFlights, type GmailScanResult } from '@/lib/email-flights/gmail-scan'
 
-// The chat assistant's one tool: look through the user's Gmail for flights
-// that are not in their log yet. It only finds and proposes; nothing is written
-// here. The chat page shows what was found and the user adds it with a click,
-// through the same /api/gmail/import the flights page uses.
+// The chat assistant's one tool: the same Gmail scan the flights page uses. It
+// only finds and proposes; the chat shows the review list and the user adds
+// what they confirm, through /api/gmail/commit.
 
 export const SCAN_EMAIL_TOOL = {
     type: 'function',
     function: {
         name: 'scan_email_for_flights',
         description:
-            "Search the user's Gmail for Ryanair booking itineraries whose flights depart in a date range, " +
-            'and report the flights that are not in their log yet. Use it when the user asks to check, scan or ' +
-            'import new flights from their email. Only Ryanair itinerary emails are read. This does not add ' +
-            'anything: the user confirms in the app before flights are added.',
+            "Read the user's Ryanair, Wizz Air and easyJet booking confirmation emails for flights departing in a date range, " +
+            'and report which are new, already in their log, or from a booking that has changed. Use it when the user asks to ' +
+            'check, scan or import flights from their email. This does not add anything: the user confirms in the app.',
         parameters: {
             type: 'object',
             properties: {
@@ -25,89 +23,10 @@ export const SCAN_EMAIL_TOOL = {
     },
 } as const
 
-export type ProposedFlight = {
-    emailId: string
-    date: string | null
-    flightNumber: string | null
-    from: string | null
-    to: string | null
-    departs: string | null
-    arrives: string | null
-    fare: string | null
-    reference: string | null
-}
+export type ScanOutcome = GmailScanResult
 
-export type ScanOutcome =
-    | { ok: true; flights: ProposedFlight[]; alreadyInLog: number; unreadable: { subject: string; problem: string }[] }
-    | { ok: false; reason: 'gmail_not_connected'; authUrl?: string }
-    | { ok: false; reason: 'bad_dates' | 'scan_failed'; detail: string }
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
-
-/**
- * Runs the existing Gmail preview for the signed-in user. It is called over
- * HTTP with the user's own cookies, so it authenticates exactly as when the
- * flights page calls it, and the parsing stays in one place.
- */
-export async function scanEmailForFlights(
-    request: Request,
-    args: { start?: unknown; end?: unknown },
-    /** flightKey() of every flight already in the user's log */
-    inLog: Set<string> = new Set()
-): Promise<ScanOutcome> {
-    const start = typeof args.start === 'string' ? args.start : ''
-    const end = typeof args.end === 'string' ? args.end : ''
-    if (!ISO_DATE.test(start) || !ISO_DATE.test(end) || start > end) {
-        return { ok: false, reason: 'bad_dates', detail: `start and end must be YYYY-MM-DD with start <= end (got ${start || '?'} to ${end || '?'})` }
-    }
-
-    const url = new URL('/api/gmail/preview', request.url)
-    url.searchParams.set('start', start)
-    url.searchParams.set('end', end)
-
-    const res = await fetch(url, { headers: { cookie: request.headers.get('cookie') ?? '' }, cache: 'no-store' })
-    const body: any = await res.json().catch(() => ({}))
-
-    if (res.status === 401 && (body?.error === 'not_connected' || body?.error === 'reauthorize')) {
-        return { ok: false, reason: 'gmail_not_connected', authUrl: typeof body.authUrl === 'string' ? body.authUrl : undefined }
-    }
-    if (!res.ok || !Array.isArray(body?.items)) {
-        return { ok: false, reason: 'scan_failed', detail: body?.message || body?.error || `HTTP ${res.status}` }
-    }
-
-    // Three outcomes per email: a misread parse is reported, never offered; a
-    // flight already in the log (same date and flight number) is counted; only
-    // the rest can be added.
-    const items: any[] = body.items.filter((i: any) => i?.parsed)
-    const unreadable: { subject: string; problem: string }[] = []
-    const fresh: any[] = []
-    let alreadyInLog = 0
-    for (const i of items) {
-        const problem = flightParseProblem(i.parsed)
-        if (problem) unreadable.push({ subject: String(i.subject ?? 'email'), problem })
-        else if (i.duplicate || inLog.has(flightKey(i.parsed.departure_date, i.parsed.flight_number))) alreadyInLog++
-        else fresh.push(i)
-    }
-    return {
-        ok: true,
-        alreadyInLog,
-        unreadable,
-        flights: fresh.map((i) => {
-            const p = i.parsed
-            const s = (v: unknown) => (v == null || v === '' ? null : String(v))
-            return {
-                emailId: String(i.id),
-                date: s(p.departure_date)?.slice(0, 10) ?? null,
-                flightNumber: s(p.flight_number),
-                from: s(p.departure_iata) ?? s(p.departure_airport),
-                to: s(p.arrival_iata) ?? s(p.arrival_airport),
-                departs: s(p.departure_time)?.slice(0, 5) ?? null,
-                arrives: s(p.arrival_time)?.slice(0, 5) ?? null,
-                fare: s(p.total_receipt),
-                reference: s(p.reservation_number),
-            }
-        }),
-    }
+export function scanEmailForFlights(ownerId: string, args: { start?: unknown; end?: unknown }): Promise<ScanOutcome> {
+    return scanGmailForFlights(ownerId, typeof args.start === 'string' ? args.start : '', typeof args.end === 'string' ? args.end : '')
 }
 
 /** What the model reads back: short, and explicit that nothing was added. */
@@ -118,18 +37,26 @@ export function describeScanForModel(outcome: ScanOutcome): string {
         }
         return `The scan did not run: ${outcome.detail}. Tell the user plainly.`
     }
-    const unreadable = outcome.unreadable.length
-        ? `\n${outcome.unreadable.length} email(s) could not be read reliably and were left out (${outcome.unreadable.map((u) => `"${u.subject}": ${u.problem}`).join('; ')}). Say so briefly; they cannot be added from here.`
-        : ''
-    if (outcome.flights.length === 0) {
-        return `No new flights found. ${outcome.alreadyInLog} flight(s) in that range are already in the log.${unreadable}\nDo not mention an add button: there is nothing to add.`
+    const line = (l: (typeof outcome.legs)[number]) =>
+        `${l.display.date} ${l.display.flightNumber} ${l.display.from}-${l.display.to} ${l.display.departs}-${l.display.arrives} ${l.display.airline} ref ${l.display.reference}${l.note ? ` (${l.note})` : ''}`
+    const group = (status: string, title: string) => {
+        const ls = outcome.legs.filter((l) => l.status === status)
+        return ls.length ? `${title} (${ls.length}):\n${ls.map(line).join('\n')}` : ''
     }
-    const lines = outcome.flights.map(
-        (f) => `${f.date ?? '?'} ${f.flightNumber ?? '?'} ${f.from ?? '?'}-${f.to ?? '?'} ${f.departs ?? ''}-${f.arrives ?? ''} ref ${f.reference ?? '?'} fare ${f.fare ?? '?'}`
+    const parts = [
+        `Read ${outcome.emailsRead} confirmation email(s)${outcome.truncated ? ', the most recent 300 only' : ''}.`,
+        group('new', 'New, not added yet'),
+        group('changed', 'Booking changed since it was logged; the user decides'),
+        group('in_log', 'Already in the log'),
+        outcome.unreadable.length
+            ? `Could not read ${outcome.unreadable.length} email(s), never added: ${outcome.unreadable.slice(0, 5).map((u) => `"${u.subject}"`).join(', ')}.`
+            : '',
+    ].filter(Boolean)
+    const addable = outcome.legs.some((l) => l.status !== 'in_log')
+    parts.push(
+        addable
+            ? 'Summarise this for the user. They add flights by ticking them in the list under your reply and pressing Add. Never say a flight was added.'
+            : 'Summarise this for the user. There is nothing to add, so do not mention an add button.'
     )
-    return (
-        `${outcome.flights.length} new flight email(s) found (not added yet); ${outcome.alreadyInLog} already in the log:\n` +
-        lines.join('\n') + unreadable +
-        '\nSummarise these for the user and tell them to press "Add these flights" under your reply to add them. Do not say they were added.'
-    )
+    return parts.join('\n')
 }
