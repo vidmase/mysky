@@ -5,7 +5,7 @@ import {
     getLastProviderError,
     isProviderPaused,
 } from '@/src/lib/services/flight-status'
-import { resolveSupabaseUserId } from '@/lib/supabase-server'
+import { resolveReadAccess } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Server not configured' }, { status: 500 })
         }
 
-        const userId = await resolveSupabaseUserId()
+        const userId = (await resolveReadAccess())?.ownerId ?? null
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

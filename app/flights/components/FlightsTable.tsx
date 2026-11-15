@@ -16,8 +16,8 @@ export interface FlightsTableProps {
   loading: boolean
   /** one entry per reservation; its legs are listed earliest departure first */
   bookings: Booking<Flight>[]
-  onEdit: (flight: Flight) => void
-  onDeleteRequest: (flight: Flight) => void
+  onEdit?: (flight: Flight) => void
+  onDeleteRequest?: (flight: Flight) => void
   onFlyAgain?: (flight: Flight) => void
   onRowClick: (flight: Flight) => void
 }
@@ -278,8 +278,8 @@ type LegRowProps = {
   fareLabel: string
   expanded?: boolean
   onToggle?: () => void
-  onEdit: (flight: Flight) => void
-  onDeleteRequest: (flight: Flight) => void
+  onEdit?: (flight: Flight) => void
+  onDeleteRequest?: (flight: Flight) => void
   onFlyAgain?: (flight: Flight) => void
   onRowClick: (flight: Flight) => void
 }
@@ -449,22 +449,26 @@ function LegRow({
               <RotateCcw />
             </button>
           )}
-          <button
-            type="button"
-            className={s.iconBtn}
-            aria-label="Edit flight"
-            onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
-          >
-            <Pencil />
-          </button>
-          <button
-            type="button"
-            className={s.iconBtn}
-            aria-label="Delete flight"
-            onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
-          >
-            <Trash2 />
-          </button>
+          {onEdit && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              aria-label="Edit flight"
+              onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
+            >
+              <Pencil />
+            </button>
+          )}
+          {onDeleteRequest && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              aria-label="Delete flight"
+              onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
+            >
+              <Trash2 />
+            </button>
+          )}
           <button
             type="button"
             className={s.iconBtn}

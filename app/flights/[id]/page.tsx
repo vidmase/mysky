@@ -41,6 +41,7 @@ import { DateTime } from 'luxon'
 import { calculateDuration as sharedCalculateDuration, formatTimeToHHMM } from '@/app/flights/lib/flight-utils'
 import { groupFlightsIntoBookings } from '@/lib/statistics/booking-spend'
 import { BoardingPass } from '@/app/flights/components/BoardingPass'
+import { useReadOnly } from '@/lib/use-read-only'
 import bp from '@/app/flights/components/boarding-pass.module.css'
 
 
@@ -317,6 +318,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
   const [isSavingNotes, setIsSavingNotes] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { id } = React.use(params)
+  const canEdit = useReadOnly() === false
 
   // Until the siblings arrive — and for a booking that has none — the flight
   // opened is the whole booking, so it prints on its own.
@@ -605,13 +607,15 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
               </p>
             </div>
           </div>
-          <Button
-            className="gap-2 bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--vermillion)]"
-            onClick={() => setLiveSearchOpen(true)}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Fly it again
-          </Button>
+          {canEdit && (
+            <Button
+              className="gap-2 bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--vermillion)]"
+              onClick={() => setLiveSearchOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Fly it again
+            </Button>
+          )}
         </div>
 
         {/* ── THE PASSES ──────────────────────────────────────
@@ -817,7 +821,7 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                     <FileText className="h-5 w-5 mr-2" />
                     Notes
                   </div>
-                  {!isEditingNotes && (
+                  {canEdit && !isEditingNotes && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -871,14 +875,16 @@ export default function FlightDetailPage({ params }: { params: Promise<{ id: str
                     <div className="text-center py-8">
                       <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
                       <p className="text-muted-foreground">No notes added for this flight.</p>
-                      <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => setIsEditingNotes(true)}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        Add Notes
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="outline"
+                          className="mt-4"
+                          onClick={() => setIsEditingNotes(true)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Add Notes
+                        </Button>
+                      )}
                     </div>
                   )
                 )}

@@ -56,3 +56,39 @@ export async function resolveSupabaseUserId(): Promise<string | null> {
 
     return profile?.id ?? null
 }
+
+export type ReadAccess = {
+    /** whose flight log is shown */
+    ownerId: string
+    /** true for a family member invited to view someone else's log */
+    readOnly: boolean
+}
+
+/**
+ * Whose log the signed-in user may read: their own, or else the log of someone
+ * who added their email as a family viewer (profile_viewers).
+ *
+ * Only reading goes through this. Every route that changes data keeps using
+ * resolveSupabaseUserId(), which returns a profile only for its owner, so a
+ * viewer is refused by default anywhere this has not been opened up.
+ */
+export async function resolveReadAccess(): Promise<ReadAccess | null> {
+    const own = await resolveSupabaseUserId()
+    if (own) return { ownerId: own, readOnly: false }
+
+    const user = await currentUser()
+    const email = user?.emailAddresses?.[0]?.emailAddress?.trim().toLowerCase()
+    if (!email) return null
+
+    const supabase = createSupabaseServer()
+    const { data, error } = await supabase
+        .from('profile_viewers')
+        .select('owner_id')
+        .eq('viewer_email', email)
+        .order('created_at', { ascending: true })
+        .limit(1)
+    if (error) {
+        throw new Error(`Failed to check family access for ${email}: ${error.message}`)
+    }
+    return data?.[0] ? { ownerId: data[0].owner_id, readOnly: true } : null
+}

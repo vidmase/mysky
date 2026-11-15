@@ -1,5 +1,6 @@
 'use client'
 
+import { useReadOnly } from '@/lib/use-read-only'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from 'next/navigation'
@@ -62,6 +63,11 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
   const router = useRouter()
+  // Family members only view; this page changes the log.
+  const readOnly = useReadOnly()
+  useEffect(() => {
+    if (readOnly) router.replace('/flights')
+  }, [readOnly, router])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

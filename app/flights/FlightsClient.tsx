@@ -46,7 +46,7 @@ export type FlightsCounts = {
   past: number
 }
 
-export function FlightsClient({ initialFlights, initialCounts }: { initialFlights: Flight[]; initialCounts: FlightsCounts }) {
+export function FlightsClient({ initialFlights, initialCounts, readOnly = false }: { initialFlights: Flight[]; initialCounts: FlightsCounts; readOnly?: boolean }) {
   const router = useRouter()
   const { showSuccess, showError } = useNotification()
 
@@ -334,10 +334,12 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
               <Search className="h-3.5 w-3.5" />
               Search flights
             </button>
-            <a href="/add-flight" className={s.btnPrimary}>
-              File a flight
-              <Arrow />
-            </a>
+            {!readOnly && (
+              <a href="/add-flight" className={s.btnPrimary}>
+                File a flight
+                <Arrow />
+              </a>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={s.btnOutline}>
@@ -347,10 +349,12 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="paper-surface w-56">
-              <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
-                <Upload className="h-4 w-4" />
-                Import CSV
-              </DropdownMenuItem>
+              {!readOnly && (
+                <DropdownMenuItem onClick={() => setIsCsvDialogOpen(true)} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Import CSV
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setIsCsvExportDialogOpen(true)} className="gap-2">
                 <Download className="h-4 w-4" />
                 Export CSV
@@ -359,11 +363,15 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
                 <Plane className="h-4 w-4 text-[var(--brass)]" />
                 Export for Flightradar24
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setIsGmailImportOpen(true)} className="gap-2">
-                <Mail className="h-4 w-4" />
-                Import from Gmail
-              </DropdownMenuItem>
+              {!readOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsGmailImportOpen(true)} className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Import from Gmail
+                  </DropdownMenuItem>
+                </>
+              )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -432,9 +440,9 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
               flight={booking.legs[0]}
               otherLegs={booking.legs.length - 1}
               onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
-              onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
-              onDeleteRequest={(f) => setFlightToDelete(f)}
-              onFlyAgain={openFlyItAgain}
+              onEdit={readOnly ? undefined : (f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
+              onDeleteRequest={readOnly ? undefined : (f) => setFlightToDelete(f)}
+              onFlyAgain={readOnly ? undefined : openFlyItAgain}
               isUpcoming={isUpcoming}
             />
           ))}
@@ -444,9 +452,9 @@ export function FlightsClient({ initialFlights, initialCounts }: { initialFlight
         <FlightsTable
           loading={isFetching}
           bookings={currentBookings}
-          onEdit={(f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
-          onDeleteRequest={(f) => setFlightToDelete(f)}
-          onFlyAgain={openFlyItAgain}
+          onEdit={readOnly ? undefined : (f) => { logEvent("open_flight_edit", { id: f.id, source: "table_edit" }); router.push(`/flights/${f.id}/edit`) }}
+          onDeleteRequest={readOnly ? undefined : (f) => setFlightToDelete(f)}
+          onFlyAgain={readOnly ? undefined : openFlyItAgain}
           onRowClick={(f) => { logEvent("open_flight", { id: f.id, source: "row_click" }); router.push(`/flights/${f.id}`) }}
         />
 
@@ -506,9 +514,9 @@ interface FlightCardProps {
   /** legs of the same reservation not shown on this card */
   otherLegs?: number;
   onRowClick: (flight: Flight) => void;
-  onEdit: (flight: Flight) => void;
-  onDeleteRequest: (flight: Flight) => void;
-  onFlyAgain: (flight: Flight) => void;
+  onEdit?: (flight: Flight) => void;
+  onDeleteRequest?: (flight: Flight) => void;
+  onFlyAgain?: (flight: Flight) => void;
   isUpcoming: (date: string) => boolean;
 }
 
@@ -593,22 +601,26 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, otherLegs = 0, onRowCli
               <RotateCcw />
             </button>
           )}
-          <button
-            type="button"
-            className={s.iconBtn}
-            aria-label="Edit flight"
-            onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
-          >
-            <Pencil />
-          </button>
-          <button
-            type="button"
-            className={s.iconBtn}
-            aria-label="Delete flight"
-            onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
-          >
-            <Trash2 />
-          </button>
+          {onEdit && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              aria-label="Edit flight"
+              onClick={(e) => { e.stopPropagation(); onEdit(flight) }}
+            >
+              <Pencil />
+            </button>
+          )}
+          {onDeleteRequest && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              aria-label="Delete flight"
+              onClick={(e) => { e.stopPropagation(); onDeleteRequest(flight) }}
+            >
+              <Trash2 />
+            </button>
+          )}
         </div>
       </div>
     </div>

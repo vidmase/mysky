@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { auth } from '@clerk/nextjs/server'
-import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
+import { createSupabaseServer, resolveReadAccess } from '@/lib/supabase-server'
 import { FlightsClient, type FlightsCounts } from './FlightsClient'
 import type { Flight } from '@/types/flight'
 
@@ -17,7 +17,8 @@ export default async function FlightsPage() {
 
   // Clerk says this user is signed in, so never bounce them to /auth here: the
   // sign-in page redirects an authenticated user straight back, which loops.
-  const userId = await resolveSupabaseUserId()
+  const access = await resolveReadAccess()
+  const userId = access?.ownerId ?? null
   if (!userId) {
     throw new Error(
       'No flight profile is linked to this account. Signed in with Clerk, but no matching row in the Supabase profiles table.'
@@ -47,7 +48,7 @@ export default async function FlightsPage() {
     <div className="paper-stock">
       <Suspense fallback={<div className="container mx-auto px-4 py-8">Loading flights...</div>}>
         {/* Hydrate client UI with initial data */}
-        <FlightsClient initialFlights={(flights as Flight[]) ?? []} initialCounts={counts} />
+        <FlightsClient initialFlights={(flights as Flight[]) ?? []} initialCounts={counts} readOnly={access!.readOnly} />
       </Suspense>
     </div>
   )

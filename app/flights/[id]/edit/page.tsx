@@ -1,5 +1,6 @@
 "use client"
 
+import { useReadOnly } from '@/lib/use-read-only'
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useNotification } from "@/contexts/notification-context"
@@ -61,6 +62,11 @@ const formatTime = (timeStr: string) => {
 export default function EditFlightPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
+  // Family members only view; this page changes the log.
+  const readOnly = useReadOnly()
+  useEffect(() => {
+    if (readOnly) router.replace('/flights')
+  }, [readOnly, router])
   const { showSuccess, showError } = useNotification()
   const [flight, setFlight] = useState<any>(null)
   const [loading, setLoading] = useState(true)
