@@ -45,7 +45,7 @@
 .weekday { padding: .65rem .5rem; text-align: left; font-family: var(--code); font-size: .5rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
 .day { min-height: 8.5rem; padding: .55rem; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); background: rgba(255,255,255,.12); transition: background .2s; }
 .day:nth-child(7n) { border-right: 0; }
-.day:hover { background: rgba(206,59,30,.045); }
+.day:hover { background: var(--wash-accent); }
 .dayOutside { background: rgba(23,19,14,.025); }
 .dayNumber { display: flex; width: 1.6rem; height: 1.6rem; align-items: center; justify-content: center; font-family: var(--code); font-size: .65rem; color: var(--ink-2); }
 .dayOutside .dayNumber { color: var(--ink-3); }

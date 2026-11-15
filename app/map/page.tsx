@@ -524,9 +524,10 @@ export default function MapPage() {
         .map-popup-paper .mp {
           min-width: 168px;
           padding: 0.7rem 0.85rem 0.75rem;
-          background: #fbf7ef;
-          border: 1px solid rgba(23, 19, 14, 0.38);
-          box-shadow: 3px 3px 0 rgba(23, 19, 14, 0.16);
+          background: var(--paper-2);
+          border: 1px solid var(--rule);
+          border-radius: 12px;
+          box-shadow: var(--shadow-2);
           font-family: var(--body);
           color: var(--ink);
         }

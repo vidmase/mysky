@@ -75,10 +75,12 @@ type Flight = {
 const SERIES = ['#ce3b1e', '#1f6fb0', '#8e4a86', '#2f8f68', '#c9942f']
 const OTHER = '#8c8071'
 
-const VERMILLION = '#ce3b1e'
-const INK = '#17130e'
-const INK_3 = '#8c8071'
-const RULE = 'rgba(23, 19, 14, 0.16)'
+// Single-series accent and chart chrome follow the light theme (app/globals.css).
+// SERIES above is the categorical airline palette and is left as validated.
+const VERMILLION = '#2563eb'
+const INK = '#0f172a'
+const INK_3 = '#94a3b8'
+const RULE = '#e6e9ef'
 
 /** Fixed-order hue for a slot; anything past the theme is deliberately neutral. */
 const seriesColor = (index: number) => SERIES[index] ?? OTHER
@@ -719,7 +721,7 @@ export default function StatsPage() {
                         fill={VERMILLION}
                         fillOpacity={0.12}
                         dot={{ r: 2.5, fill: VERMILLION, stroke: 'none' }}
-                        activeDot={{ r: 4.5, fill: VERMILLION, stroke: '#fbf7ef', strokeWidth: 2 }}
+                        activeDot={{ r: 4.5, fill: VERMILLION, stroke: '#ffffff', strokeWidth: 2 }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -765,7 +767,7 @@ export default function StatsPage() {
                         innerRadius={46}
                         /* the 2px stock gap that lets adjacent hues separate
                            without leaning on colour alone */
-                        stroke="#fbf7ef"
+                        stroke="#ffffff"
                         strokeWidth={2}
                       >
                         {chartData.airlineData.map((item, idx) => (
@@ -901,7 +903,7 @@ export default function StatsPage() {
                               fill={VERMILLION}
                               fillOpacity={0.12}
                               dot={{ r: 2.5, fill: VERMILLION, stroke: 'none' }}
-                              activeDot={{ r: 4.5, fill: VERMILLION, stroke: '#fbf7ef', strokeWidth: 2 }}
+                              activeDot={{ r: 4.5, fill: VERMILLION, stroke: '#ffffff', strokeWidth: 2 }}
                             />
                           </AreaChart>
                         </ResponsiveContainer>

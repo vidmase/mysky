@@ -27,9 +27,9 @@ export type AtlasRoute = {
   path: [number, number][]
 }
 
-// --- PAPER PALETTE (mirrors app/styles/paper.css) ---
-const PAPER = '#f2ece1'
-const INK = '#17130e'
+// --- LIGHT PALETTE (mirrors the :root theme in app/globals.css) ---
+const PAPER = '#f6f7f9'
+const INK = '#0f172a'
 
 function haloWidth(count: number): number {
   if (count >= 10) return 8
@@ -379,7 +379,7 @@ export default function RouteAtlas({
         radius: dotRadius(airport.flightCount),
         color: dark ? '#f2ece1' : INK,
         weight: 1.4,
-        fillColor: dark ? '#0b0d11' : '#e8dfcd',
+        fillColor: dark ? '#0b0d11' : '#ffffff',
         fillOpacity: 1,
       }).addTo(group)
 

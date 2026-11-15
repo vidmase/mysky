@@ -356,11 +356,11 @@ export default function ChatPage() {
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] rounded-lg">
+                  <div className="p-2 bg-[var(--vermillion)] rounded-lg">
                     <Bot className="h-6 w-6 text-[var(--paper)]" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] bg-clip-text text-transparent">
+                    <CardTitle className="text-2xl text-[var(--ink)]">
                       Flight Assistant
                     </CardTitle>
                     <p className="text-sm text-[var(--ink-2)]">
@@ -393,7 +393,7 @@ export default function ChatPage() {
                   >
                     <KeyRound className={cn(
                       'h-4 w-4',
-                      keyStatus.configured ? 'text-[var(--jade)]' : 'text-[var(--vermillion)]'
+                      keyStatus.configured ? 'text-[var(--jade)]' : 'text-[var(--vermillion-dk)]'
                     )} />
                     {keyStatus.configured ? `Key …${keyStatus.hint}` : 'Add key'}
                   </Button>
@@ -423,7 +423,7 @@ export default function ChatPage() {
                     <div className="bg-gradient-to-br from-[color-mix(in_srgb,var(--vermillion)_80%,transparent)] to-[color-mix(in_srgb,var(--brass)_80%,transparent)] rounded-full p-4 shadow-lg mb-6">
                       <Bot className="h-14 w-14 text-[var(--paper)] drop-shadow-xl" />
                     </div>
-                    <h3 className="text-3xl font-extrabold text-center bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] bg-clip-text text-transparent mb-2 tracking-tight">
+                    <h3 className="text-3xl font-extrabold text-center text-[var(--ink)] mb-2 tracking-tight">
                       Welcome to your Flight Assistant!
                     </h3>
                     <p className="text-base text-[var(--ink-2)] max-w-xl text-center mb-6">
@@ -458,7 +458,7 @@ export default function ChatPage() {
                     <Button
                       onClick={handleSendMessage}
                       disabled={isLoading || !inputMessage.trim()}
-                      className="bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] hover:from-[var(--vermillion-dk)] hover:to-[var(--brass)]"
+                      className="bg-[var(--vermillion)] hover:bg-[var(--accent-dk)] text-white"
                     >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -529,7 +529,7 @@ export default function ChatPage() {
                         <div className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                           message.role === 'user'
-                            ? "bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)]"
+                            ? "bg-[var(--vermillion)]"
                             : "bg-[var(--jade)]"
                         )}>
                           {message.role === 'user' ? (
@@ -543,7 +543,7 @@ export default function ChatPage() {
                           className={cn(
                             "rounded-xl px-4 py-3 max-w-full relative",
                             message.role === 'user'
-                              ? "bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] text-[var(--paper)]"
+                              ? "bg-[var(--vermillion)] text-white"
                               : "bg-[var(--paper-2)] text-[var(--ink)]",
                             message.pinned && 'ring-2 ring-[var(--brass)] shadow-lg',
                           )}
@@ -616,7 +616,7 @@ export default function ChatPage() {
                       <Button
                         onClick={handleSendMessage}
                         disabled={isLoading || !inputMessage.trim()}
-                        className="bg-gradient-to-r from-[var(--vermillion)] to-[var(--brass)] hover:from-[var(--vermillion-dk)] hover:to-[var(--brass)]"
+                        className="bg-[var(--vermillion)] hover:bg-[var(--accent-dk)] text-white"
                       >
                         {isLoading ? (
                           <Loader2 className="h-4 w-4 animate-spin" />

@@ -126,7 +126,7 @@
   gap: 0.7rem;
   padding: 0.75rem 1.1rem;
   background: var(--vermillion);
-  color: #fbf3e6;
+  color: #fff;
   font-family: var(--code);
   font-size: 0.5625rem;
   font-weight: 600;
@@ -138,8 +138,8 @@
 }
 
 .btnSolid:hover {
-  background: var(--vermillion-dk);
-  border-color: var(--vermillion-dk);
+  background: var(--accent-dk);
+  border-color: var(--accent-dk);
 }
 
 .btnSolid svg {
@@ -150,7 +150,7 @@
 .btnOutline:hover:not(:disabled) {
   color: var(--vermillion);
   border-color: var(--vermillion);
-  background: rgba(206, 59, 30, 0.05);
+  background: var(--wash-accent);
 }
 
 .btnOutline:disabled {
@@ -449,7 +449,7 @@
   letter-spacing: 0.02em;
   padding: 0.15rem 0.35rem;
   border: 1px solid var(--rule-strong);
-  background: #fbf7ef;
+  background: var(--paper-2);
 }
 
 .rankName {
@@ -698,7 +698,7 @@
 /* the tooltip, reprinted on paper */
 .tip {
   padding: 0.55rem 0.7rem;
-  background: #fbf7ef;
+  background: var(--paper-2);
   border: 1px solid var(--rule-strong);
   box-shadow: 3px 3px 0 rgba(23, 19, 14, 0.14);
 }
@@ -838,6 +838,6 @@
   border-radius: 2px;
   font-size: 0.5rem;
   font-weight: 700;
-  color: var(--vermillion-dk);
+  color: var(--accent-dk);
   font-variant-numeric: tabular-nums;
 }

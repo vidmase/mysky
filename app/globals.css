@@ -3,33 +3,42 @@
 @tailwind utilities;
 
 @layer base {
-  /* The app is printed on paper stock. These are the same values the
-     print-aesthetic surfaces used to opt into via `.paper-stock`; they live
-     here so every component — including the Radix dialogs and menus that
-     portal onto <body> — wears the palette by default. */
+  /* The light logbook theme (design/light-logbook): a neutral ground, white
+     surfaces, one blue accent. The variable names are the paper theme's, so
+     every page and the Radix dialogs that portal onto <body> follow without
+     renaming anything:
+       --vermillion     the accent (blue now; the name is historical)
+       --vermillion-dk  "bad": late, cancelled, worst — stays red on purpose
+       --accent-dk      the accent's pressed/hover shade */
   :root {
     /* ---- palette ---- */
-    --paper: #f2ece1;
-    --paper-2: #e8dfcd;
-    --paper-3: #ded2ba;
-    --ink: #17130e;
-    --ink-2: #5b5142;
-    --ink-3: #8c8071;
-    --vermillion: #ce3b1e;
-    --vermillion-dk: #a32c14;
+    --paper: #f6f7f9;
+    --paper-2: #ffffff;
+    --paper-3: #f1f3f6;
+    --ink: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #94a3b8;
+    --vermillion: #2563eb;
+    --vermillion-dk: #b91c1c;
+    --accent-dk: #1d4ed8;
+    --warn: #b45309;
+    --warn-soft: #fdf3e4;
     --navy: #0e2033;
     --brass: #c9942f;
     --jade: #2f6b53;
 
-    --rule: rgba(23, 19, 14, 0.16);
-    --rule-strong: rgba(23, 19, 14, 0.38);
+    --rule: #e6e9ef;
+    --rule-strong: #d5dae3;
+    --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+    --shadow-2: 0 12px 32px -12px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.05);
 
     /* Translucent washes of the accents, for chips and tinted panels. The
        accents are opaque inks, so anything that used to be a glow on the dark
        theme becomes one of these on stock. */
-    --wash-ink: rgba(23, 19, 14, 0.04);
-    --wash-accent: rgba(206, 59, 30, 0.1);
-    --wash-accent-2: rgba(206, 59, 30, 0.18);
+    --wash-ink: rgba(15, 23, 42, 0.04);
+    --wash-accent: rgba(37, 99, 235, 0.08);
+    --wash-accent-2: rgba(37, 99, 235, 0.16);
+    --wash-bad: rgba(185, 28, 28, 0.08);
     --wash-jade: rgba(47, 107, 83, 0.1);
     --wash-jade-2: rgba(47, 107, 83, 0.18);
     --wash-brass: rgba(201, 148, 47, 0.12);
@@ -38,36 +47,37 @@
     --wash-navy-2: rgba(14, 32, 51, 0.14);
 
     /* ---- type (font vars come from app/styles/paper-fonts.ts) ---- */
-    --display: var(--font-display), "Bodoni MT", Didot, "Times New Roman", serif;
+    /* headings in the body sans; the serif display face is retired */
+    --display: var(--body);
     --body: var(--font-body), "Helvetica Neue", Helvetica, Arial, sans-serif;
     --code: var(--font-code), ui-monospace, "SF Mono", Consolas, monospace;
 
     /* ---- shadcn tokens (HSL triplets) ---- */
-    --background: 39 39% 92%;
-    --foreground: 33 24% 7%;
-    --card: 39 42% 95%;
-    --card-foreground: 33 24% 7%;
-    --popover: 39 42% 95%;
-    --popover-foreground: 33 24% 7%;
-    --primary: 10 75% 46%;
-    --primary-foreground: 39 45% 96%;
-    --secondary: 40 37% 86%;
-    --secondary-foreground: 33 24% 7%;
-    --muted: 40 30% 88%;
-    --muted-foreground: 33 12% 42%;
-    --accent: 40 37% 86%;
-    --accent-foreground: 33 24% 7%;
-    --destructive: 10 75% 42%;
-    --destructive-foreground: 39 45% 96%;
-    --border: 35 18% 74%;
-    --input: 35 18% 74%;
-    --ring: 10 75% 46%;
-    --radius: 0.5rem;
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 215 19% 35%;
+    --accent: 220 20% 95%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 74% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 92%;
+    --input: 220 20% 90%;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
 
     /* Custom accents used by shared components */
     --color-airline: 39 62% 42%;
     --color-airport: 210 45% 24%;
-    --color-flight: 10 75% 46%;
+    --color-flight: 221 83% 53%;
     --color-stats: 158 39% 30%;
     --color-map: 210 45% 24%;
     --gradient-blue: linear-gradient(135deg, hsl(210, 45%, 24%), hsl(210, 45%, 32%));

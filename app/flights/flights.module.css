@@ -104,7 +104,7 @@
   gap: 0.7rem;
   padding: 0.8rem 1.3rem;
   background: var(--vermillion);
-  color: #fff5ee;
+  color: #fff;
   border: 0;
   cursor: pointer;
   text-decoration: none;
@@ -156,7 +156,7 @@
 .btnOutline:hover {
   color: var(--vermillion);
   border-color: var(--vermillion);
-  background: rgba(206, 59, 30, 0.05);
+  background: var(--wash-accent);
 }
 
 /* ============================================================
@@ -477,7 +477,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fbf7ef;
+  background: var(--paper-2);
   border: 1px solid var(--rule);
   overflow: hidden;
 }
@@ -559,8 +559,8 @@
 }
 
 .chipLate {
-  border-color: rgba(206, 59, 30, 0.4);
-  background: rgba(206, 59, 30, 0.08);
+  border-color: rgba(185, 28, 28, 0.4);
+  background: var(--wash-accent);
   color: var(--vermillion-dk);
 }
 
@@ -690,7 +690,7 @@
   letter-spacing: 0.08em;
   padding: 0.2rem 0.4rem;
   border: 1px solid var(--rule-strong);
-  background: #fbf7ef;
+  background: var(--paper-2);
   white-space: nowrap;
 }
 
@@ -737,7 +737,7 @@
 .iconBtn:hover {
   color: var(--vermillion);
   border-color: var(--vermillion);
-  background: rgba(206, 59, 30, 0.06);
+  background: var(--wash-accent);
 }
 
 .iconBtn svg {
@@ -784,7 +784,7 @@
   position: relative;
   display: grid;
   grid-template-columns: 1fr 74px;
-  background: #fbf7ef;
+  background: var(--paper-2);
   color: var(--ink);
   cursor: pointer;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset,
@@ -834,7 +834,7 @@
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #fff5ee;
+  color: #fff;
   background: var(--vermillion);
   padding: 0.2rem 0.4rem;
 }
@@ -929,7 +929,7 @@
   justify-content: space-between;
   gap: 0.6rem;
   padding: 0.95rem 0.4rem 1rem;
-  background: #f6f0e5;
+  background: var(--paper-3);
 }
 
 .notch {
@@ -1269,53 +1269,19 @@
 
 /* ============================================================
    LIGHT — the flights page in the light logbook design
-   (design/light-logbook). Everything above still describes the
-   layout; this block only re-skins it: the palette is swapped on
-   .page, so every var() above follows, and the few shapes that
-   carried the paper look (hairline ledger, underline search,
-   square table) become white rounded surfaces. Scoped to .page,
-   so the rest of the app keeps the paper stock.
+   (design/light-logbook). The palette comes from the app-wide
+   theme; this block turns the shapes that carried the paper look
+   (hairline ledger, underline search, square table) into white
+   rounded surfaces.
    ============================================================ */
 .page {
-  --paper: #f6f7f9;
-  --paper-2: #ffffff;
-  --paper-3: #f1f3f6;
-  --ink: #0f172a;
-  --ink-2: #475569;
-  --ink-3: #94a3b8;
-  --rule: #e6e9ef;
-  --rule-strong: #d5dae3;
-  /* one accent: the old vermillion's decorative uses become blue */
-  --vermillion: #2563eb;
-  --vermillion-dk: #1d4ed8;
-  --wash-accent: rgba(37, 99, 235, 0.08);
-  --wash-accent-2: rgba(37, 99, 235, 0.16);
-  --display: var(--body);
-  /* status colours keep their meaning instead of following the accent */
-  --late: #b91c1c;
-  --late-soft: #fdecec;
-  --warn: #b45309;
-  --warn-soft: #fdf3e4;
-  --lt-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
-  --lt-shadow-lift: 0 12px 32px -12px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.05);
+  /* The palette is the app-wide light theme (app/globals.css); only the
+     page's own surface values live here. */
+  --late: var(--vermillion-dk);
+  --late-soft: var(--wash-bad);
+  --lt-shadow: var(--shadow-1);
+  --lt-shadow-lift: var(--shadow-2);
   --lt-radius: 20px;
-
-  /* shadcn guests inside the page (filter panel, selects) */
-  --background: 220 20% 97%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
-  --muted: 220 20% 95%;
-  --muted-foreground: 215 19% 35%;
-  --accent: 220 20% 95%;
-  --accent-foreground: 222 47% 11%;
-  --border: 220 20% 92%;
-  --input: 220 20% 90%;
-  --ring: 221 83% 53%;
 
   background: var(--paper);
   color: var(--ink);

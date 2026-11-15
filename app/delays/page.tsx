@@ -88,10 +88,10 @@ function KPICard({ icon: Icon, label, value, subtext, color }: {
   icon: any; label: string; value: string | number; subtext?: string; color: string
 }) {
   const colorMap: Record<string, { text: string; bg: string; glow: string; iconBg: string }> = {
-    accent: { text: 'text-[var(--vermillion)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(206,59,30,0.12)', iconBg: 'bg-[var(--wash-accent-2)]' },
+    accent: { text: 'text-[var(--vermillion)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(37,99,235,0.12)', iconBg: 'bg-[var(--wash-accent-2)]' },
     good: { text: 'text-[var(--jade)]', bg: 'bg-[var(--wash-jade)]', glow: 'rgba(47,107,83,0.12)', iconBg: 'bg-[var(--wash-jade-2)]' },
     warn: { text: 'text-[var(--brass)]', bg: 'bg-[var(--wash-brass)]', glow: 'rgba(201,148,47,0.14)', iconBg: 'bg-[var(--wash-brass-2)]' },
-    bad: { text: 'text-[var(--vermillion-dk)]', bg: 'bg-[var(--wash-accent)]', glow: 'rgba(163,44,20,0.12)', iconBg: 'bg-[var(--wash-accent-2)]' },
+    bad: { text: 'text-[var(--vermillion-dk)]', bg: 'bg-[var(--wash-bad)]', glow: 'rgba(185,28,28,0.12)', iconBg: 'bg-[var(--wash-bad)]' },
     navy: { text: 'text-[var(--navy)]', bg: 'bg-[var(--wash-navy)]', glow: 'rgba(14,32,51,0.1)', iconBg: 'bg-[var(--wash-navy-2)]' },
   }
   const c = colorMap[color] || colorMap.accent
@@ -219,7 +219,7 @@ export default function DelaysDashboard() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold text-[var(--ink)] mb-4">Flight Delays</h1>
-          <div className="bg-[var(--wash-accent)] border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] rounded-xl p-6 text-[var(--vermillion-dk)]">
+          <div className="bg-[var(--wash-bad)] border border-[color-mix(in_srgb,var(--vermillion-dk)_30%,transparent)] rounded-xl p-6 text-[var(--vermillion-dk)]">
             <AlertTriangle className="w-5 h-5 mb-2" />
             <p>{error}</p>
           </div>
