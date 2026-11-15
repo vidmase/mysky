@@ -37,6 +37,42 @@ export function parseDurationHours(raw?: string | null): number | null {
   return null
 }
 
+/**
+ * The legs that were actually flown, each once. The log holds rows, and a row
+ * is not always a flight: a cancelled leg stays on file for its fare, and one
+ * flight can be filed several times over — a second receipt for bags or seats
+ * bought later, or a companion's booking on the same aircraft. Counting rows
+ * would put flights, kilometres and hours into the totals that never happened.
+ * Fares are a separate matter and are still read from every row.
+ */
+export function flownLegs<
+  T extends {
+    id: string | number
+    cancelled?: boolean | null
+    flight_number?: string | null
+    departure_date?: string | null
+    departure_iata?: string | null
+    arrival_iata?: string | null
+  }
+>(flights: T[]): T[] {
+  const seen = new Set<string>()
+  const legs: T[] = []
+  for (const f of flights) {
+    if (f.cancelled === true) continue
+    const number = (f.flight_number || '').replace(/\s+/g, '').toUpperCase()
+    const date = (f.departure_date || '').slice(0, 10)
+    // Without a flight number and a date there is nothing to tell two flights on
+    // the same route apart, so such a row always stands as its own leg.
+    const key = number && date
+      ? `${date}|${number}|${(f.departure_iata || '').toUpperCase()}|${(f.arrival_iata || '').toUpperCase()}`
+      : `row:${f.id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    legs.push(f)
+  }
+  return legs
+}
+
 export const deriveDurationHours = (distanceKm: number) => distanceKm / 840 + 0.5
 
 /* A leg's recorded duration is worked out from its dates, so a single

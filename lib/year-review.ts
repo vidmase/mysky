@@ -11,6 +11,7 @@ import { formatMoney, groupFlightsIntoBookings, type ReceiptCurrency } from '@/l
 import {
   AIRPORT_BY_IATA,
   countryForIata,
+  flownLegs,
   legHours,
 } from '@/lib/statistics/leg-metrics'
 
@@ -25,6 +26,7 @@ export type ReviewFlight = {
   arrival_date?: string | null
   airline?: string | null
   flight_number?: string | null
+  cancelled?: boolean | null
   departure_iata?: string | null
   arrival_iata?: string | null
   departure_airport?: string | null
@@ -170,7 +172,7 @@ export const todayISO = () => {
 
 export function toLegs(flights: ReviewFlight[], until = todayISO()): Leg[] {
   const legs: Leg[] = []
-  for (const f of flights) {
+  for (const f of flownLegs(flights)) {
     const date = parseDate(f.departure_date)
     // Planned flights are not part of a look back.
     if (!date || date > until) continue

@@ -23,6 +23,7 @@ import { formatMoney, groupFlightsIntoBookings, MONEY_SYMBOL, type ReceiptCurren
 import {
   AIRPORT_BY_IATA,
   countryForIata,
+  flownLegs,
   legHours,
 } from "@/lib/statistics/leg-metrics"
 import s from "./stats.module.css"
@@ -44,6 +45,7 @@ type Flight = {
   departure_time?: string | null
   arrival_time?: string | null
   arrival_date?: string | null
+  flight_number?: string | null
   reservation_number?: string | null
   total_receipt?: string | null
   extras_receipt?: string | null
@@ -202,6 +204,7 @@ export default function StatsPage() {
             arrival_country: countryForIata(arrIata, f.arrival_country),
             departure_date: f.departure_date || null,
             airline: f.airline || null,
+            flight_number: f.flight_number || null,
             departure_iata: depIata,
             arrival_iata: arrIata,
             departure_airport: f.departure_airport || depMeta?.name || null,
@@ -247,11 +250,14 @@ export default function StatsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Counts, distance and hours are of legs flown; fares are read from every row filed.
+  const legs = useMemo(() => flownLegs(flights), [flights])
+
   // Process chart data
   const chartData = useMemo(() => {
     // Airlines
     const byAirline = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       const k = f.airline || "Unknown"
       byAirline.set(k, (byAirline.get(k) || 0) + 1)
     }
@@ -277,7 +283,7 @@ export default function StatsPage() {
 
     // Years
     const byYear = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (!f.departure_date) continue
       try {
         const date = new Date(f.departure_date)
@@ -294,7 +300,7 @@ export default function StatsPage() {
 
     // Months
     const byMonth = new Map<number, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (!f.departure_date) continue
       try {
         const date = new Date(f.departure_date)
@@ -313,7 +319,7 @@ export default function StatsPage() {
 
     // Countries
     const countryCounts = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_country) countryCounts.set(f.departure_country, (countryCounts.get(f.departure_country) || 0) + 1)
       if (f.arrival_country) countryCounts.set(f.arrival_country, (countryCounts.get(f.arrival_country) || 0) + 1)
     }
@@ -324,7 +330,7 @@ export default function StatsPage() {
 
     // Top airports
     const airportCounts = new Map<string, { count: number; name: string }>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata) {
         const prev = airportCounts.get(f.departure_iata) || { count: 0, name: f.departure_airport || '' }
         airportCounts.set(f.departure_iata, { count: prev.count + 1, name: prev.name || f.departure_airport || '' })
@@ -341,7 +347,7 @@ export default function StatsPage() {
 
     // Top routes
     const routeCounts = new Map<string, number>()
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata && f.arrival_iata) {
         const key = `${f.departure_iata} → ${f.arrival_iata}`
         routeCounts.set(key, (routeCounts.get(key) || 0) + 1)
@@ -445,11 +451,11 @@ export default function StatsPage() {
       topRoutes,
       spendingStats,
     }
-  }, [flights])
+  }, [flights, legs])
 
   // Calculate stats
   const calculatedStats = useMemo(() => {
-    if (!flights.length) return null
+    if (!legs.length) return null
 
     const num = (v: unknown) => (v == null ? undefined : Number(v))
     const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -468,7 +474,7 @@ export default function StatsPage() {
     let totalKm = 0
     let totalHours = 0
 
-    for (const f of flights) {
+    for (const f of legs) {
       if (f.departure_iata) airportSet.add(f.departure_iata)
       if (f.arrival_iata) airportSet.add(f.arrival_iata)
       if (f.departure_country) countrySet.add(f.departure_country)
@@ -504,7 +510,7 @@ export default function StatsPage() {
     }
 
     // Calculate years of flying
-    const years = flights
+    const years = legs
       .map(f => {
         if (!f.departure_date) return 0
         try {
@@ -518,7 +524,7 @@ export default function StatsPage() {
     const yearsFlying = years.length ? Math.max(...years) - Math.min(...years) + 1 : 0
 
     return {
-      totalFlights: flights.length,
+      totalFlights: legs.length,
       totalAirports: airportSet.size,
       totalCountries: countrySet.size,
       totalRoutes: routeSet.size,
@@ -527,7 +533,7 @@ export default function StatsPage() {
       yearsFlying,
       earthCircumnavigations: totalKm / 40075
     }
-  }, [flights])
+  }, [flights, legs])
 
   const viewStats = stats ?? calculatedStats
 
@@ -593,7 +599,7 @@ export default function StatsPage() {
               What it all <em>adds up to</em>
             </h1>
             <p className={`${s.lede} ${s.rise}`} style={{ animationDelay: '200ms' }}>
-              {viewStats?.yearsFlying || 0} years of flying, {flights.length} legs filed.
+              {viewStats?.yearsFlying || 0} years of flying, {legs.length} legs flown.
               Distance uses great-circle airport coordinates. Hours prefer recorded
               flight duration when available, otherwise a distance-based estimate.
             </p>
