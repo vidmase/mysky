@@ -81,18 +81,21 @@ export async function saveRefreshTokenToUser(refresh_token: string, gmail_email?
   const { supabase, dbUserId, email } = await getClerkUser()
   if (!dbUserId) throw new Error('Not authenticated')
 
-  // Store Gmail refresh token in the user's profile
-  // verification: if profile doesn't exist, we must provide email to satisfy NOT NULL constraint
-  const { error } = await supabase
+  // dbUserId is resolved from an existing profile, so this is always an update.
+  // An upsert first builds a full insert row, and profiles.username is NOT NULL,
+  // so it was rejected before the conflict could turn it into an update: every
+  // Gmail connection failed with "null value in column username".
+  const { data, error } = await supabase
     .from('profiles')
-    .upsert({
-      id: dbUserId,
-      email: email, // Required if creating new row
+    .update({
       gmail_refresh_token: refresh_token,
       gmail_email: gmail_email || null,
-    }, { onConflict: 'id' })
+    })
+    .eq('id', dbUserId)
+    .select('id')
 
   if (error) throw error
+  if (!data?.length) throw new Error(`No profile row for ${email ?? dbUserId} to store the Gmail token on`)
 }
 
 export async function getUserOAuth2Client(): Promise<{ client: OAuth2Client; hasToken: boolean; email: string | null }> {
