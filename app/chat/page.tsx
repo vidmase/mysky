@@ -11,6 +11,8 @@ import { Loader2, Send, Bot, User, Plane, MapPin, Clock, BarChart3, Trash2, Pin,
 import { cn } from '@/lib/utils'
 import { DEEPSEEK_MODELS, DEFAULT_DEEPSEEK_MODEL, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { ApiKeyDialog, type KeyStatus } from './components/ApiKeyDialog'
+import { EmailScanCard } from './components/EmailScanCard'
+import type { ScanOutcome } from '@/lib/chat-email-scan'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -21,6 +23,8 @@ interface ChatMessage {
   timestamp: string
   isStreaming?: boolean
   pinned?: boolean
+  /** Flights the assistant found in email for this reply; not kept after a reload. */
+  scan?: ScanOutcome | null
 }
 
 interface UserStats {
@@ -180,7 +184,8 @@ export default function ChatPage() {
             content: data.response || data.content || data.message,
             timestamp: data.created_at || new Date().toISOString(),
             isStreaming: false,
-            pinned: false
+            pinned: false,
+            scan: data.scan ?? null
           }
         ])
       }
@@ -542,6 +547,7 @@ export default function ChatPage() {
                               <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1" />
                             )}
                           </div>
+                          {message.role === 'assistant' && message.scan && <EmailScanCard scan={message.scan} />}
                           <div className={cn(
                             "text-xs mt-2 opacity-70",
                             message.role === 'user' ? "text-[var(--paper)]" : "text-[var(--ink-3)]"

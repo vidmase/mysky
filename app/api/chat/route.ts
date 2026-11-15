@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
-import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, type DeepSeekModelId } from '@/lib/deepseek-models'
+import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, modelCanUseTools, type DeepSeekModelId } from '@/lib/deepseek-models'
+import { SCAN_EMAIL_TOOL, describeScanForModel, scanEmailForFlights, type ScanOutcome } from '@/lib/chat-email-scan'
 import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { NextResponse } from 'next/server'
 import { getUserStats } from "../../../src/lib/services/stats"
@@ -258,7 +259,9 @@ Answer only from the record above, and never invent a flight. When you are asked
 
 A flight marked CANCELLED was paid for but never flown. Leave its fare out of any spending total, the same way the rest of the app does, and mention what was paid only if the user asks about that booking.
 
-The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.`
+The messages that follow are one ongoing conversation. Read them before answering: a short follow-up like "and the return?", "what about that one?" or "why?" refers to what was already said, so resolve it from the earlier turns instead of asking the user to repeat themselves. Only ask for clarification when the earlier turns genuinely do not settle it.${modelCanUseTools(selectedModel) ? `
+
+You can also look through the user's Gmail for flights that are not in the record yet, with the scan_email_for_flights tool. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.` : ''}`
 
     // --- LOGGING for debugging ---
 
@@ -297,32 +300,36 @@ The messages that follow are one ongoing conversation. Read them before answerin
         user_stats: userStats
       })
 
-    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${deepseekApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...history,
-          { role: 'user', content: message }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
+    const useTools = modelCanUseTools(selectedModel)
+    const baseMessages: any[] = [
+      { role: 'system', content: systemPrompt },
+      ...history,
+      { role: 'user', content: message }
+    ]
+    const callDeepSeek = (messages: any[], withTools: boolean) =>
+      fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${deepseekApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages,
+          max_tokens: 1000,
+          temperature: 0.7,
+          ...(withTools ? { tools: [SCAN_EMAIL_TOOL] } : {})
+        })
       })
-    });
 
     // A non-2xx from DeepSeek used to fall through to `data.choices?.[0]` and
     // store an empty assistant message, so a rejected key looked like the
     // assistant simply had nothing to say.
-    if (!deepseekResponse.ok) {
-      const detail = await deepseekResponse.text()
-      console.error(`DeepSeek ${deepseekResponse.status} for model ${selectedModel}:`, detail)
+    const deepseekFailure = async (res: Response) => {
+      const detail = await res.text()
+      console.error(`DeepSeek ${res.status} for model ${selectedModel}:`, detail)
 
-      if (deepseekResponse.status === 401) {
+      if (res.status === 401) {
         return NextResponse.json(
           {
             error: 'DeepSeek rejected the API key. Check it from the key button above the chat.',
@@ -331,13 +338,13 @@ The messages that follow are one ongoing conversation. Read them before answerin
           { status: 401 }
         )
       }
-      if (deepseekResponse.status === 402) {
+      if (res.status === 402) {
         return NextResponse.json(
           { error: 'This DeepSeek account is out of credit.', code: 'insufficient_balance' },
           { status: 402 }
         )
       }
-      if (deepseekResponse.status === 429) {
+      if (res.status === 429) {
         return NextResponse.json({ error: getErrorMessage({ status: 429 }) }, { status: 429 })
       }
 
@@ -347,7 +354,35 @@ The messages that follow are one ongoing conversation. Read them before answerin
       )
     }
 
-    const data = await deepseekResponse.json();
+    let deepseekResponse = await callDeepSeek(baseMessages, useTools)
+    // The model list is checked against search results, not DeepSeek's own
+    // docs: if a model turns out to reject tools, answer without them rather
+    // than failing every message.
+    if (useTools && deepseekResponse.status === 400) {
+      console.error(`DeepSeek 400 for ${selectedModel} with tools; retrying without:`, await deepseekResponse.text())
+      deepseekResponse = await callDeepSeek(baseMessages, false)
+    }
+    if (!deepseekResponse.ok) return deepseekFailure(deepseekResponse)
+
+    let data = await deepseekResponse.json();
+
+    // One tool round at most: run the scan, hand the result back, and let the
+    // model write the reply from it.
+    let scan: ScanOutcome | null = null
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]
+    if (toolCall?.function?.name === 'scan_email_for_flights') {
+      let args: Record<string, unknown> = {}
+      try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { }
+      scan = await scanEmailForFlights(request, args)
+      const followUp = await callDeepSeek([
+        ...baseMessages,
+        data.choices[0].message,
+        { role: 'tool', tool_call_id: toolCall.id, content: describeScanForModel(scan) }
+      ], false)
+      if (!followUp.ok) return deepseekFailure(followUp)
+      data = await followUp.json()
+    }
+
     const responseText = data.choices?.[0]?.message?.content || '';
 
     // An empty body is not an answer; storing it would leave a blank bubble in
@@ -379,6 +414,9 @@ The messages that follow are one ongoing conversation. Read them before answerin
       response: responseText,
       stats: userStats,
       model: selectedModel,
+      // What the email scan found, for the "Add these flights" card. Only the
+      // reply text is stored, so the card is not shown again after a reload.
+      scan,
       created_at: storedAssistant?.created_at,
       timestamp: new Date().toISOString()
     })
