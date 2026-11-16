@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createSupabaseServer, resolveSupabaseUserId } from '@/lib/supabase-server'
 import { DEFAULT_DEEPSEEK_MODEL, isDeepSeekModel, modelCanUseTools, type DeepSeekModelId } from '@/lib/deepseek-models'
 import { SCAN_EMAIL_TOOL, describeScanForModel, scanEmailForFlights, type ScanOutcome } from '@/lib/chat-email-scan'
+import { FLIGHT_STATUS_TOOL, QUERY_FLIGHTS_TOOL, formatFlightLine, getFlightStatusForModel, queryFlights } from '@/lib/chat-tools'
 import { resolveDeepSeekKey } from '@/lib/deepseek'
 import { completedExchanges, containsToolMarkup, parseLeakedToolCall } from '@/lib/chat-history'
 import { NextResponse } from 'next/server'
@@ -10,6 +11,9 @@ import { getUserStats } from "../../../src/lib/services/stats"
 export const dynamic = 'force-dynamic'
 // An email scan can read a few hundred emails before the model answers.
 export const maxDuration = 60
+
+const CHAT_TOOLS = [SCAN_EMAIL_TOOL, QUERY_FLIGHTS_TOOL, FLIGHT_STATUS_TOOL]
+const MAX_TOOL_ROUNDS = 3
 
 interface UserStats {
   totalFlights: number
@@ -243,18 +247,7 @@ export async function POST(request: Request) {
     const MAX_FLIGHT_LINES = 2000
     const listedFlights = allFlights.slice(0, MAX_FLIGHT_LINES)
     const flightsText = listedFlights
-      .map((f) =>
-        `${f.departure_date || '????-??-??'} ${f.departure_iata || '???'}->${f.arrival_iata || '???'} ` +
-        `passenger ${f.passenger_name || 'unknown'}, ` +
-        `${f.departure_airport || ''} to ${f.arrival_airport || ''}, ` +
-        `${f.airline || 'unknown airline'} ${f.flight_number || ''}, ` +
-        `${f.departure_time || '??'}-${f.arrival_time || '??'}, ` +
-        `duration ${f.calculated_duration || 'unknown'}, seat ${f.seat || 'n/a'}, ` +
-        `fare ${f.total_receipt || 'n/a'}, ref ${f.reservation_number || 'n/a'}` +
-        // Without this the model sums a cancelled fare into spending, which is
-        // the opposite of what the rest of the app shows.
-        (f.cancelled ? ', CANCELLED (fare was paid but the trip did not happen)' : '')
-      )
+      .map(formatFlightLine)
       .join('\n')
 
     const trimmedNote =
@@ -294,7 +287,9 @@ Answer the user's latest message, and only that. Earlier turns are context for r
 
 Lead with the answer itself (the flight, date, fare or number asked for), then at most a short line of supporting detail. Fares can be in different currencies: compare fares only within one currency, always name the currency, and if the cheapest depends on the currency, give the cheapest in each. "The last N months" counts back from the current timestamp. Format with plain Markdown only: **bold**, short bullet lists. No tables, no headings.${modelCanUseTools(selectedModel) ? `
 
-You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations in Gmail, with the scan_email_for_flights tool, to find flights that are not in the record yet. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.` : ''}`
+You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations in Gmail, with the scan_email_for_flights tool, to find flights that are not in the record yet. Use it only when the user asks to check, scan or import flights from their email. If they give no dates, scan from the day after the newest flight in the record to one year from today. Scanning never adds anything: the user adds what you found with a button in the app, so never say a flight was added.
+
+For questions that count or list flights by passenger, airline, airport, route or dates, call query_flights and report its count; prefer it over counting the lines above. For whether a flight is on time, delayed or cancelled today or soon, call get_flight_status. You may call tools more than once, for example query_flights to find the user's next flight and then get_flight_status for it.` : ''}`
 
     // --- LOGGING for debugging ---
 
@@ -353,7 +348,7 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
           max_tokens: 4000,
           // Answers are read off the record; there is nothing to be creative about.
           temperature: 0.3,
-          ...(withTools ? { tools: [SCAN_EMAIL_TOOL] } : {})
+          ...(withTools ? { tools: CHAT_TOOLS } : {})
         })
       })
 
@@ -401,32 +396,48 @@ You can also read the user's Ryanair, Wizz Air and easyJet booking confirmations
 
     let data = await deepseekResponse.json();
 
-    // One tool round at most: run the scan, hand the result back, and let the
-    // model write the reply from it.
+    // A few tool rounds at most: each round runs every call the model made and
+    // hands the results back. The last round is sent without tools so the
+    // model has to answer. The bound matters for time too: each round is
+    // another DeepSeek call inside the 60 s function limit.
     let scan: ScanOutcome | null = null
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]
-    // Sometimes the model writes the call into its reply as DeepSeek markup
-    // instead of returning it in tool_calls. Left alone, that markup was shown
-    // as the answer and the scan never ran, so no "Add these flights" card.
-    const leaked = useTools && !toolCall ? parseLeakedToolCall(data.choices?.[0]?.message?.content || '') : null
-    if (toolCall?.function?.name === 'scan_email_for_flights') {
-      let args: Record<string, unknown> = {}
-      try { args = JSON.parse(toolCall.function.arguments || '{}') } catch { }
-      scan = await scanEmailForFlights(userId, args)
-      const followUp = await callDeepSeek([
-        ...baseMessages,
-        data.choices[0].message,
-        { role: 'tool', tool_call_id: toolCall.id, content: describeScanForModel(scan) }
-      ], false)
-      if (!followUp.ok) return deepseekFailure(followUp)
-      data = await followUp.json()
-    } else if (leaked?.name === 'scan_email_for_flights') {
-      scan = await scanEmailForFlights(userId, leaked.args)
-      // No tool_call id to answer, so the result goes back as a plain turn.
-      const followUp = await callDeepSeek([
-        ...baseMessages,
-        { role: 'user', content: `Result of scanning my email:\n${describeScanForModel(scan)}\n\nNow answer my last message using this result.` }
-      ], false)
+    const runTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
+      if (name === 'scan_email_for_flights') {
+        scan = await scanEmailForFlights(userId, args)
+        return describeScanForModel(scan)
+      }
+      if (name === 'query_flights') return queryFlights(allFlights, args)
+      if (name === 'get_flight_status') return getFlightStatusForModel(args)
+      return `There is no tool called ${name}. Answer without it.`
+    }
+    const conversation = [...baseMessages]
+    for (let round = 0; useTools && round < MAX_TOOL_ROUNDS; round++) {
+      const reply = data.choices?.[0]?.message
+      const calls: any[] = reply?.tool_calls ?? []
+      // Sometimes the model writes the call into its reply as DeepSeek markup
+      // instead of returning it in tool_calls. Left alone, that markup was
+      // shown as the answer and the tool never ran.
+      const leaked = calls.length === 0 ? parseLeakedToolCall(reply?.content || '') : null
+      if (calls.length === 0 && !leaked) break
+
+      if (calls.length > 0) {
+        conversation.push(reply)
+        for (const call of calls) {
+          let args: Record<string, unknown> = {}
+          try { args = JSON.parse(call.function?.arguments || '{}') } catch { }
+          console.log(`Chat tool: ${call.function?.name}`, args)
+          conversation.push({ role: 'tool', tool_call_id: call.id, content: await runTool(call.function?.name, args) })
+        }
+      } else {
+        console.log(`Chat tool (leaked markup): ${leaked!.name}`, leaked!.args)
+        // No tool_call id to answer, so the result goes back as a plain turn.
+        conversation.push({
+          role: 'user',
+          content: `Result of ${leaked!.name}:\n${await runTool(leaked!.name, leaked!.args)}\n\nNow answer my last message using this result.`
+        })
+      }
+
+      const followUp = await callDeepSeek(conversation, round < MAX_TOOL_ROUNDS - 1)
       if (!followUp.ok) return deepseekFailure(followUp)
       data = await followUp.json()
     }
