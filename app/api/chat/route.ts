@@ -108,6 +108,27 @@ function summariseByPeriod(flights: any[]): string {
     .join('\n')
 }
 
+// Counted in code for the same reason as summariseByPeriod: the model tallies
+// lines badly. Names are grouped case- and space-insensitively because imports
+// store the same person as 'PATRICIJA X' and 'Patricija X'.
+function summariseByPassenger(flights: any[]): string {
+  const byName = new Map<string, { label: string; flown: number; cancelled: number }>()
+  for (const f of flights) {
+    const label = String(f.passenger_name ?? '').trim().replace(/\s+/g, ' ')
+    if (!label) continue
+    const key = label.toUpperCase()
+    if (!byName.has(key)) byName.set(key, { label, flown: 0, cancelled: 0 })
+    const entry = byName.get(key)!
+    if (f.cancelled) entry.cancelled += 1
+    else entry.flown += 1
+  }
+  if (byName.size === 0) return 'No passenger names on record.'
+  return [...byName.values()]
+    .sort((a, b) => b.flown - a.flown)
+    .map((e) => `  ${e.label}: ${e.flown} flown` + (e.cancelled ? `, ${e.cancelled} cancelled` : ''))
+    .join('\n')
+}
+
 // Helper to calculate duration string from dates and times
 function calculateDurationString(depDate: string, depTime: string, arrDate: string, arrTime: string): string | null {
   if (!depDate || !depTime || !arrDate || !arrTime) return null;
@@ -214,6 +235,7 @@ export async function POST(request: Request) {
     // Counted over everything, so the totals stay exact even if the per-flight
     // list below is trimmed for a very large logbook.
     const periodSummary = summariseByPeriod(allFlights)
+    const passengerSummary = summariseByPassenger(allFlights)
 
     // One line per flight. A generous ceiling rather than none: 2000 lines is
     // roughly 150k characters, past what the model can hold. The summary above
@@ -223,6 +245,7 @@ export async function POST(request: Request) {
     const flightsText = listedFlights
       .map((f) =>
         `${f.departure_date || '????-??-??'} ${f.departure_iata || '???'}->${f.arrival_iata || '???'} ` +
+        `passenger ${f.passenger_name || 'unknown'}, ` +
         `${f.departure_airport || ''} to ${f.arrival_airport || ''}, ` +
         `${f.airline || 'unknown airline'} ${f.flight_number || ''}, ` +
         `${f.departure_time || '??'}-${f.arrival_time || '??'}, ` +
@@ -251,6 +274,9 @@ The user's complete flight record is below — ${allFlights.length} flight${allF
 
 Flights per year, counted for you (use these numbers directly; do not recount):
 ${periodSummary}
+
+Flights per passenger, counted for you (use these numbers directly; a name may be stored with or without a surname, so match the person the user means):
+${passengerSummary}
 
 Derived travel statistics:
 ${JSON.stringify(userStats, null, 2)}
